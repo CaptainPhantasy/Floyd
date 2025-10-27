@@ -1,4 +1,4 @@
-# sysc-Go
+![sysc-Go](assets/sysc-go.png)
 
 Terminal animation library for Go. Pure Go animations ready to use in your TUI applications.
 
@@ -18,6 +18,19 @@ Terminal animation library for Go. Pure Go animations ready to use in your TUI a
 ## Installation
 
 ### CLI Tool
+
+**One-line install (requires Go):**
+```bash
+curl -sSL https://raw.githubusercontent.com/Nomadcxx/sysc-Go/master/install.sh | bash
+```
+
+**Via interactive installer:**
+```bash
+# Clone and run the TUI installer
+git clone https://github.com/Nomadcxx/sysc-Go.git
+cd sysc-Go
+go run ./cmd/installer/
+```
 
 **Via AUR (Arch Linux):**
 ```bash
