@@ -695,7 +695,7 @@ func runRingText(width, height int, theme string, file string, frames int) {
 		}
 	}
 
-	// Create ring text effect configuration (TTE-like parameters)
+	// Create ring text effect configuration (TTE-like parameters with theme-sensitive gradients)
 	config := animations.RingTextConfig{
 		Width:               width,
 		Height:              height,
@@ -710,6 +710,8 @@ func runRingText(width, height int, theme string, file string, frames int) {
 		StaticFrames:        100,                       // Initial static display
 		FinalGradientStops:  finalGradientStops,
 		FinalGradientSteps:  12,
+		StaticGradientStops: ringColors,                // Use ring colors for static gradient
+		StaticGradientDir:   animations.GradientHorizontal, // Left-to-right gradient
 	}
 
 	ringText := animations.NewRingTextEffect(config)

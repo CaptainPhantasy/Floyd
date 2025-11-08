@@ -9,21 +9,33 @@ import (
 	"github.com/charmbracelet/lipgloss/v2"
 )
 
+// GradientDirection specifies the direction of gradient application
+type GradientDirection int
+
+const (
+	GradientHorizontal GradientDirection = iota // Left to right
+	GradientVertical                            // Top to bottom
+	GradientDiagonal                            // Top-left to bottom-right
+	GradientRadial                              // Center outward
+)
+
 // RingTextConfig holds the configuration for the RingText effect
 type RingTextConfig struct {
 	Width               int
 	Height              int
 	Text                string
-	RingColors          []string  // Colors for each ring
-	RingGap             float64   // Distance between rings as a percent of smallest dimension
-	SpinSpeedRange      [2]float64 // Speed range for rotation (min, max radians per frame)
-	SpinDuration        int       // Frames to spin on rings
-	DisperseDuration    int       // Frames to stay in dispersed state
-	SpinDisperseCycles  int       // Number of spin/disperse cycles before returning
-	TransitionFrames    int       // Frames for transitions between states
-	StaticFrames        int       // Frames to display static text initially
-	FinalGradientStops  []string  // Gradient for final text state
-	FinalGradientSteps  int       // Number of gradient steps
+	RingColors          []string          // Colors for each ring
+	RingGap             float64           // Distance between rings as a percent of smallest dimension
+	SpinSpeedRange      [2]float64        // Speed range for rotation (min, max radians per frame)
+	SpinDuration        int               // Frames to spin on rings
+	DisperseDuration    int               // Frames to stay in dispersed state
+	SpinDisperseCycles  int               // Number of spin/disperse cycles before returning
+	TransitionFrames    int               // Frames for transitions between states
+	StaticFrames        int               // Frames to display static text initially
+	FinalGradientStops  []string          // Gradient for final text state
+	FinalGradientSteps  int               // Number of gradient steps
+	StaticGradientStops []string          // Gradient for static ASCII presentation
+	StaticGradientDir   GradientDirection // Direction of static gradient
 }
 
 // RingTextEffect represents the multi-phase ring text animation
@@ -43,10 +55,13 @@ type RingTextEffect struct {
 	staticFrames       int
 
 	// Gradient configuration
-	finalGradientStops []string
-	finalGradientSteps int
-	finalGradient      []string
-	ringGradients      map[int][]string // 8-step gradients for each ring
+	finalGradientStops  []string
+	finalGradientSteps  int
+	finalGradient       []string
+	staticGradientStops []string
+	staticGradientDir   GradientDirection
+	staticGradient      []string          // Pre-computed static gradient
+	ringGradients       map[int][]string // 8-step gradients for each ring
 
 	// Character data
 	chars      []RingTextCharacter
@@ -122,26 +137,32 @@ func NewRingTextEffect(config RingTextConfig) *RingTextEffect {
 	if len(config.FinalGradientStops) == 0 {
 		config.FinalGradientStops = []string{"#6272a4", "#bd93f9", "#f8f8f2"}
 	}
+	if len(config.StaticGradientStops) == 0 {
+		// Default: use ring colors for static gradient
+		config.StaticGradientStops = config.RingColors
+	}
 
 	effect := &RingTextEffect{
-		width:              config.Width,
-		height:             config.Height,
-		text:               config.Text,
-		ringColors:         config.RingColors,
-		ringGap:            config.RingGap,
-		spinSpeedRange:     config.SpinSpeedRange,
-		spinDuration:       config.SpinDuration,
-		disperseDuration:   config.DisperseDuration,
-		spinDisperseCycles: config.SpinDisperseCycles,
-		transitionFrames:   config.TransitionFrames,
-		staticFrames:       config.StaticFrames,
-		finalGradientStops: config.FinalGradientStops,
-		finalGradientSteps: config.FinalGradientSteps,
-		rng:                rng,
-		phase:              "static",
-		frameCount:         0,
-		currentCycle:       0,
-		ringGradients:      make(map[int][]string),
+		width:               config.Width,
+		height:              config.Height,
+		text:                config.Text,
+		ringColors:          config.RingColors,
+		ringGap:             config.RingGap,
+		spinSpeedRange:      config.SpinSpeedRange,
+		spinDuration:        config.SpinDuration,
+		disperseDuration:    config.DisperseDuration,
+		spinDisperseCycles:  config.SpinDisperseCycles,
+		transitionFrames:    config.TransitionFrames,
+		staticFrames:        config.StaticFrames,
+		finalGradientStops:  config.FinalGradientStops,
+		finalGradientSteps:  config.FinalGradientSteps,
+		staticGradientStops: config.StaticGradientStops,
+		staticGradientDir:   config.StaticGradientDir,
+		rng:                 rng,
+		phase:               "static",
+		frameCount:          0,
+		currentCycle:        0,
+		ringGradients:       make(map[int][]string),
 	}
 
 	effect.init()
@@ -155,6 +176,9 @@ func (e *RingTextEffect) init() {
 
 	// Create gradient for final state
 	e.finalGradient = e.createGradient(e.finalGradientStops, e.finalGradientSteps)
+
+	// Create gradient for static ASCII presentation (higher resolution for smooth transitions)
+	e.staticGradient = e.createGradient(e.staticGradientStops, 100)
 
 	// Parse text and create characters
 	e.parseText()
@@ -170,6 +194,9 @@ func (e *RingTextEffect) init() {
 
 	// Generate random disperse positions for all characters
 	e.generateDispersePositions()
+
+	// Apply initial static gradient colors to all characters
+	e.applyStaticGradient()
 }
 
 // parseText converts the text into positioned characters
@@ -568,6 +595,92 @@ func (e *RingTextEffect) createGradient(stops []string, steps int) []string {
 	// Add final color
 	gradient = append(gradient, stops[len(stops)-1])
 	return gradient
+}
+
+// applyStaticGradient applies theme-sensitive gradient to static ASCII presentation
+func (e *RingTextEffect) applyStaticGradient() {
+	if len(e.chars) == 0 || len(e.staticGradient) == 0 {
+		return
+	}
+
+	// Find text bounds for gradient calculation
+	minX, maxX := e.width, 0
+	minY, maxY := e.height, 0
+
+	for i := range e.chars {
+		if e.chars[i].x < minX {
+			minX = e.chars[i].x
+		}
+		if e.chars[i].x > maxX {
+			maxX = e.chars[i].x
+		}
+		if e.chars[i].y < minY {
+			minY = e.chars[i].y
+		}
+		if e.chars[i].y > maxY {
+			maxY = e.chars[i].y
+		}
+	}
+
+	textWidth := float64(maxX - minX)
+	textHeight := float64(maxY - minY)
+	if textWidth == 0 {
+		textWidth = 1
+	}
+	if textHeight == 0 {
+		textHeight = 1
+	}
+
+	// Apply gradient based on direction
+	for i := range e.chars {
+		var gradientPos float64
+
+		switch e.staticGradientDir {
+		case GradientHorizontal:
+			// Left to right
+			gradientPos = float64(e.chars[i].x-minX) / textWidth
+
+		case GradientVertical:
+			// Top to bottom
+			gradientPos = float64(e.chars[i].y-minY) / textHeight
+
+		case GradientDiagonal:
+			// Top-left to bottom-right
+			xPos := float64(e.chars[i].x-minX) / textWidth
+			yPos := float64(e.chars[i].y-minY) / textHeight
+			gradientPos = (xPos + yPos) / 2.0
+
+		case GradientRadial:
+			// Center outward
+			dx := float64(e.chars[i].x) - e.centerX
+			dy := float64(e.chars[i].y) - e.centerY
+			maxDist := math.Sqrt(textWidth*textWidth + textHeight*textHeight) / 2.0
+			dist := math.Sqrt(dx*dx + dy*dy)
+			gradientPos = math.Min(dist/maxDist, 1.0)
+
+		default:
+			gradientPos = 0
+		}
+
+		// Clamp to [0, 1]
+		if gradientPos < 0 {
+			gradientPos = 0
+		}
+		if gradientPos > 1 {
+			gradientPos = 1
+		}
+
+		// Map to gradient index
+		gradientIndex := int(gradientPos * float64(len(e.staticGradient)-1))
+		if gradientIndex >= len(e.staticGradient) {
+			gradientIndex = len(e.staticGradient) - 1
+		}
+		if gradientIndex < 0 {
+			gradientIndex = 0
+		}
+
+		e.chars[i].currentColor = e.staticGradient[gradientIndex]
+	}
 }
 
 // easeInOutCubic applies an ease-in-out cubic easing function
