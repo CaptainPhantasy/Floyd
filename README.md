@@ -1,142 +1,144 @@
+<p align="center">
+  <img src="https://maas-log-prod.cn-wlcb.ufileos.com/anthropic/6500cb76-82ce-49aa-b942-d515a541f5ca/FLOYD_CLI.png?UCloudPublicKey=TOKEN_e15ba47a-d098-4fbd-9afc-a0dcf0e4e621&Expires=1768647857&Signature=CGy21zYEZ7px0+zaEyZ54iiJRyU=" alt="FLOYD CLI" width="600"/>
+</p>
+
 # FLOYD CLI
 
 **File-Logged Orchestrator Yielding Deliverables**
 
-A GLM-4.7 powered coding agent designed to compete with Claude Code - at a fraction of the cost.
+> *Because paying $20/month for an AI coding assistant is for people who hate money.*
+
+FLOYD is a GLM-4.7 powered coding agent that does everything that *other* AI coding assistants do — except it runs in your terminal and costs approximately 1/100th the price. We would name the competition, but our lawyers advised against it.
 
 ## What is FLOYD?
 
-FLOYD is an AI coding assistant that:
-- Reads and writes code
-- Runs commands and tools
-- Remembers context across sessions (FLOYD-S SUPERCACHE)
-- Follows the FLOYD AGENT protocol for structured development
-- Uses your GLM Mac Code unlimited plan instead of monthly subscriptions
+FLOYD is your personal coding accomplice that:
+- Reads and writes code (sometimes even correct code!)
+- Runs commands and tools (destructively, if you're not careful)
+- Remembers context across sessions via FLOYD-S SUPERCACHE™
+- Uses your existing GLM API key instead of demanding a kidney
+- Looks absolutely stunning in your terminal
 
 ## Installation
 
 ```bash
-# Build from source
-go build -o floyd ./cmd/floyd
-go build -o pink-floyd ./cmd/pink-floyd
+# Clone the repo
+git clone https://github.com/CaptainPhantasy/Floyd-CLI.git
+cd Floyd-CLI/INK/floyd-cli
 
-# Install globally
-sudo cp floyd /usr/local/bin/floyd
-sudo cp pink-floyd /usr/local/bin/pink-floyd
+# Install dependencies
+npm install
+
+# Build
+npm run build
+
+# Run
+npm start
 ```
 
 ## Configuration
 
-FLOYD reads your API key from:
-1. `ANTHROPIC_AUTH_TOKEN` environment variable
-2. `GLM_API_KEY` environment variable
-3. `ZHIPU_API_KEY` environment variable
-4. `~/.claude/settings.json`
+FLOYD needs an API key to function. It checks:
+1. `GLM_API_KEY` environment variable
+2. `ZHIPU_API_KEY` environment variable
+3. Its own internal sense of entitlement (not recommended)
 
-## Reliability Configuration
-
-The following internal settings are configured for stability:
-- **UI Watchdog:** 120s timeout (waits for agent thinking)
-- **Tool Execution:** 5m timeout (allows long builds/tests)
-- **Streaming:** No HTTP timeout (prevents disconnects during long generations)
+No API key? FLOYD will sit there and judge you silently.
 
 ## Usage
 
 ```bash
-# Start FLOYD (TUI mode)
-floyd
+# Start FLOYD
+cd INK/floyd-cli
+npm start
 
-# Start pink-floyd (TUI mode)
-pink-floyd
-
-# Workspace commands (init .floyd/ directory)
-floyd  # then type /init
+# FLOYD will greet you with a stunning ASCII banner
+# Then you type things and FLOYD types back
+# It's conversational! Revolutionary!
 ```
 
 ## Commands
 
 | Command | Description |
 |---------|-------------|
-| `/help` | Show help |
-| `/init` | Initialize .floyd/ workspace |
-| `/status` | Show workspace status |
-| `/tools` | List available tools |
-| `/clear` | Clear chat history |
-| `/theme <name>` | Change theme |
-| `/exit` | Quit |
+| Type anything | FLOYD will attempt to help |
+| Esc | Escape the existential dread |
+| ? | Toggle help (when you're hopelessly lost) |
 
-## FLOYD-S SUPERCACHE
+## FLOYD-S SUPERCACHE™
 
-FLOYD uses a 3-tier caching system:
+FLOYD remembers stuff. Three tiers of memory:
 
 | Tier | Purpose | TTL |
 |------|---------|-----|
-| `reasoning` | Current conversation context | 5 min |
-| `project` | Project-specific context | 24 hours |
-| `vault` | Reusable solutions | 7 days |
+| `reasoning` | Current conversation | 5 min |
+| `project` | Project context | 24 hours |
+| `vault` | Reusable wisdom | 7 days |
+
+*Patent pending. Probably.*
 
 ## Available Tools
 
-- `bash` - Run shell commands
-- `read` - Read files
-- `write` - Write files
-- `edit` - Edit files (find/replace)
-- `multiedit` - Multiple edits at once
-- `grep` - Search files
-- `ls` - List directories
-- `glob` - Find files by pattern
-- `cache` - Manage SUPERCACHE tiers
+FLOYD can do things to your files:
+- `bash` - Execute arbitrary commands (what could go wrong?)
+- `read` - Read files (spying on your code)
+- `write` - Write files (creating new problems)
+- `edit` - Edit files (surgical strikes on bugs)
+- `multiedit` - Multiple edits (chaos at scale)
+- `grep` - Search (find what you're looking for)
+- `ls` - List directories (see what's there)
 
 ## Project Structure
 
 ```
-├── agent/           # Core agent logic
-├── cache/           # 3-tier cache backend
-├── cmd/             # Entry points
-│   ├── floyd/       # Main CLI/TUI
-│   └── pink-floyd/  # TUI variant
-├── tui/             # TUI components
-└── ui/floyd/        # Shared UI package
+INK/floyd-cli/
+├── src/agent/       # The brain
+├── src/mcp/         # Tool integration
+├── src/store/       # Session persistence
+├── src/theme/       # Make it pretty
+├── src/ui/          # Ink components
+└── source/app.tsx   # Main entry point
 ```
 
 ## Status
 
-- ✅ Supercache protocol installed
-- ✅ 3-tier cache backend implemented
-- ✅ Tools registered and working
-- ✅ TUI mode working (fixed 2026-01-12)
-- ✅ Agent responds to user input
-- ⏳ Simple CLI mode in progress
+- ✅ Agent core implemented
+- ✅ MCP client working
+- ✅ Session persistence
+- ✅ Chrome extension bridge
+- ✅ ASCII banner looks fly
+- ⏳ World domination (in progress)
 
 ## Quick Test
 
-Verify the agent is working:
-
 ```bash
-# Build and test
-go build -o floyd ./cmd/floyd
-go run ./cmd/test_agent/main.go
+cd INK/floyd-cli
+npm install
+npm run build
+npm start
 
-# Expected output:
-# ✓ Client created
-# ✓ Stream started
-# Response: Hello! I am FLOYD.
-# ✓ Done! Received X tokens
+# Expected: A stunning terminal interface appears
+# Unexpected: Nothing, because you forgot to set GLM_API_KEY
 ```
 
 ## Troubleshooting
 
-If the agent doesn't respond:
-1. Check API key: `echo $ANTHROPIC_AUTH_TOKEN` or `echo $GLM_API_KEY`
-2. Run test: `go run ./cmd/test_agent/main.go`
-3. See `docs/agents.md` for detailed troubleshooting
+**Q: FLOYD isn't responding**
+A: Did you set `GLM_API_KEY`? FLOYD can't read minds.
+
+**Q: The build failed**
+A: Did you run `npm install`? Did you update Node.js since 2019?
+
+**Q: Why isn't this as good as [REDACTED]?**
+A: It costs 1/100th the price. You get what you pay for. But hey, it's open source!
 
 ## License
 
-MIT
+MIT - do whatever you want. Fork it, improve it, sell it, set it on fire.
 
 ## Acknowledgments
 
-- Forked from [sysc-Go](https://github.com/Nomadcxx/sysc-Go)
-- Inspired by [Claude Code](https://claude.ai/claude-code)
-- Uses [Bubble Tea](https://github.com/charmbracelet/bubbletea) for TUI
+- Built with [Ink](https://github.com/vadimdemedes/ink) (React for CLIs, mind = blown)
+- Powered by [GLM-4.7](https://open.bigmodel.cn/) (the unsung hero)
+- Inspired by *certain* AI coding tools that shall remain nameless
+- ASCII art generated with questionable taste
