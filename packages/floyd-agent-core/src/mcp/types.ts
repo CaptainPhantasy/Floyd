@@ -71,8 +71,18 @@ export type MCPSSEConfig = {
 
 export type MCPServerConfig = {
   name: string;
+  /** Module path for built-in servers (CLI-specific) */
+  modulePath?: string;
+  /** Command for stdio external servers */
+  command?: string;
+  /** Arguments for stdio command */
+  args?: string[];
+  /** Server description */
+  description?: string;
+  /** Whether server is enabled */
   enabled?: boolean;
-  transport: MCPStdioConfig | MCPWebSocketConfig | MCPSSEConfig;
+  /** Transport configuration for external MCP servers */
+  transport?: MCPStdioConfig | MCPWebSocketConfig | MCPSSEConfig;
 };
 
 export type MCPConfigFile = {

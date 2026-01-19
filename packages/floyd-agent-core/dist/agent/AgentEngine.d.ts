@@ -1,7 +1,9 @@
 import type { MCPClientManager } from '../mcp/client-manager.js';
 import type { ISessionManager, IPermissionManager, IConfig, SessionData } from './interfaces.js';
 import type { Message, ToolCall } from './types.js';
-export type { Message, ToolCall, StreamChunk, AgentEvent } from './types.js';
+import { type Provider } from '../constants.js';
+export type { Message, ToolCall, AgentEvent } from './types.js';
+export type { StreamChunk } from '../llm/types.js';
 export type { ISessionManager, IPermissionManager, IConfig, SessionData } from './interfaces.js';
 export interface AgentEngineOptions {
     apiKey: string;
@@ -13,6 +15,7 @@ export interface AgentEngineOptions {
     temperature?: number;
     enableThinkingMode?: boolean;
     outputFormat?: 'ansi' | 'plain' | 'markdown';
+    provider?: Provider;
 }
 export interface AgentCallbacks {
     onChunk?: (chunk: string) => void;
@@ -29,9 +32,15 @@ export interface AgentCallbacks {
  * - Desktop applications (Electron)
  * - Web applications
  * - Testing environments
+ *
+ * Now uses unified LLMClient abstraction to support multiple providers:
+ * - GLM (api.z.ai) - OpenAI-compatible format
+ * - OpenAI (api.openai.com) - OpenAI format
+ * - Anthropic (api.anthropic.com) - Anthropic format
+ * - DeepSeek (api.deepseek.com) - OpenAI-compatible format
  */
 export declare class AgentEngine {
-    private anthropic;
+    private llmClient;
     private mcpManager;
     private sessionManager;
     private permissionManager;
@@ -44,6 +53,8 @@ export declare class AgentEngine {
     private temperature;
     private enableThinkingMode;
     private outputFormat;
+    private provider;
+    private baseURL;
     constructor(options: AgentEngineOptions, mcpManager: MCPClientManager, sessionManager: ISessionManager, permissionManager: IPermissionManager, config: IConfig);
     /**
      * Initialize a new session or load an existing one
@@ -74,6 +85,10 @@ export declare class AgentEngine {
      */
     deleteSession(sessionId: string): Promise<void>;
     /**
+     * Convert internal history to LLM messages format
+     */
+    private convertHistoryToLLMMessages;
+    /**
      * Send a message and get a streaming response
      *
      * This is the main method for interacting with the agent.
@@ -100,5 +115,17 @@ export declare class AgentEngine {
      * Reset to a fresh state
      */
     reset(): Promise<void>;
+    /**
+     * Get the current model name
+     */
+    getModel(): string;
+    /**
+     * Get the current base URL
+     */
+    getBaseURL(): string;
+    /**
+     * Get the current provider
+     */
+    getProvider(): Provider;
 }
 //# sourceMappingURL=AgentEngine.d.ts.map

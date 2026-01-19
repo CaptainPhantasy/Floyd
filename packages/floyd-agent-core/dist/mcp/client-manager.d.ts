@@ -1,3 +1,4 @@
+import { EventEmitter } from 'events';
 import type { MCPTool, MCPResource, MCPCallResult, MCPServerConfig, MCPConfigFile } from './types.js';
 export interface MCPClientConfig {
     name: string;
@@ -10,6 +11,27 @@ export interface StdioServerConfig {
     env?: Record<string, string>;
 }
 /**
+ * Server status tracking (Bug #29 fix)
+ */
+export interface ServerStatus {
+    name: string;
+    status: 'connected' | 'disconnected' | 'connecting' | 'error';
+    lastConnected?: number;
+    lastError?: string;
+    toolCount: number;
+    reconnectAttempts: number;
+}
+/**
+ * MCP Manager Events
+ */
+export interface MCPManagerEvents {
+    'server:connected': (name: string, toolCount: number) => void;
+    'server:disconnected': (name: string, reason: string) => void;
+    'server:error': (name: string, error: Error) => void;
+    'server:reconnecting': (name: string, attempt: number) => void;
+    'tools:changed': () => void;
+}
+/**
  * MCPClientManager manages multiple MCP client connections
  *
  * Responsibilities:
@@ -17,11 +39,29 @@ export interface StdioServerConfig {
  * - Connecting to local MCP servers via stdio
  * - Aggregating tools from all connected clients
  * - Routing tool calls to the appropriate client
+ * - Tracking server status (Bug #29 fix)
+ * - Automatic reconnection (Bug #30 fix)
  */
-export declare class MCPClientManager {
+export declare class MCPClientManager extends EventEmitter {
     private clients;
     private wss;
     private toolToClientMap;
+    private serverStatus;
+    private serverConfigs;
+    private maxReconnectAttempts;
+    private reconnectDelay;
+    private reconnectTimers;
+    private serverProcesses;
+    private builtinServers;
+    constructor(builtinServers?: Record<string, MCPServerConfig>);
+    /**
+     * Register a custom MCP server configuration
+     */
+    registerServer(config: MCPServerConfig): void;
+    /**
+     * Unregister a server configuration
+     */
+    unregisterServer(name: string): void;
     /**
      * Start a WebSocket server for external MCP clients
      *
@@ -31,6 +71,26 @@ export declare class MCPClientManager {
      * @param port - Port to listen on (default: 3000)
      */
     startServer(port?: number): Promise<void>;
+    /**
+     * Bug #22: Handle disconnect with proper cleanup and event emission
+     */
+    private handleDisconnect;
+    /**
+     * Bug #30: Attempt to reconnect to a server
+     */
+    private attemptReconnect;
+    /**
+     * Bug #29: Get the status of all servers
+     */
+    getServerStatuses(): ServerStatus[];
+    /**
+     * Bug #29: Get status of a specific server
+     */
+    getServerStatus(name: string): ServerStatus | null;
+    /**
+     * Get tool count for a specific client
+     */
+    private getToolCountForClient;
     /**
      * Stop the WebSocket server
      */
@@ -125,5 +185,34 @@ export declare class MCPClientManager {
             error: string;
         }>;
     }>;
+    /**
+     * Start a built-in MCP server as a subprocess
+     */
+    startBuiltinServer(serverName: string): Promise<boolean>;
+    /**
+     * Stop a running built-in server
+     */
+    stopBuiltinServer(serverName: string): Promise<boolean>;
+    /**
+     * Start all enabled built-in servers
+     */
+    startBuiltinServers(): Promise<void>;
+    /**
+     * Stop all running built-in servers
+     */
+    stopAllBuiltinServers(): Promise<void>;
+    /**
+     * Get list of registered servers with their status
+     */
+    getServers(): Array<{
+        name: string;
+        description?: string;
+        enabled: boolean;
+        running: boolean;
+    }>;
+    /**
+     * Cleanup when shutting down
+     */
+    shutdown(): Promise<void>;
 }
 //# sourceMappingURL=client-manager.d.ts.map

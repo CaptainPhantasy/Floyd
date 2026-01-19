@@ -11,6 +11,7 @@ import { WebSocketConnectionTransport } from './websocket-transport.js';
 import type { MCPTool, MCPResource, MCPCallResult, MCPServerConfig, MCPStdioConfig, MCPWebSocketConfig, MCPConfigFile } from './types.js';
 import { readFileSync, existsSync } from 'fs';
 import { join } from 'path';
+import execa from 'execa';
 
 export interface MCPClientConfig {
   name: string;
@@ -72,8 +73,35 @@ export class MCPClientManager extends EventEmitter {
   private reconnectDelay = 1000; // Start with 1 second
   private reconnectTimers: Map<string, NodeJS.Timeout> = new Map();
 
-  constructor() {
+  // Built-in server management (CLI feature)
+  private serverProcesses: Map<string, ReturnType<typeof execa>> = new Map();
+  private builtinServers: Record<string, MCPServerConfig> = {};
+
+  constructor(builtinServers: Record<string, MCPServerConfig> = {}) {
     super();
+    // Register built-in servers
+    this.builtinServers = builtinServers;
+    for (const [key, config] of Object.entries(builtinServers)) {
+      this.serverConfigs.set(config.name, config);
+    }
+  }
+
+  /**
+   * Register a custom MCP server configuration
+   */
+  registerServer(config: MCPServerConfig): void {
+    this.serverConfigs.set(config.name, config);
+    if (config.modulePath) {
+      this.builtinServers[config.name] = config;
+    }
+  }
+
+  /**
+   * Unregister a server configuration
+   */
+  unregisterServer(name: string): void {
+    this.serverConfigs.delete(name);
+    delete this.builtinServers[name];
   }
 
   /**
@@ -353,9 +381,13 @@ export class MCPClientManager extends EventEmitter {
       reconnectAttempts: this.serverStatus.get(name)?.reconnectAttempts || 0,
     });
 
-    switch (transport.type) {
+    if (!config.transport) {
+      throw new Error(`Server ${name} has no transport configured`);
+    }
+
+    switch (config.transport.type) {
       case 'stdio': {
-        const stdioConfig = transport as MCPStdioConfig;
+        const stdioConfig = config.transport as MCPStdioConfig;
         await this.connectStdio(
           name,
           stdioConfig.command,
@@ -369,13 +401,13 @@ export class MCPClientManager extends EventEmitter {
       case 'websocket': {
         // WebSocket client connection (different from hosting a server)
         // This connects TO a WebSocket MCP server
-        const wsConfig = transport as MCPWebSocketConfig;
+        const wsConfig = config.transport as MCPWebSocketConfig;
         await this.connectWebSocket(name, wsConfig.url, wsConfig.headers);
         break;
       }
 
       default:
-        throw new Error(`Unsupported transport type: ${(transport as any).type}`);
+        throw new Error(`Unsupported transport type: ${(config.transport as any).type}`);
     }
     
     // Update status on success
@@ -607,5 +639,112 @@ export class MCPClientManager extends EventEmitter {
   }> {
     const config = this.loadMCPConfig(projectRoot);
     return this.connectFromConfig(config.servers);
+  }
+
+  // ==========================================================================
+  // BUILT-IN SERVER MANAGEMENT (CLI feature)
+  // ==========================================================================
+
+  /**
+   * Start a built-in MCP server as a subprocess
+   */
+  async startBuiltinServer(serverName: string): Promise<boolean> {
+    const config = this.builtinServers[serverName];
+    if (!config || !config.enabled) {
+      console.warn(`Server ${serverName} not found or disabled`);
+      return false;
+    }
+
+    if (this.serverProcesses.has(serverName)) {
+      console.log(`Server ${serverName} already running`);
+      return true;
+    }
+
+    try {
+      const args = config.modulePath ? [config.modulePath] : config.args || [];
+
+      // Connect to the server via stdio using tsx
+      await this.connectStdio(`builtin-${serverName}`, 'npx', ['tsx', ...args]);
+
+      console.log(`Started built-in MCP server: ${serverName}`);
+      return true;
+    } catch (error) {
+      console.error(`Failed to start server ${serverName}:`, error);
+      return false;
+    }
+  }
+
+  /**
+   * Stop a running built-in server
+   */
+  async stopBuiltinServer(serverName: string): Promise<boolean> {
+    const process = this.serverProcesses.get(serverName);
+    if (!process) {
+      return false;
+    }
+
+    try {
+      process.kill();
+      this.serverProcesses.delete(serverName);
+      this.clients.delete(`builtin-${serverName}`);
+      console.log(`Stopped built-in server: ${serverName}`);
+      return true;
+    } catch (error) {
+      console.error(`Failed to stop server ${serverName}:`, error);
+      return false;
+    }
+  }
+
+  /**
+   * Start all enabled built-in servers
+   */
+  async startBuiltinServers(): Promise<void> {
+    for (const [name, config] of Object.entries(this.builtinServers)) {
+      if (config.enabled && config.modulePath) {
+        await this.startBuiltinServer(name);
+      }
+    }
+  }
+
+  /**
+   * Stop all running built-in servers
+   */
+  async stopAllBuiltinServers(): Promise<void> {
+    const serverNames = Array.from(this.serverProcesses.keys());
+    for (const name of serverNames) {
+      await this.stopBuiltinServer(name);
+    }
+  }
+
+  /**
+   * Get list of registered servers with their status
+   */
+  getServers(): Array<{
+    name: string;
+    description?: string;
+    enabled: boolean;
+    running: boolean;
+  }> {
+    return Array.from(this.serverConfigs.values()).map(config => ({
+      name: config.name,
+      description: config.description,
+      enabled: config.enabled ?? false,
+      running: this.serverProcesses.has(config.name) || this.clients.has(config.name),
+    }));
+  }
+
+  /**
+   * Cleanup when shutting down
+   */
+  async shutdown(): Promise<void> {
+    await this.stopAllBuiltinServers();
+
+    if (this.wss) {
+      this.wss.close();
+      this.wss = null;
+    }
+
+    this.clients.clear();
+    this.toolToClientMap.clear();
   }
 }

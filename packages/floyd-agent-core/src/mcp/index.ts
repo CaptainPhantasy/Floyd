@@ -20,4 +20,9 @@ export type {
   MCPServerConfig,
   MCPConfigFile,
 } from './types.js';
-export type { MCPClientConfig, ServerStatus, MCPManagerEvents } from './client-manager.js';
+export type { 
+  MCPClientConfig, 
+  StdioServerConfig,
+  ServerStatus, 
+  MCPManagerEvents 
+} from './client-manager.js';

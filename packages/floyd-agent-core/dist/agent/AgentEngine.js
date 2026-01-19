@@ -1,6 +1,7 @@
 // Agent Engine - Core AI agent orchestrator
 // This is the shared agent core used by CLI, Desktop, and potentially other UIs
-import Anthropic from '@anthropic-ai/sdk';
+import { createLLMClient } from '../llm/index.js';
+import { PROVIDER_DEFAULTS, inferProviderFromEndpoint } from '../constants.js';
 /**
  * AgentEngine - The core AI agent that manages conversations, tools, and streaming
  *
@@ -9,9 +10,15 @@ import Anthropic from '@anthropic-ai/sdk';
  * - Desktop applications (Electron)
  * - Web applications
  * - Testing environments
+ *
+ * Now uses unified LLMClient abstraction to support multiple providers:
+ * - GLM (api.z.ai) - OpenAI-compatible format
+ * - OpenAI (api.openai.com) - OpenAI format
+ * - Anthropic (api.anthropic.com) - Anthropic format
+ * - DeepSeek (api.deepseek.com) - OpenAI-compatible format
  */
 export class AgentEngine {
-    anthropic;
+    llmClient;
     mcpManager;
     sessionManager;
     permissionManager;
@@ -25,22 +32,33 @@ export class AgentEngine {
     temperature;
     enableThinkingMode;
     outputFormat;
+    provider;
+    baseURL;
     constructor(options, mcpManager, sessionManager, permissionManager, config) {
         this.mcpManager = mcpManager;
         this.sessionManager = sessionManager;
         this.permissionManager = permissionManager;
         this.config = config;
-        // Set options with defaults
-        this.model = options.model ?? 'glm-4.7';
+        // Determine provider from options or endpoint
+        this.provider = options.provider ?? inferProviderFromEndpoint(options.baseURL ?? '');
+        const defaults = PROVIDER_DEFAULTS[this.provider];
+        // Set options with defaults from provider
+        this.baseURL = options.baseURL ?? defaults.endpoint;
+        this.model = options.model ?? defaults.model;
         this.maxTokens = options.maxTokens ?? 8192;
         this.maxTurns = options.maxTurns ?? 10;
         this.temperature = options.temperature ?? 0.2;
         this.enableThinkingMode = options.enableThinkingMode ?? true;
         this.outputFormat = options.outputFormat ?? 'plain';
-        // Initialize Anthropic client with Zai GLM-4.7 API
-        this.anthropic = new Anthropic({
+        // Create LLM client using factory
+        this.llmClient = createLLMClient({
             apiKey: options.apiKey,
-            baseURL: options.baseURL ?? 'https://api.z.ai/api/paas/v4/chat/completions',
+            baseURL: this.baseURL,
+            model: this.model,
+            maxTokens: this.maxTokens,
+            temperature: this.temperature,
+            defaultHeaders: options.defaultHeaders,
+            provider: this.provider,
         });
     }
     /**
@@ -109,6 +127,38 @@ export class AgentEngine {
         }
     }
     /**
+     * Convert internal history to LLM messages format
+     */
+    convertHistoryToLLMMessages() {
+        return this.history.map((msg) => {
+            // Handle complex content (tool_use, tool_result)
+            let content;
+            if (typeof msg.content === 'string') {
+                content = msg.content;
+            }
+            else if (Array.isArray(msg.content)) {
+                // Extract text from content blocks
+                content = msg.content
+                    .filter((block) => block.type === 'text' || block.type === 'tool_result')
+                    .map((block) => {
+                    if (block.type === 'text')
+                        return block.text;
+                    if (block.type === 'tool_result')
+                        return `[Tool Result for ${block.tool_use_id}]: ${block.content}`;
+                    return '';
+                })
+                    .join('\n');
+            }
+            else {
+                content = String(msg.content);
+            }
+            return {
+                role: msg.role,
+                content,
+            };
+        });
+    }
+    /**
      * Send a message and get a streaming response
      *
      * This is the main method for interacting with the agent.
@@ -127,72 +177,63 @@ export class AgentEngine {
         while (!currentTurnDone && turns < this.maxTurns) {
             turns++;
             // Get available tools from MCP
-            const tools = await this.mcpManager.listTools();
-            // Transform MCP tools to Anthropic format
-            const anthropicTools = tools.map(tool => ({
+            const mcpTools = await this.mcpManager.listTools();
+            // Transform MCP tools to LLM format
+            const tools = mcpTools.map(tool => ({
                 name: tool.name,
                 description: tool.description || '',
-                input_schema: {
+                inputSchema: {
                     type: 'object',
                     ...tool.inputSchema,
                 },
             }));
-            // Separate system prompt from history for Anthropic API
-            const systemMessage = this.history.find(m => m.role === 'system');
-            const conversationHistory = this.history.filter(m => m.role !== 'system');
-            // Create the streaming request
-            const stream = await this.anthropic.messages.create({
-                model: this.model,
-                messages: conversationHistory,
-                system: systemMessage?.content || this.config.systemPrompt,
-                tools: anthropicTools.length > 0 ? anthropicTools : undefined,
-                stream: true,
-                max_tokens: this.maxTokens,
-                temperature: this.temperature,
-            });
+            // Convert history to LLM messages
+            const messages = this.convertHistoryToLLMMessages();
             let assistantContent = '';
             let toolCalls = [];
-            let currentBlock = null;
-            // Process streaming chunks
-            for await (const chunk of stream) {
-                if (chunk.type === 'content_block_start') {
-                    if (chunk.content_block?.type === 'tool_use') {
-                        currentBlock = {
-                            id: chunk.content_block.id,
-                            name: chunk.content_block.name,
-                            input: '',
+            let currentToolId = null;
+            // Stream from LLM client
+            try {
+                for await (const chunk of this.llmClient.chat(messages, tools)) {
+                    // Handle text tokens
+                    if (chunk.token) {
+                        assistantContent += chunk.token;
+                        yield chunk.token;
+                        callbacks?.onChunk?.(chunk.token);
+                    }
+                    // Handle tool call start
+                    if (chunk.tool_call && !chunk.tool_use_complete) {
+                        currentToolId = chunk.tool_call.id;
+                        // Tool call will be finalized when tool_use_complete is true
+                    }
+                    // Handle tool call complete
+                    if (chunk.tool_call && chunk.tool_use_complete) {
+                        const toolCall = {
+                            id: chunk.tool_call.id,
+                            name: chunk.tool_call.name,
+                            input: chunk.tool_call.input,
+                            status: 'pending',
                         };
+                        toolCalls.push(toolCall);
+                    }
+                    // Handle errors
+                    if (chunk.error) {
+                        const error = new Error(chunk.error);
+                        callbacks?.onError?.(error);
+                        yield `\n[Error: ${chunk.error}]\n`;
+                    }
+                    // Handle completion
+                    if (chunk.done) {
+                        // Finalize this turn
                     }
                 }
-                if (chunk.type === 'content_block_delta') {
-                    if (chunk.delta?.type === 'text_delta') {
-                        assistantContent += chunk.delta.text;
-                        yield chunk.delta.text;
-                        callbacks?.onChunk?.(chunk.delta.text);
-                    }
-                    else if (chunk.delta?.type === 'input_json_delta' && currentBlock) {
-                        currentBlock.input += chunk.delta.partial_json;
-                    }
-                }
-                if (chunk.type === 'content_block_stop' && currentBlock?.name) {
-                    // Safely parse tool input - handle malformed JSON gracefully (Bug #63)
-                    let parsedInput = {};
-                    try {
-                        parsedInput = JSON.parse(currentBlock.input || '{}');
-                    }
-                    catch (parseError) {
-                        console.warn('[AgentEngine] Malformed JSON in tool input:', parseError);
-                        parsedInput = { _parseError: true, _raw: currentBlock.input };
-                    }
-                    const toolCall = {
-                        id: currentBlock.id,
-                        name: currentBlock.name,
-                        input: parsedInput,
-                        status: 'pending',
-                    };
-                    toolCalls.push(toolCall);
-                    currentBlock = null;
-                }
+            }
+            catch (error) {
+                const errorMessage = error?.message || String(error);
+                callbacks?.onError?.(error instanceof Error ? error : new Error(errorMessage));
+                yield `\n[Error: ${errorMessage}]\n`;
+                currentTurnDone = true;
+                continue;
             }
             // Build assistant message
             const assistantMessage = {
@@ -200,7 +241,7 @@ export class AgentEngine {
                 content: assistantContent,
             };
             if (toolCalls.length > 0) {
-                // Build content array with tool_use blocks
+                // Store tool calls in message for history
                 assistantMessage.content = [
                     { type: 'text', text: assistantContent },
                     ...toolCalls.map(tc => ({
@@ -319,6 +360,24 @@ export class AgentEngine {
     async reset() {
         this.history = [];
         this.currentSession = null;
+    }
+    /**
+     * Get the current model name
+     */
+    getModel() {
+        return this.model;
+    }
+    /**
+     * Get the current base URL
+     */
+    getBaseURL() {
+        return this.baseURL;
+    }
+    /**
+     * Get the current provider
+     */
+    getProvider() {
+        return this.provider;
     }
 }
 //# sourceMappingURL=AgentEngine.js.map

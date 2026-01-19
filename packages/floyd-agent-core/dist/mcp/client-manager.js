@@ -4,6 +4,7 @@
 import { Client } from '@modelcontextprotocol/sdk/client/index.js';
 import { StdioClientTransport } from '@modelcontextprotocol/sdk/client/stdio.js';
 import { WebSocketServer } from 'ws';
+import { EventEmitter } from 'events';
 import { WebSocketConnectionTransport } from './websocket-transport.js';
 import { readFileSync, existsSync } from 'fs';
 import { join } from 'path';
@@ -15,11 +16,47 @@ import { join } from 'path';
  * - Connecting to local MCP servers via stdio
  * - Aggregating tools from all connected clients
  * - Routing tool calls to the appropriate client
+ * - Tracking server status (Bug #29 fix)
+ * - Automatic reconnection (Bug #30 fix)
  */
-export class MCPClientManager {
+export class MCPClientManager extends EventEmitter {
     clients = new Map();
     wss = null;
     toolToClientMap = new Map();
+    // Bug #29: Server status tracking
+    serverStatus = new Map();
+    serverConfigs = new Map();
+    // Bug #30: Reconnection settings
+    maxReconnectAttempts = 5;
+    reconnectDelay = 1000; // Start with 1 second
+    reconnectTimers = new Map();
+    // Built-in server management (CLI feature)
+    serverProcesses = new Map();
+    builtinServers = {};
+    constructor(builtinServers = {}) {
+        super();
+        // Register built-in servers
+        this.builtinServers = builtinServers;
+        for (const [key, config] of Object.entries(builtinServers)) {
+            this.serverConfigs.set(config.name, config);
+        }
+    }
+    /**
+     * Register a custom MCP server configuration
+     */
+    registerServer(config) {
+        this.serverConfigs.set(config.name, config);
+        if (config.modulePath) {
+            this.builtinServers[config.name] = config;
+        }
+    }
+    /**
+     * Unregister a server configuration
+     */
+    unregisterServer(name) {
+        this.serverConfigs.delete(name);
+        delete this.builtinServers[name];
+    }
     /**
      * Start a WebSocket server for external MCP clients
      *
@@ -33,6 +70,13 @@ export class MCPClientManager {
         this.wss.on('connection', async (ws) => {
             const transport = new WebSocketConnectionTransport(ws);
             const clientId = `ws-${Date.now()}-${Math.random().toString(36).slice(2, 9)}`;
+            // Bug #29: Initialize server status
+            this.serverStatus.set(clientId, {
+                name: clientId,
+                status: 'connecting',
+                toolCount: 0,
+                reconnectAttempts: 0,
+            });
             const client = new Client({
                 name: 'floyd-agent',
                 version: '0.1.0',
@@ -46,18 +90,115 @@ export class MCPClientManager {
                 this.clients.set(clientId, client);
                 // Cache tool mapping
                 await this.updateToolCache(clientId);
+                // Bug #29: Update status and emit event
+                const toolCount = this.getToolCountForClient(clientId);
+                this.serverStatus.set(clientId, {
+                    name: clientId,
+                    status: 'connected',
+                    lastConnected: Date.now(),
+                    toolCount,
+                    reconnectAttempts: 0,
+                });
+                this.emit('server:connected', clientId, toolCount);
+                this.emit('tools:changed');
+                // Bug #22: Handle disconnect properly
                 ws.on('close', () => {
-                    this.clients.delete(clientId);
-                    this.clearToolCache(clientId);
+                    this.handleDisconnect(clientId, 'WebSocket connection closed');
+                });
+                ws.on('error', (error) => {
+                    this.handleDisconnect(clientId, error.message);
                 });
             }
             catch (e) {
+                const errorMsg = e instanceof Error ? e.message : String(e);
+                this.serverStatus.set(clientId, {
+                    name: clientId,
+                    status: 'error',
+                    lastError: errorMsg,
+                    toolCount: 0,
+                    reconnectAttempts: 0,
+                });
+                this.emit('server:error', clientId, e instanceof Error ? e : new Error(errorMsg));
                 ws.close();
             }
         });
         return new Promise((resolve) => {
             this.wss?.on('listening', () => resolve());
         });
+    }
+    /**
+     * Bug #22: Handle disconnect with proper cleanup and event emission
+     */
+    handleDisconnect(clientId, reason) {
+        this.clients.delete(clientId);
+        this.clearToolCache(clientId);
+        const status = this.serverStatus.get(clientId);
+        if (status) {
+            status.status = 'disconnected';
+            this.serverStatus.set(clientId, status);
+        }
+        this.emit('server:disconnected', clientId, reason);
+        this.emit('tools:changed');
+        // Bug #30: Attempt reconnection if we have the config
+        const config = this.serverConfigs.get(clientId);
+        if (config) {
+            this.attemptReconnect(clientId, config);
+        }
+    }
+    /**
+     * Bug #30: Attempt to reconnect to a server
+     */
+    attemptReconnect(clientId, config) {
+        const status = this.serverStatus.get(clientId);
+        if (!status || status.reconnectAttempts >= this.maxReconnectAttempts) {
+            console.log(`[MCP] Max reconnect attempts reached for ${clientId}`);
+            return;
+        }
+        // Clear any existing reconnect timer
+        const existingTimer = this.reconnectTimers.get(clientId);
+        if (existingTimer) {
+            clearTimeout(existingTimer);
+        }
+        // Exponential backoff
+        const delay = this.reconnectDelay * Math.pow(2, status.reconnectAttempts);
+        status.status = 'connecting';
+        status.reconnectAttempts++;
+        this.serverStatus.set(clientId, status);
+        this.emit('server:reconnecting', clientId, status.reconnectAttempts);
+        const timer = setTimeout(async () => {
+            try {
+                await this.connectServer(config);
+                console.log(`[MCP] Reconnected to ${clientId}`);
+            }
+            catch (error) {
+                console.error(`[MCP] Reconnect failed for ${clientId}:`, error);
+                // Will trigger another reconnect attempt via handleDisconnect
+            }
+        }, delay);
+        this.reconnectTimers.set(clientId, timer);
+    }
+    /**
+     * Bug #29: Get the status of all servers
+     */
+    getServerStatuses() {
+        return Array.from(this.serverStatus.values());
+    }
+    /**
+     * Bug #29: Get status of a specific server
+     */
+    getServerStatus(name) {
+        return this.serverStatus.get(name) || null;
+    }
+    /**
+     * Get tool count for a specific client
+     */
+    getToolCountForClient(clientId) {
+        let count = 0;
+        for (const [, id] of this.toolToClientMap) {
+            if (id === clientId)
+                count++;
+        }
+        return count;
     }
     /**
      * Stop the WebSocket server
@@ -136,22 +277,45 @@ export class MCPClientManager {
      */
     async connectServer(config) {
         const { name, transport } = config;
-        switch (transport.type) {
+        // Store config for potential reconnection
+        this.serverConfigs.set(name, config);
+        // Initialize status
+        this.serverStatus.set(name, {
+            name,
+            status: 'connecting',
+            toolCount: 0,
+            reconnectAttempts: this.serverStatus.get(name)?.reconnectAttempts || 0,
+        });
+        if (!config.transport) {
+            throw new Error(`Server ${name} has no transport configured`);
+        }
+        switch (config.transport.type) {
             case 'stdio': {
-                const stdioConfig = transport;
+                const stdioConfig = config.transport;
                 await this.connectStdio(name, stdioConfig.command, stdioConfig.args || [], stdioConfig.env, stdioConfig.cwd);
                 break;
             }
             case 'websocket': {
                 // WebSocket client connection (different from hosting a server)
                 // This connects TO a WebSocket MCP server
-                const wsConfig = transport;
+                const wsConfig = config.transport;
                 await this.connectWebSocket(name, wsConfig.url, wsConfig.headers);
                 break;
             }
             default:
-                throw new Error(`Unsupported transport type: ${transport.type}`);
+                throw new Error(`Unsupported transport type: ${config.transport.type}`);
         }
+        // Update status on success
+        const toolCount = this.getToolCountForClient(name);
+        this.serverStatus.set(name, {
+            name,
+            status: 'connected',
+            lastConnected: Date.now(),
+            toolCount,
+            reconnectAttempts: 0,
+        });
+        this.emit('server:connected', name, toolCount);
+        this.emit('tools:changed');
     }
     /**
      * Connect to an MCP server via WebSocket (as a client)
@@ -341,6 +505,96 @@ export class MCPClientManager {
     async connectExternalServers(projectRoot = process.cwd()) {
         const config = this.loadMCPConfig(projectRoot);
         return this.connectFromConfig(config.servers);
+    }
+    // ==========================================================================
+    // BUILT-IN SERVER MANAGEMENT (CLI feature)
+    // ==========================================================================
+    /**
+     * Start a built-in MCP server as a subprocess
+     */
+    async startBuiltinServer(serverName) {
+        const config = this.builtinServers[serverName];
+        if (!config || !config.enabled) {
+            console.warn(`Server ${serverName} not found or disabled`);
+            return false;
+        }
+        if (this.serverProcesses.has(serverName)) {
+            console.log(`Server ${serverName} already running`);
+            return true;
+        }
+        try {
+            const args = config.modulePath ? [config.modulePath] : config.args || [];
+            // Connect to the server via stdio using tsx
+            await this.connectStdio(`builtin-${serverName}`, 'npx', ['tsx', ...args]);
+            console.log(`Started built-in MCP server: ${serverName}`);
+            return true;
+        }
+        catch (error) {
+            console.error(`Failed to start server ${serverName}:`, error);
+            return false;
+        }
+    }
+    /**
+     * Stop a running built-in server
+     */
+    async stopBuiltinServer(serverName) {
+        const process = this.serverProcesses.get(serverName);
+        if (!process) {
+            return false;
+        }
+        try {
+            process.kill();
+            this.serverProcesses.delete(serverName);
+            this.clients.delete(`builtin-${serverName}`);
+            console.log(`Stopped built-in server: ${serverName}`);
+            return true;
+        }
+        catch (error) {
+            console.error(`Failed to stop server ${serverName}:`, error);
+            return false;
+        }
+    }
+    /**
+     * Start all enabled built-in servers
+     */
+    async startBuiltinServers() {
+        for (const [name, config] of Object.entries(this.builtinServers)) {
+            if (config.enabled && config.modulePath) {
+                await this.startBuiltinServer(name);
+            }
+        }
+    }
+    /**
+     * Stop all running built-in servers
+     */
+    async stopAllBuiltinServers() {
+        const serverNames = Array.from(this.serverProcesses.keys());
+        for (const name of serverNames) {
+            await this.stopBuiltinServer(name);
+        }
+    }
+    /**
+     * Get list of registered servers with their status
+     */
+    getServers() {
+        return Array.from(this.serverConfigs.values()).map(config => ({
+            name: config.name,
+            description: config.description,
+            enabled: config.enabled ?? false,
+            running: this.serverProcesses.has(config.name) || this.clients.has(config.name),
+        }));
+    }
+    /**
+     * Cleanup when shutting down
+     */
+    async shutdown() {
+        await this.stopAllBuiltinServers();
+        if (this.wss) {
+            this.wss.close();
+            this.wss = null;
+        }
+        this.clients.clear();
+        this.toolToClientMap.clear();
     }
 }
 //# sourceMappingURL=client-manager.js.map
