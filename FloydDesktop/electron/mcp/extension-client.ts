@@ -44,6 +44,26 @@ export interface ExtensionClientConfig {
   connectionTimeout?: number;
   /** Request timeout in milliseconds (default: 30000) */
   requestTimeout?: number;
+  /** Enable automatic reconnection (default: true) */
+  autoReconnect?: boolean;
+  /** Maximum reconnection attempts (default: 5) */
+  maxReconnectAttempts?: number;
+  /** Reconnection delay in milliseconds (default: 1000, with exponential backoff) */
+  reconnectDelay?: number;
+  /** Status change callback */
+  onStatusChange?: (status: ExtensionConnectionStatus) => void;
+}
+
+/**
+ * Connection status for extension client (Bug #48 fix)
+ */
+export interface ExtensionConnectionStatus {
+  connected: boolean;
+  connecting: boolean;
+  initialized: boolean;
+  reconnectAttempts: number;
+  toolCount: number;
+  error?: string;
 }
 
 /**
@@ -61,6 +81,17 @@ export class ExtensionMCPClient {
   private requestTimeout: number;
   private connected = false;
   private initialized = false;
+  private connecting = false;
+
+  // Bug #49: Reconnection settings
+  private autoReconnect: boolean;
+  private maxReconnectAttempts: number;
+  private reconnectDelay: number;
+  private reconnectAttempts = 0;
+  private reconnectTimer: NodeJS.Timeout | null = null;
+  
+  // Bug #48: Status change callback
+  private onStatusChange?: (status: ExtensionConnectionStatus) => void;
 
   // Tools cache from extension
   private toolsCache: ExtensionTool[] = [];
@@ -70,12 +101,41 @@ export class ExtensionMCPClient {
     this.host = config.host ?? 'localhost';
     this.connectionTimeout = config.connectionTimeout ?? 5000;
     this.requestTimeout = config.requestTimeout ?? 30000;
+    this.autoReconnect = config.autoReconnect ?? true;
+    this.maxReconnectAttempts = config.maxReconnectAttempts ?? 5;
+    this.reconnectDelay = config.reconnectDelay ?? 1000;
+    this.onStatusChange = config.onStatusChange;
+  }
+
+  /**
+   * Bug #48: Emit status change
+   */
+  private emitStatusChange(error?: string): void {
+    if (this.onStatusChange) {
+      this.onStatusChange({
+        connected: this.connected,
+        connecting: this.connecting,
+        initialized: this.initialized,
+        reconnectAttempts: this.reconnectAttempts,
+        toolCount: this.toolsCache.length,
+        error,
+      });
+    }
   }
 
   /**
    * Connect to the extension's WebSocket server
    */
   async connect(): Promise<void> {
+    // Cancel any pending reconnect
+    if (this.reconnectTimer) {
+      clearTimeout(this.reconnectTimer);
+      this.reconnectTimer = null;
+    }
+    
+    this.connecting = true;
+    this.emitStatusChange();
+    
     return new Promise((resolve, reject) => {
       const url = `ws://${this.host}:${this.port}`;
       console.log(`[ExtensionClient] Connecting to ${url}...`);
@@ -83,6 +143,8 @@ export class ExtensionMCPClient {
       // Set connection timeout
       const timeout = setTimeout(() => {
         if (!this.connected) {
+          this.connecting = false;
+          this.emitStatusChange('Connection timeout');
           reject(new Error('Connection timeout'));
         }
       }, this.connectionTimeout);
@@ -92,29 +154,68 @@ export class ExtensionMCPClient {
       this.ws.on('open', async () => {
         console.log(`[ExtensionClient] Connected to extension on port ${this.port}`);
         this.connected = true;
+        this.connecting = false;
+        this.reconnectAttempts = 0; // Reset on successful connection
         clearTimeout(timeout);
 
         // Initialize the session
         try {
           await this.initialize();
+          this.emitStatusChange();
           resolve();
         } catch (error) {
+          this.emitStatusChange(error instanceof Error ? error.message : String(error));
           reject(error);
         }
       });
 
       this.ws.on('error', (error) => {
         clearTimeout(timeout);
+        this.connecting = false;
         console.error('[ExtensionClient] WebSocket error:', error);
+        this.emitStatusChange(error.message);
         reject(error);
       });
 
       this.ws.on('close', () => {
         console.log('[ExtensionClient] Disconnected from extension');
+        const wasConnected = this.connected;
         this.connected = false;
         this.initialized = false;
+        this.connecting = false;
+        this.emitStatusChange('Disconnected');
+        
+        // Bug #49: Attempt reconnection if enabled and was previously connected
+        if (this.autoReconnect && wasConnected && this.reconnectAttempts < this.maxReconnectAttempts) {
+          this.scheduleReconnect();
+        }
       });
     });
+  }
+
+  /**
+   * Bug #49: Schedule a reconnection attempt
+   */
+  private scheduleReconnect(): void {
+    if (this.reconnectTimer) {
+      return; // Already scheduled
+    }
+    
+    this.reconnectAttempts++;
+    const delay = this.reconnectDelay * Math.pow(2, this.reconnectAttempts - 1); // Exponential backoff
+    
+    console.log(`[ExtensionClient] Scheduling reconnect attempt ${this.reconnectAttempts}/${this.maxReconnectAttempts} in ${delay}ms`);
+    
+    this.reconnectTimer = setTimeout(async () => {
+      this.reconnectTimer = null;
+      try {
+        await this.connect();
+        console.log('[ExtensionClient] Reconnected successfully');
+      } catch (error) {
+        console.error('[ExtensionClient] Reconnect failed:', error);
+        // The close handler will schedule another attempt if appropriate
+      }
+    }, delay);
   }
 
   /**
@@ -289,13 +390,43 @@ export class ExtensionMCPClient {
    * Disconnect from the extension
    */
   disconnect(): void {
+    // Cancel any pending reconnect
+    if (this.reconnectTimer) {
+      clearTimeout(this.reconnectTimer);
+      this.reconnectTimer = null;
+    }
+    
+    // Disable auto-reconnect for explicit disconnect
+    const prevAutoReconnect = this.autoReconnect;
+    this.autoReconnect = false;
+    
     if (this.ws) {
       this.ws.close();
       this.ws = null;
     }
     this.connected = false;
     this.initialized = false;
+    this.connecting = false;
+    this.reconnectAttempts = 0;
+    
+    this.emitStatusChange();
     console.log('[ExtensionClient] Disconnected');
+    
+    // Restore auto-reconnect setting
+    this.autoReconnect = prevAutoReconnect;
+  }
+
+  /**
+   * Bug #48: Get current connection status
+   */
+  getStatus(): ExtensionConnectionStatus {
+    return {
+      connected: this.connected,
+      connecting: this.connecting,
+      initialized: this.initialized,
+      reconnectAttempts: this.reconnectAttempts,
+      toolCount: this.toolsCache.length,
+    };
   }
 
   /**

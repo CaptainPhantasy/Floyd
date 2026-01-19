@@ -6,6 +6,7 @@ import { Client } from '@modelcontextprotocol/sdk/client/index.js';
 import { StdioClientTransport } from '@modelcontextprotocol/sdk/client/stdio.js';
 import { ListToolsResult } from '@modelcontextprotocol/sdk/types.js';
 import { WebSocketServer } from 'ws';
+import { EventEmitter } from 'events';
 import { WebSocketConnectionTransport } from './websocket-transport.js';
 import type { MCPTool, MCPResource, MCPCallResult, MCPServerConfig, MCPStdioConfig, MCPWebSocketConfig, MCPConfigFile } from './types.js';
 import { readFileSync, existsSync } from 'fs';
@@ -24,6 +25,29 @@ export interface StdioServerConfig {
 }
 
 /**
+ * Server status tracking (Bug #29 fix)
+ */
+export interface ServerStatus {
+  name: string;
+  status: 'connected' | 'disconnected' | 'connecting' | 'error';
+  lastConnected?: number;
+  lastError?: string;
+  toolCount: number;
+  reconnectAttempts: number;
+}
+
+/**
+ * MCP Manager Events
+ */
+export interface MCPManagerEvents {
+  'server:connected': (name: string, toolCount: number) => void;
+  'server:disconnected': (name: string, reason: string) => void;
+  'server:error': (name: string, error: Error) => void;
+  'server:reconnecting': (name: string, attempt: number) => void;
+  'tools:changed': () => void;
+}
+
+/**
  * MCPClientManager manages multiple MCP client connections
  *
  * Responsibilities:
@@ -31,11 +55,26 @@ export interface StdioServerConfig {
  * - Connecting to local MCP servers via stdio
  * - Aggregating tools from all connected clients
  * - Routing tool calls to the appropriate client
+ * - Tracking server status (Bug #29 fix)
+ * - Automatic reconnection (Bug #30 fix)
  */
-export class MCPClientManager {
+export class MCPClientManager extends EventEmitter {
   private clients: Map<string, Client> = new Map();
   private wss: WebSocketServer | null = null;
   private toolToClientMap: Map<string, string> = new Map();
+  
+  // Bug #29: Server status tracking
+  private serverStatus: Map<string, ServerStatus> = new Map();
+  private serverConfigs: Map<string, MCPServerConfig> = new Map();
+  
+  // Bug #30: Reconnection settings
+  private maxReconnectAttempts = 5;
+  private reconnectDelay = 1000; // Start with 1 second
+  private reconnectTimers: Map<string, NodeJS.Timeout> = new Map();
+
+  constructor() {
+    super();
+  }
 
   /**
    * Start a WebSocket server for external MCP clients
@@ -51,6 +90,14 @@ export class MCPClientManager {
     this.wss.on('connection', async (ws) => {
       const transport = new WebSocketConnectionTransport(ws);
       const clientId = `ws-${Date.now()}-${Math.random().toString(36).slice(2, 9)}`;
+
+      // Bug #29: Initialize server status
+      this.serverStatus.set(clientId, {
+        name: clientId,
+        status: 'connecting',
+        toolCount: 0,
+        reconnectAttempts: 0,
+      });
 
       const client = new Client(
         {
@@ -70,12 +117,37 @@ export class MCPClientManager {
 
         // Cache tool mapping
         await this.updateToolCache(clientId);
+        
+        // Bug #29: Update status and emit event
+        const toolCount = this.getToolCountForClient(clientId);
+        this.serverStatus.set(clientId, {
+          name: clientId,
+          status: 'connected',
+          lastConnected: Date.now(),
+          toolCount,
+          reconnectAttempts: 0,
+        });
+        this.emit('server:connected', clientId, toolCount);
+        this.emit('tools:changed');
 
+        // Bug #22: Handle disconnect properly
         ws.on('close', () => {
-          this.clients.delete(clientId);
-          this.clearToolCache(clientId);
+          this.handleDisconnect(clientId, 'WebSocket connection closed');
+        });
+
+        ws.on('error', (error) => {
+          this.handleDisconnect(clientId, error.message);
         });
       } catch (e) {
+        const errorMsg = e instanceof Error ? e.message : String(e);
+        this.serverStatus.set(clientId, {
+          name: clientId,
+          status: 'error',
+          lastError: errorMsg,
+          toolCount: 0,
+          reconnectAttempts: 0,
+        });
+        this.emit('server:error', clientId, e instanceof Error ? e : new Error(errorMsg));
         ws.close();
       }
     });
@@ -83,6 +155,92 @@ export class MCPClientManager {
     return new Promise((resolve) => {
       this.wss?.on('listening', () => resolve());
     });
+  }
+
+  /**
+   * Bug #22: Handle disconnect with proper cleanup and event emission
+   */
+  private handleDisconnect(clientId: string, reason: string): void {
+    this.clients.delete(clientId);
+    this.clearToolCache(clientId);
+    
+    const status = this.serverStatus.get(clientId);
+    if (status) {
+      status.status = 'disconnected';
+      this.serverStatus.set(clientId, status);
+    }
+    
+    this.emit('server:disconnected', clientId, reason);
+    this.emit('tools:changed');
+    
+    // Bug #30: Attempt reconnection if we have the config
+    const config = this.serverConfigs.get(clientId);
+    if (config) {
+      this.attemptReconnect(clientId, config);
+    }
+  }
+
+  /**
+   * Bug #30: Attempt to reconnect to a server
+   */
+  private attemptReconnect(clientId: string, config: MCPServerConfig): void {
+    const status = this.serverStatus.get(clientId);
+    if (!status || status.reconnectAttempts >= this.maxReconnectAttempts) {
+      console.log(`[MCP] Max reconnect attempts reached for ${clientId}`);
+      return;
+    }
+    
+    // Clear any existing reconnect timer
+    const existingTimer = this.reconnectTimers.get(clientId);
+    if (existingTimer) {
+      clearTimeout(existingTimer);
+    }
+    
+    // Exponential backoff
+    const delay = this.reconnectDelay * Math.pow(2, status.reconnectAttempts);
+    
+    status.status = 'connecting';
+    status.reconnectAttempts++;
+    this.serverStatus.set(clientId, status);
+    
+    this.emit('server:reconnecting', clientId, status.reconnectAttempts);
+    
+    const timer = setTimeout(async () => {
+      try {
+        await this.connectServer(config);
+        console.log(`[MCP] Reconnected to ${clientId}`);
+      } catch (error) {
+        console.error(`[MCP] Reconnect failed for ${clientId}:`, error);
+        // Will trigger another reconnect attempt via handleDisconnect
+      }
+    }, delay);
+    
+    this.reconnectTimers.set(clientId, timer);
+  }
+
+  /**
+   * Bug #29: Get the status of all servers
+   */
+  getServerStatuses(): ServerStatus[] {
+    return Array.from(this.serverStatus.values());
+  }
+
+  /**
+   * Bug #29: Get status of a specific server
+   */
+  getServerStatus(name: string): ServerStatus | null {
+    return this.serverStatus.get(name) || null;
+  }
+
+  /**
+   * Get tool count for a specific client
+   */
+  private getToolCountForClient(clientId: string): number {
+    let count = 0;
+    for (const [, id] of this.toolToClientMap) {
+      if (id === clientId) count++;
+    }
+    return count;
   }
 
   /**
@@ -183,6 +341,17 @@ export class MCPClientManager {
    */
   private async connectServer(config: MCPServerConfig): Promise<void> {
     const { name, transport } = config;
+    
+    // Store config for potential reconnection
+    this.serverConfigs.set(name, config);
+    
+    // Initialize status
+    this.serverStatus.set(name, {
+      name,
+      status: 'connecting',
+      toolCount: 0,
+      reconnectAttempts: this.serverStatus.get(name)?.reconnectAttempts || 0,
+    });
 
     switch (transport.type) {
       case 'stdio': {
@@ -208,6 +377,18 @@ export class MCPClientManager {
       default:
         throw new Error(`Unsupported transport type: ${(transport as any).type}`);
     }
+    
+    // Update status on success
+    const toolCount = this.getToolCountForClient(name);
+    this.serverStatus.set(name, {
+      name,
+      status: 'connected',
+      lastConnected: Date.now(),
+      toolCount,
+      reconnectAttempts: 0,
+    });
+    this.emit('server:connected', name, toolCount);
+    this.emit('tools:changed');
   }
 
   /**

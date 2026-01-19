@@ -17,5 +17,6 @@ export default defineConfig({
   build: {
     outDir: 'dist-renderer',
     emptyOutDir: true,
+    sourcemap: true, // Enable source maps for better error debugging
   },
 });

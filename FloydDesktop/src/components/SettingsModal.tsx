@@ -7,7 +7,7 @@ import * as Tabs from '@radix-ui/react-tabs';
 import { cn } from '../lib/utils';
 import type { FloydSettings } from '../types';
 import { MCPSettings } from './MCPSettings';
-import { PROVIDERS, getProvider, getProviderIds } from '../config/providers';
+import { PROVIDERS, getProvider, getProviderIds, DEFAULT_PROVIDER, DEFAULT_MODEL, type ProviderId } from '../config/providers';
 
 interface SettingsModalProps {
   isOpen: boolean;
@@ -15,10 +15,10 @@ interface SettingsModalProps {
 }
 
 const DEFAULT_SETTINGS: FloydSettings = {
-  provider: 'glm',
+  provider: DEFAULT_PROVIDER,
   apiKey: '',
-  apiEndpoint: 'https://api.z.ai/api/anthropic',
-  model: 'claude-opus-4',
+  apiEndpoint: 'https://api.anthropic.com',
+  model: DEFAULT_MODEL,
 };
 
 export function SettingsModal({ isOpen, onClose }: SettingsModalProps) {
@@ -38,31 +38,22 @@ export function SettingsModal({ isOpen, onClose }: SettingsModalProps) {
       }
       const savedSettings = await window.floydAPI.getSettings();
       
-      // Infer provider from endpoint if not set (for backward compatibility)
-      let provider = savedSettings.provider as 'glm' | 'anthropic' | 'openai' | 'deepseek' | undefined;
-      const endpoint = (savedSettings.apiEndpoint as string) || DEFAULT_SETTINGS.apiEndpoint;
+      // Get provider - default to anthropic
+      let provider = (savedSettings.provider as ProviderId) || DEFAULT_PROVIDER;
       
-      if (!provider) {
-        // Infer from endpoint
-        if (endpoint.includes('api.anthropic.com')) {
-          provider = 'anthropic';
-        } else if (endpoint.includes('api.z.ai')) {
-          provider = 'glm';
-        } else if (endpoint.includes('api.openai.com')) {
-          provider = 'openai';
-        } else if (endpoint.includes('api.deepseek.com')) {
-          provider = 'deepseek';
-        } else {
-          provider = DEFAULT_SETTINGS.provider;
-        }
+      // Validate provider is in our list
+      const validProviders = getProviderIds();
+      if (!validProviders.includes(provider)) {
+        provider = DEFAULT_PROVIDER;
       }
       
-      // Ensure endpoint matches provider
       const providerConfig = getProvider(provider);
-      const finalEndpoint = endpoint === DEFAULT_SETTINGS.apiEndpoint ? providerConfig.endpoint : endpoint;
+      
+      // Use saved endpoint or provider default
+      const endpoint = (savedSettings.apiEndpoint as string) || providerConfig.endpoint;
       
       // Ensure model is valid for provider
-      let model = (savedSettings.model as string) || DEFAULT_SETTINGS.model;
+      let model = (savedSettings.model as string) || DEFAULT_MODEL;
       const modelExists = providerConfig.models.some(m => m.id === model);
       if (!modelExists && providerConfig.models.length > 0) {
         model = providerConfig.models[0].id;
@@ -71,7 +62,7 @@ export function SettingsModal({ isOpen, onClose }: SettingsModalProps) {
       setSettings({
         provider,
         apiKey: (savedSettings.apiKey as string) || '',
-        apiEndpoint: finalEndpoint,
+        apiEndpoint: endpoint,
         model,
         systemPrompt: savedSettings.systemPrompt as string | undefined,
         workingDirectory: savedSettings.workingDirectory as string | undefined,
@@ -177,7 +168,7 @@ export function SettingsModal({ isOpen, onClose }: SettingsModalProps) {
     onClose();
   };
 
-  const handleProviderChange = (providerId: 'glm' | 'anthropic' | 'openai' | 'deepseek') => {
+  const handleProviderChange = (providerId: ProviderId) => {
     console.log('[SettingsModal] Provider changed to:', providerId);
     const provider = getProvider(providerId);
     console.log('[SettingsModal] Provider config:', provider.name, provider.endpoint, provider.models.length, 'models');
@@ -201,7 +192,7 @@ export function SettingsModal({ isOpen, onClose }: SettingsModalProps) {
 
   // Get current provider's models - useMemo to ensure it updates when provider changes
   const availableModels = useMemo(() => {
-    const currentProvider = settings.provider || 'glm';
+    const currentProvider = settings.provider || DEFAULT_PROVIDER;
     const providerConfig = getProvider(currentProvider);
     console.log('[SettingsModal] Computing availableModels for provider:', currentProvider, 'models:', providerConfig.models.length);
     return providerConfig.models;
@@ -323,8 +314,8 @@ export function SettingsModal({ isOpen, onClose }: SettingsModalProps) {
                     </label>
                     <select
                       id={`${formId}-provider`}
-                      value={settings.provider || 'glm'}
-                      onChange={(e) => handleProviderChange(e.target.value as 'glm' | 'anthropic' | 'openai' | 'deepseek')}
+                      value={settings.provider || DEFAULT_PROVIDER}
+                      onChange={(e) => handleProviderChange(e.target.value as ProviderId)}
                       className="w-full px-4 py-2 bg-slate-900 border border-slate-700 rounded-lg focus:outline-none focus:ring-2 focus:ring-sky-500 text-slate-100"
                     >
                       {getProviderIds().map((id) => (
@@ -350,7 +341,7 @@ export function SettingsModal({ isOpen, onClose }: SettingsModalProps) {
                     value={settings.apiEndpoint}
                     onChange={(value) => setSettings({ ...settings, apiEndpoint: value })}
                     type="text"
-                    placeholder="https://api.z.ai/api/anthropic"
+                    placeholder="https://api.anthropic.com"
                     description="The API endpoint to use for requests. Auto-filled when you select a provider."
                   />
                   <div className="space-y-2">

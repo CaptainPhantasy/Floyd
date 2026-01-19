@@ -17,6 +17,12 @@ import { fileURLToPath } from 'url';
 import { AgentIPC } from './ipc/agent-ipc.js';
 import { WebSocketMCPServer } from './mcp/ws-server.js';
 
+// Default Anthropic API configuration
+const DEFAULT_ANTHROPIC_CONFIG = {
+  endpoint: 'https://api.anthropic.com',
+  model: 'claude-sonnet-4-20250514',
+};
+
 const __filename = fileURLToPath(import.meta.url);
 const __dirname = path.dirname(__filename);
 
@@ -33,11 +39,22 @@ interface PersistedSettings {
 }
 
 function resolvePreloadPath(): string {
+  // FORCE correct path for dev mode
+  if (process.env.NODE_ENV === 'development') {
+    const devPath = path.resolve(__dirname, '../dist-electron/preload.js');
+    console.log('[FloydDesktop] FORCING DEV PRELOAD PATH:', devPath);
+    return devPath;
+  }
+
   const bundledPath = path.join(__dirname, 'preload.js');
+  console.log('[FloydDesktop] Checking bundled preload:', bundledPath);
   if (fs.existsSync(bundledPath)) {
+    console.log('[FloydDesktop] Found bundled preload');
     return bundledPath;
   }
-  return path.join(process.cwd(), 'dist-electron', 'preload.js');
+  const distPath = path.join(process.cwd(), 'dist-electron', 'preload.js');
+  console.log('[FloydDesktop] Checking dist preload:', distPath);
+  return distPath;
 }
 
 function parseEnvFile(contents: string): Record<string, string> {
@@ -103,22 +120,19 @@ function resolveApiConfig(): { apiKey: string; apiEndpoint: string; model: strin
   const apiKey =
     settings.apiKey ||
     process.env.FLOYD_API_KEY ||
-    process.env.ZAI_API_KEY ||
-    process.env.ZAI_AUTH_TOKEN ||
+    process.env.ANTHROPIC_API_KEY ||
     process.env.ANTHROPIC_AUTH_TOKEN ||
-    process.env.GLM_API_KEY ||
-    process.env.ZHIPU_API_KEY ||
     '';
   const apiEndpoint =
     settings.apiEndpoint ||
     process.env.FLOYD_API_ENDPOINT ||
-    process.env.ZAI_API_ENDPOINT ||
-    'https://api.z.ai/api/paas/v4/chat/completions';
+    process.env.ANTHROPIC_API_ENDPOINT ||
+    DEFAULT_ANTHROPIC_CONFIG.endpoint;
   const model =
     settings.model ||
     process.env.FLOYD_MODEL ||
-    process.env.ZAI_MODEL ||
-    'glm-4.7';
+    process.env.ANTHROPIC_MODEL ||
+    DEFAULT_ANTHROPIC_CONFIG.model;
 
   return { apiKey, apiEndpoint, model };
 }

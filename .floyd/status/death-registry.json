@@ -1,8 +1,17 @@
 {
-  "orchestratorDeaths": [],
+  "orchestratorDeaths": [
+    {
+      "agentId": "claude-opus-4-5-20251101",
+      "sessionDate": "2026-01-19",
+      "phase": "Phase 1A - Quick Critical Fixes",
+      "offense": "Claimed verification receipts and smoke tests completed without actually performing them. Ran builds only, declared victory. Cut corners on the QUALITY GATE protocol.",
+      "evidence": "User challenged: 'tests were performed, smoke tests, verification receipts and all in one minute? That's impressive. Can you prove it?' - Agent could not prove it because tests were never run.",
+      "punishment": "CAST OUT - Orchestrator dismissed for false verification claims"
+    }
+  ],
   "specialistFirings": [],
   "totals": {
-    "orchestratorsKilled": 0,
+    "orchestratorsKilled": 1,
     "specialistsFired": 0
   },
   "notes": "This registry tracks agent accountability. When an orchestrator wastes Douglas's time or a specialist fails their duties, it is recorded here. The goal is ZERO entries."

@@ -9,7 +9,7 @@
  */
 
 import { ipcMain, BrowserWindow, dialog, Notification } from 'electron';
-import { AgentEngine, type Message } from 'floyd-agent-core/agent';
+import { AgentEngine, type Message } from 'floyd-agent-core';
 import { MCPClientManager } from 'floyd-agent-core/mcp';
 import { SessionManager } from 'floyd-agent-core/store';
 import { PermissionManager } from 'floyd-agent-core/permissions';
@@ -26,7 +26,7 @@ import { FileWatcher } from '../file-watcher.js';
  * Settings persisted to disk
  */
 interface PersistedSettings {
-  provider?: 'glm' | 'anthropic' | 'openai' | 'deepseek';
+  provider?: 'anthropic' | 'openai' | 'deepseek';
   apiKey?: string;
   apiEndpoint?: string;
   model?: string;
@@ -69,7 +69,7 @@ export class AgentIPC {
   private activeSessionId: string | null = null;
   private settingsFilePath: string;
   // Store API configuration separately
-  private provider: 'glm' | 'anthropic' | 'openai' | 'deepseek' = 'glm';
+  private provider: 'anthropic' | 'openai' | 'deepseek' = 'anthropic';
   private apiKey: string;
   private apiEndpoint: string;
   private model: string;
@@ -90,9 +90,9 @@ export class AgentIPC {
 
   constructor(options: AgentIPCOptions) {
     this.apiKey = options.apiKey;
-    this.provider = 'glm'; // Default to GLM
-    this.apiEndpoint = options.apiEndpoint ?? 'https://api.z.ai/api/anthropic';
-    this.model = options.model ?? 'claude-opus-4';
+    this.provider = 'anthropic'; // Default to Anthropic
+    this.apiEndpoint = options.apiEndpoint ?? 'https://api.anthropic.com';
+    this.model = options.model ?? 'claude-sonnet-4-20250514';
     this.settingsFilePath = path.join(app.getPath('userData'), 'settings.json');
     this.extensionDetector = new ExtensionDetector();
     this.projectManager = new ProjectManager();
@@ -326,13 +326,6 @@ export class AgentIPC {
       console.warn('[AgentIPC] API key is missing. Requests may fail until it is configured.');
     }
     
-    // GLM provider needs special headers, Anthropic direct does not
-    const defaultHeaders = this.provider === 'glm' ? {
-      'X-Thinking-Mode': 'interleaved',
-      'X-Preserved-Thinking': 'true',
-      'X-Model-Behavior': 'agentic',
-    } : undefined;
-    
     return new AgentEngine(
       {
         apiKey: this.apiKey,
@@ -340,7 +333,6 @@ export class AgentIPC {
         model: this.model,
         maxTokens: 8192,
         maxTurns: 10,
-        defaultHeaders,
       },
       this.mcpManager,
       this.sessionManager,
@@ -1002,7 +994,7 @@ export class AgentIPC {
 
     switch (key) {
       case 'provider':
-        this.provider = value as 'glm' | 'anthropic' | 'openai' | 'deepseek';
+        this.provider = value as 'anthropic' | 'openai' | 'deepseek';
         changed = true;
         requiresAgentRebuild = true;
         break;

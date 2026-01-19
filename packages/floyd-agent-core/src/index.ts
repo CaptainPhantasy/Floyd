@@ -5,6 +5,25 @@ export { SessionManager } from './store/conversation-store.js';
 export { PermissionManager } from './permissions/permission-manager.js';
 export { Config } from './utils/config.js';
 
+// Error handling utilities
+export { humanizeError, formatHumanizedError, getSeverityEmoji, type HumanizedError } from './utils/error-humanizer.js';
+
+// LLM Client exports
+export { createLLMClient, OpenAICompatibleClient, AnthropicClient } from './llm/index.js';
+export type { LLMClient, LLMClientOptions, LLMMessage, LLMTool, StreamChunk, LLMChatCallbacks } from './llm/index.js';
+
+// Constants exports
+export { 
+  PROVIDER_DEFAULTS, 
+  DEFAULT_GLM_CONFIG, 
+  DEFAULT_ANTHROPIC_CONFIG, 
+  DEFAULT_OPENAI_CONFIG, 
+  DEFAULT_DEEPSEEK_CONFIG,
+  inferProviderFromEndpoint,
+  isOpenAICompatible,
+  type Provider 
+} from './constants.js';
+
 // Re-export types
 export type { Message, ToolCall } from './agent/types.js';
 export type { MCPTool, MCPResource } from './mcp/types.js';

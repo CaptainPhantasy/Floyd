@@ -1,0 +1,5 @@
+node_modules/
+.env.local
+.floyd-data/
+dist/
+dist-server/

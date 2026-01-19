@@ -15,6 +15,8 @@ import { TokenUsage } from './components/TokenUsage';
 import { CommandPalette } from './components/CommandPalette';
 import { ExportDialog } from './components/ExportDialog';
 import { KeyboardShortcuts } from './components/KeyboardShortcuts';
+import { WelcomeScreen } from './components/WelcomeScreen';
+import { LoadingState } from './components/LoadingState';
 import { useAgentStream } from './hooks/useAgentStream';
 import { useSessions } from './hooks/useSessions';
 import { useProjects } from './hooks/useProjects';
@@ -29,6 +31,8 @@ function App() {
   const [commandPaletteOpen, setCommandPaletteOpen] = useState(false);
   const [exportDialogOpen, setExportDialogOpen] = useState(false);
   const [keyboardShortcutsOpen, setKeyboardShortcutsOpen] = useState(false);
+  const [isInitializing, setIsInitializing] = useState(true);
+  const [showWelcome, setShowWelcome] = useState(false);
 
   const {
     messages,
@@ -128,14 +132,26 @@ function App() {
   ]);
 
   const loadSessions = async () => {
-    if (!window.floydAPI) return;
+    if (!window.floydAPI) {
+      setIsInitializing(false);
+      setShowWelcome(true);
+      return;
+    }
     try {
+      setIsInitializing(true);
       const sessionList = await window.floydAPI.listSessions();
       if (sessionList.length > 0) {
         setCurrentSession(sessionList[0]);
+        setShowWelcome(false);
+      } else {
+        // No sessions - show welcome screen
+        setShowWelcome(true);
       }
     } catch (error) {
       console.error('Failed to load sessions:', error);
+      setShowWelcome(true);
+    } finally {
+      setIsInitializing(false);
     }
   };
 
@@ -171,6 +187,42 @@ function App() {
       console.error('Failed to create session:', error);
     }
   };
+
+  // Show loading state during initialization
+  if (isInitializing) {
+    return (
+      <div className="flex h-screen bg-slate-900 text-slate-100 items-center justify-center">
+        <LoadingState message="Starting Floyd..." size="large" />
+      </div>
+    );
+  }
+
+  // Show welcome screen for first-time users or when no sessions exist
+  if (showWelcome && !currentSession) {
+    return (
+      <div className="flex h-screen bg-slate-900 text-slate-100">
+        <WelcomeScreen
+          onNewProject={handleNewProject}
+          onNewSession={async () => {
+            try {
+              const newSession = await createSession();
+              if (newSession) {
+                setCurrentSession(newSession);
+                setShowWelcome(false);
+              }
+            } catch (error) {
+              console.error('Failed to create session:', error);
+            }
+          }}
+          onOpenSettings={() => setSettingsOpen(true)}
+        />
+        <SettingsModal
+          isOpen={settingsOpen}
+          onClose={() => setSettingsOpen(false)}
+        />
+      </div>
+    );
+  }
 
   return (
     <div className="flex h-screen bg-slate-900 text-slate-100">

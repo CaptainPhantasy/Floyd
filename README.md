@@ -8,6 +8,10 @@
 
 > *Because paying $20/month for an AI coding assistant is for people who hate money.*
 
+<p align="center">
+  <img src="INK/Floyd_CLI_Screen.PNG" alt="FLOYD CLI In Action" width="800"/>
+</p>
+
 FLOYD is a GLM-4.7 powered coding agent that does everything that *other* AI coding assistants do — except it runs in your terminal and costs approximately 1/100th the price. We would name the competition, but our lawyers advised against it.
 
 ## What is FLOYD?
@@ -205,6 +209,31 @@ A: Did you run `npm install`? Did you update Node.js since 2019?
 
 **Q: Why isn't this as good as [REDACTED]?**
 A: It costs 1/100th the price. You get what you pay for. But hey, it's open source!
+
+## Security
+
+**⚠️ NEVER COMMIT API KEYS OR SECRETS**
+
+This repository uses `.gitignore` to prevent accidental commits of sensitive files. The following are explicitly ignored:
+
+- `INK/floyd-cli/.env` - Environment files with API keys
+- `scripts/verify-ipc-flow.ts` - Verification scripts with test keys
+- `scripts/verify-connection.ts` - Connection test scripts
+
+**Rules:**
+1. Always use environment variables for API keys (`GLM_API_KEY`, `ANTHROPIC_AUTH_TOKEN`)
+2. Never hardcode keys in source files
+3. If you accidentally commit a key, **revoke it immediately** from your provider
+4. Use placeholder values like `sk-placeholder` in test code
+
+**To configure your API key safely:**
+```bash
+# Set as environment variable (recommended)
+export GLM_API_KEY=your-key-here
+
+# Or create a local .env file (already gitignored)
+echo "GLM_API_KEY=your-key-here" > INK/floyd-cli/.env
+```
 
 ## License
 

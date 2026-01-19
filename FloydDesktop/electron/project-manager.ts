@@ -7,6 +7,7 @@
 import fs from 'fs/promises';
 import path from 'path';
 import { app } from 'electron';
+import { randomUUID } from 'crypto';
 
 // Project types (duplicated from src/types.ts to avoid cross-boundary imports)
 interface Project {
@@ -44,13 +45,33 @@ export class ProjectManager {
 
   private async doInit(): Promise<void> {
     await this.ensureProjectsDir();
-    // Load projects on initialization
+    // Load projects on initialization - call internal version to avoid deadlock
     try {
-      await this.loadProjects();
+      await this.loadProjectsInternal();
     } catch (error) {
       console.error('[ProjectManager] Failed to load projects on init:', error);
     }
     this.initialized = true;
+  }
+
+  /**
+   * Internal load that doesn't wait for init (called FROM init)
+   */
+  private async loadProjectsInternal(): Promise<Project[]> {
+    try {
+      await this.ensureProjectsDir();
+      const data = await fs.readFile(PROJECTS_FILE, 'utf-8');
+      const projects: Project[] = JSON.parse(data);
+      this.projects = new Map(projects.map((p) => [p.id, p]));
+      return projects;
+    } catch (error) {
+      if ((error as NodeJS.ErrnoException).code === 'ENOENT') {
+        // File doesn't exist yet, return empty array
+        return [];
+      }
+      console.error('[ProjectManager] Failed to load projects:', error);
+      return [];
+    }
   }
 
   private async waitForInit(): Promise<void> {
@@ -69,20 +90,8 @@ export class ProjectManager {
 
   async loadProjects(): Promise<Project[]> {
     await this.waitForInit();  // Bug #73 fix: Wait for initialization
-    try {
-      await this.ensureProjectsDir();
-      const data = await fs.readFile(PROJECTS_FILE, 'utf-8');
-      const projects: Project[] = JSON.parse(data);
-      this.projects = new Map(projects.map((p) => [p.id, p]));
-      return projects;
-    } catch (error) {
-      if ((error as NodeJS.ErrnoException).code === 'ENOENT') {
-        // File doesn't exist yet, return empty array
-        return [];
-      }
-      console.error('[ProjectManager] Failed to load projects:', error);
-      return [];
-    }
+    // After init, just return what's in memory (already loaded)
+    return Array.from(this.projects.values());
   }
 
   async saveProjects(): Promise<void> {
@@ -99,8 +108,9 @@ export class ProjectManager {
 
   async createProject(name: string, projectPath: string, settings?: Partial<ProjectSettings>): Promise<Project> {
     await this.waitForInit();  // Bug #73 fix: Wait for initialization
+    // Bug #16 fix: Use cryptographically random UUID to prevent ID collision
     const project: Project = {
-      id: `proj_${Date.now()}_${Math.random().toString(36).substr(2, 9)}`,
+      id: `proj_${randomUUID()}`,
       name,
       path: projectPath,
       created: Date.now(),
@@ -164,9 +174,10 @@ export class ProjectManager {
       return false;
     }
 
+    // Bug #26 fix: Create new array instead of mutating in place
     if (!project.sessions.includes(sessionId)) {
-      project.sessions.push(sessionId);
-      await this.updateProject(projectId, { sessions: project.sessions });
+      const newSessions = [...project.sessions, sessionId];
+      await this.updateProject(projectId, { sessions: newSessions });
     }
     return true;
   }
@@ -178,9 +189,10 @@ export class ProjectManager {
       return false;
     }
 
+    // Bug #26 fix: Create new array instead of mutating in place
     if (!project.contextFiles.includes(filePath)) {
-      project.contextFiles.push(filePath);
-      await this.updateProject(projectId, { contextFiles: project.contextFiles });
+      const newContextFiles = [...project.contextFiles, filePath];
+      await this.updateProject(projectId, { contextFiles: newContextFiles });
     }
     return true;
   }
@@ -192,8 +204,9 @@ export class ProjectManager {
       return false;
     }
 
-    project.contextFiles = project.contextFiles.filter((f) => f !== filePath);
-    await this.updateProject(projectId, { contextFiles: project.contextFiles });
+    // Bug #26 fix: Create new array instead of mutating in place
+    const newContextFiles = project.contextFiles.filter((f) => f !== filePath);
+    await this.updateProject(projectId, { contextFiles: newContextFiles });
     return true;
   }
 }

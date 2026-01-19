@@ -2,13 +2,29 @@ import { defineConfig } from 'vite';
 import react from '@vitejs/plugin-react';
 import electron from 'vite-plugin-electron';
 import { resolve } from 'path';
+import { spawn } from 'child_process';
+
+// Build preload as CommonJS using esbuild (vite-plugin-electron outputs ESM which breaks preload)
+function buildPreloadPlugin() {
+  return {
+    name: 'build-preload-cjs',
+    buildStart() {
+      spawn('npx', ['esbuild', 'electron/preload.ts', '--bundle', '--platform=node', '--target=node18', '--format=cjs', '--outfile=dist-electron/preload.js', '--external:electron'], {
+        cwd: process.cwd(),
+        stdio: 'inherit',
+        shell: true,
+      });
+    },
+  };
+}
 
 export default defineConfig({
   plugins: [
     react(),
+    buildPreloadPlugin(),
     electron([
       {
-        // Main process
+        // Main process only - preload is built separately as CJS
         entry: 'electron/main.ts',
         onstart({ startup }) {
           startup();
@@ -16,19 +32,9 @@ export default defineConfig({
         vite: {
           build: {
             outDir: 'dist-electron',
-          },
-        },
-      },
-      {
-        // Preload script
-        entry: 'electron/preload.ts',
-        onstart({ reload }) {
-          reload();
-        },
-        vite: {
-          build: {
-            outDir: 'dist-electron',
-            emptyOutDir: false, // Don't clear main.js when rebuilding preload
+            rollupOptions: {
+              external: ['electron', 'floyd-agent-core', 'floyd-agent-core/mcp', 'floyd-agent-core/store', 'floyd-agent-core/permissions', 'floyd-agent-core/utils'],
+            },
           },
         },
       },

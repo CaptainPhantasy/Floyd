@@ -20,8 +20,21 @@ export function ExtensionPanel({}: ExtensionPanelProps) {
 
   useEffect(() => {
     loadExtensionStatus();
-    const interval = setInterval(loadExtensionStatus, 2000);
-    return () => clearInterval(interval);
+    // Bug #23 fix: Reduce polling frequency from 2s to 10s
+    // Extension status doesn't change frequently
+    const interval = setInterval(loadExtensionStatus, 10000);
+    
+    // Listen for extension status changes via IPC
+    const handleStatusChange = (newStatus: ExtensionFallbackStatus) => {
+      setStatus(newStatus);
+    };
+    
+    window.floydAPI?.onExtensionFallbackStatusChange?.(handleStatusChange);
+    
+    return () => {
+      clearInterval(interval);
+      window.floydAPI?.removeExtensionFallbackStatusListener?.();
+    };
   }, []);
 
   const loadExtensionStatus = async () => {

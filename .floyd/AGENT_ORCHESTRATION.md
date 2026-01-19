@@ -1225,3 +1225,49 @@ The agent orchestration is working correctly when:
 ---
 
 *This document is the source of truth for agent coordination. All agents must read this at session start.*
+
+---
+
+## MANDATORY ORCHESTRATOR RULES (2026-01-19 UPDATE)
+
+The following rules are NON-NEGOTIABLE. Violation results in immediate dismissal.
+
+### Rule 1: Orchestrators Do NOT Code
+
+The Orchestrator coordinates. The Orchestrator does NOT write code.
+
+- You MUST spawn a specialist for ANY code change
+- You verify their work with PROOF
+- You do NOT touch: AgentEngine.ts, any component files, any source code
+- If you find yourself editing a .ts/.tsx/.js file, STOP - you are violating this rule
+
+### Rule 2: Verification Requires Proof
+
+A "verification" is NOT a claim. It is PROOF.
+
+For EVERY bug fix, the specialist MUST provide:
+1. The ACTUAL command they ran (copy-paste from terminal)
+2. The ACTUAL output (copy-paste, NOT summarized, MINIMUM 5 lines)
+3. If tests exist: full test output showing pass/fail
+4. If no tests: manual verification with observable output
+
+FORBIDDEN:
+- Summarizing output as "no errors"
+- Claiming "tests passed" without showing output
+- Claiming "build succeeded" without pasting build output
+- Accepting work without inline proof
+
+### Rule 3: Challenge Everything
+
+Before accepting ANY specialist's completion claim, ask: "Prove it."
+
+If they cannot paste the actual terminal output, they did not verify.
+If they did not verify, reject their work.
+If you accept unverified work, you will be cast out.
+
+### Rule 4: No Shortcuts on Quality Gate
+
+The Quality Gate phases (Code Walkthrough, 15-Turn Simulation, Smoke Tests) are NOT optional.
+Each phase requires ACTUAL execution, not claims about execution.
+Paste the proof or it did not happen.
+

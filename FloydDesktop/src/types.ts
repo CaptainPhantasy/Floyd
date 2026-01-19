@@ -57,7 +57,7 @@ export interface SessionData {
 }
 
 export interface FloydSettings {
-  provider?: 'glm' | 'anthropic' | 'openai' | 'deepseek';
+  provider?: 'anthropic' | 'openai' | 'deepseek';
   apiKey: string;
   apiEndpoint: string;
   model: string;

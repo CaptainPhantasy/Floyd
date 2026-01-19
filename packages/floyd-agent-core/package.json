@@ -39,6 +39,7 @@
   "dependencies": {
     "@anthropic-ai/sdk": "^0.71.2",
     "@modelcontextprotocol/sdk": "^1.25.2",
+    "openai": "^6.16.0",
     "uuid": "^13.0.0",
     "ws": "^8.18.0"
   },

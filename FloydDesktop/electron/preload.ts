@@ -9,6 +9,8 @@
 
 import { contextBridge, ipcRenderer } from 'electron';
 
+console.log('[FloydPreload] Initializing preload script...');
+
 // Types for the exposed API
 interface FloydAPI {
   // Agent communication
@@ -224,8 +226,13 @@ const API: FloydAPI = {
   cancelSubAgent: (id: string) => ipcRenderer.invoke('floyd:cancel-subagent', id),
 };
 
-// Expose the API to the renderer process
-contextBridge.exposeInMainWorld('floydAPI', API);
+try {
+  // Expose the API to the renderer process
+  contextBridge.exposeInMainWorld('floydAPI', API);
+  console.log('[FloydPreload] API exposed to renderer');
+} catch (error) {
+  console.error('[FloydPreload] Failed to expose API:', error);
+}
 
 // Type declarations for the renderer process
 declare global {

@@ -918,3 +918,47 @@ cd FloydDesktop && npm run build
 | Final | - | 1 hr | No |
 
 **Total Estimated:** 15-18 hours across multiple sessions
+
+## VERIFICATION PROTOCOL (NON-NEGOTIABLE)
+
+**A verification receipt is NOT a claim. It is PROOF.**
+
+### What Counts as Proof
+
+For EACH bug fix, you MUST paste:
+1. The ACTUAL command you ran (copy-paste from terminal)
+2. The ACTUAL output (copy-paste, NOT summarized, MINIMUM 5 lines)
+3. If tests exist: full test output showing pass/fail
+4. If no tests: manual verification with observable output
+
+### Required Format
+
+BUG #XX VERIFICATION:
+---------------------
+Command: [exact command you ran]
+Output:
+[paste actual terminal output here - MINIMUM 5 lines]
+
+Result: PASS/FAIL
+
+### FORBIDDEN
+
+- Summarizing output as "no errors"
+- Claiming "tests passed" without showing output
+- Claiming "build succeeded" without pasting build output
+- Tables that hide whether verification actually happened
+- Producing completion summaries without inline proof
+
+### Enforcement
+
+ASSUME you will be challenged: "Prove it."
+
+If you cannot paste the actual terminal output, you did not verify.
+If you did not verify, you are not done.
+If you claim completion without proof, you will be cast out.
+
+BEFORE producing ANY completion summary:
+1. Count your verification receipts
+2. Each receipt MUST have actual terminal output pasted inline
+3. If ANY receipt is missing output - you are NOT done
+

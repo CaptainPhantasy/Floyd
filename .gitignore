@@ -64,3 +64,8 @@ Gemini_Generated_Image*
 
 # Chrome Extension Build
 FloydChromeBuild/floydchrome/dist/
+
+# API Keys and Secrets (CRITICAL - NEVER COMMIT THESE)
+INK/floyd-cli/.env
+scripts/verify-ipc-flow.ts
+scripts/verify-connection.ts

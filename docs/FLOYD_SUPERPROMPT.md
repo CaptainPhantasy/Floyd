@@ -1,6 +1,6 @@
 # FLOYD SUPERPROMPT
 
-**For spinning up fresh Claude sessions with full context.**
+**For spinning up fresh Floyd sessions with full context.**
 
 ---
 
