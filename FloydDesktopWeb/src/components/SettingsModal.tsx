@@ -13,7 +13,7 @@ interface SettingsModalProps {
   onSave: () => void;
 }
 
-type Provider = 'anthropic' | 'openai' | 'glm';
+type Provider = 'anthropic' | 'openai' | 'glm' | 'anthropic-compatible';
 
 const PROVIDER_MODELS: Record<Provider, Array<{ id: string; name: string }>> = {
   anthropic: [
@@ -21,6 +21,22 @@ const PROVIDER_MODELS: Record<Provider, Array<{ id: string; name: string }>> = {
     { id: 'claude-opus-4-5-20250514', name: 'Claude 4.5 Opus (Most Capable)' },
     { id: 'claude-sonnet-4-20250514', name: 'Claude 4 Sonnet' },
     { id: 'claude-3-5-haiku-20241022', name: 'Claude 3.5 Haiku (Fast)' },
+  ],
+  'anthropic-compatible': [
+    { id: 'glm-4.7', name: 'GLM-4.7 (Standard, Complex Tasks)' },
+    { id: 'glm-4.5-air', name: 'GLM-4.5 Air (Lightweight, Faster)' },
+    { id: 'glm-4-plus', name: 'GLM-4 Plus (Most Capable)' },
+    { id: 'glm-4-0520', name: 'GLM-4-0520 (Recommended)' },
+    { id: 'glm-4', name: 'GLM-4 (Standard)' },
+    { id: 'glm-4-air', name: 'GLM-4 Air (Fast)' },
+    { id: 'glm-4-airx', name: 'GLM-4 AirX (Faster)' },
+    { id: 'glm-4-long', name: 'GLM-4 Long (128K Context)' },
+    { id: 'glm-4-flash', name: 'GLM-4 Flash (Cheapest)' },
+    { id: 'claude-sonnet-4-5-20250514', name: 'Claude 4.5 Sonnet' },
+    { id: 'claude-opus-4-5-20250514', name: 'Claude 4.5 Opus' },
+    { id: 'claude-sonnet-4-20250514', name: 'Claude 4 Sonnet' },
+    { id: 'claude-3-5-haiku-20241022', name: 'Claude 3.5 Haiku' },
+    { id: 'custom-model', name: 'Custom Model (specify in settings)' },
   ],
   openai: [
     { id: 'gpt-4o', name: 'GPT-4o (Recommended)' },
@@ -48,6 +64,7 @@ export function SettingsModal({ isOpen, onClose, onSave }: SettingsModalProps) {
   const [model, setModel] = useState('claude-sonnet-4-5-20250514');
   const [systemPrompt, setSystemPrompt] = useState('');
   const [maxTokens, setMaxTokens] = useState(16384);
+  const [baseURL, setBaseURL] = useState('');
   const [hasExistingKey, setHasExistingKey] = useState(false);
   const [keyPreview, setKeyPreview] = useState<string | null>(null);
   
@@ -65,6 +82,7 @@ export function SettingsModal({ isOpen, onClose, onSave }: SettingsModalProps) {
         setKeyPreview(settings.apiKeyPreview);
         setSystemPrompt(settings.systemPrompt || '');
         setMaxTokens(settings.maxTokens || 16384);
+        setBaseURL(settings.baseURL || '');
         setApiKey('');
         setTestResult(null);
       });
@@ -115,6 +133,7 @@ export function SettingsModal({ isOpen, onClose, onSave }: SettingsModalProps) {
         model,
         systemPrompt,
         maxTokens,
+        ...(provider === 'anthropic-compatible' && baseURL ? { baseURL } : {}),
       });
       onSave();
       onClose();
@@ -147,7 +166,7 @@ export function SettingsModal({ isOpen, onClose, onSave }: SettingsModalProps) {
             <label className="block text-sm font-medium text-slate-300 mb-2">
               AI Provider
             </label>
-            <div className="grid grid-cols-3 gap-2">
+            <div className="grid grid-cols-2 gap-2">
               <button
                 onClick={() => handleProviderChange('anthropic')}
                 className={cn(
@@ -158,7 +177,19 @@ export function SettingsModal({ isOpen, onClose, onSave }: SettingsModalProps) {
                 )}
               >
                 <div className="font-medium">Anthropic</div>
-                <div className="text-xs text-slate-400">Claude</div>
+                <div className="text-xs text-slate-400">Official API</div>
+              </button>
+              <button
+                onClick={() => handleProviderChange('anthropic-compatible')}
+                className={cn(
+                  'p-3 rounded-lg border text-left transition-colors',
+                  provider === 'anthropic-compatible'
+                    ? 'border-sky-500 bg-sky-500/10 text-sky-300'
+                    : 'border-slate-600 hover:border-slate-500'
+                )}
+              >
+                <div className="font-medium">Anthropic-Compatible</div>
+                <div className="text-xs text-slate-400">Custom Endpoint</div>
               </button>
               <button
                 onClick={() => handleProviderChange('openai')}
@@ -170,7 +201,7 @@ export function SettingsModal({ isOpen, onClose, onSave }: SettingsModalProps) {
                 )}
               >
                 <div className="font-medium">OpenAI</div>
-                <div className="text-xs text-slate-400">GPT</div>
+                <div className="text-xs text-slate-400">GPT Models</div>
               </button>
               <button
                 onClick={() => handleProviderChange('glm')}
@@ -182,7 +213,7 @@ export function SettingsModal({ isOpen, onClose, onSave }: SettingsModalProps) {
                 )}
               >
                 <div className="font-medium">Zai GLM</div>
-                <div className="text-xs text-slate-400">Zhipu</div>
+                <div className="text-xs text-slate-400">Zhipu AI</div>
               </button>
             </div>
           </div>
@@ -190,7 +221,7 @@ export function SettingsModal({ isOpen, onClose, onSave }: SettingsModalProps) {
           {/* API Key */}
           <div>
             <label className="block text-sm font-medium text-slate-300 mb-2">
-              {provider === 'anthropic' ? 'Anthropic' : provider === 'openai' ? 'OpenAI' : 'GLM'} API Key
+              {provider === 'anthropic' || provider === 'anthropic-compatible' ? 'Anthropic' : provider === 'openai' ? 'OpenAI' : 'GLM'} API Key
             </label>
             {hasExistingKey && keyPreview && (
               <div className="text-xs text-slate-500 mb-2">
@@ -205,7 +236,7 @@ export function SettingsModal({ isOpen, onClose, onSave }: SettingsModalProps) {
                   setApiKey(e.target.value);
                   setTestResult(null);
                 }}
-                placeholder={hasExistingKey ? 'Enter new key to change' : `${provider === 'anthropic' ? 'sk-ant-...' : provider === 'openai' ? 'sk-...' : 'xxxxxxxx.xxxxxxxx'}`}
+                placeholder={hasExistingKey ? 'Enter new key to change' : `${provider === 'anthropic' || provider === 'anthropic-compatible' ? 'sk-ant-...' : provider === 'openai' ? 'sk-...' : 'xxxxxxxx.xxxxxxxx'}`}
                 className="flex-1 bg-slate-700 border border-slate-600 rounded px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-sky-500"
               />
               <button
@@ -226,6 +257,25 @@ export function SettingsModal({ isOpen, onClose, onSave }: SettingsModalProps) {
               </div>
             )}
           </div>
+
+          {/* Base URL - only for anthropic-compatible */}
+          {provider === 'anthropic-compatible' && (
+            <div>
+              <label className="block text-sm font-medium text-slate-300 mb-2">
+                API Endpoint URL
+              </label>
+              <input
+                type="text"
+                value={baseURL}
+                onChange={(e) => setBaseURL(e.target.value)}
+                placeholder="https://api.example.com/v1/messages"
+                className="w-full bg-slate-700 border border-slate-600 rounded px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-sky-500"
+              />
+              <p className="text-xs text-slate-500 mt-1">
+                Enter the base URL of your Anthropic-compatible API endpoint.
+              </p>
+            </div>
+          )}
 
           {/* Model Selection */}
           <div>

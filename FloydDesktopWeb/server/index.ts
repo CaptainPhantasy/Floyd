@@ -60,7 +60,7 @@ interface Session {
   messages: Message[];
 }
 
-type Provider = 'anthropic' | 'openai' | 'glm';
+type Provider = 'anthropic' | 'openai' | 'glm' | 'anthropic-compatible';
 
 interface Settings {
   provider: Provider;
@@ -68,6 +68,7 @@ interface Settings {
   model: string;
   systemPrompt?: string;
   maxTokens?: number;
+  baseURL?: string; // For custom Anthropic-compatible endpoints
 }
 
 // Provider configurations
@@ -77,6 +78,22 @@ const PROVIDER_MODELS: Record<Provider, Array<{ id: string; name: string }>> = {
     { id: 'claude-opus-4-5-20250514', name: 'Claude 4.5 Opus (Most Capable)' },
     { id: 'claude-sonnet-4-20250514', name: 'Claude 4 Sonnet' },
     { id: 'claude-3-5-haiku-20241022', name: 'Claude 3.5 Haiku (Fast)' },
+  ],
+  'anthropic-compatible': [
+    { id: 'glm-4.7', name: 'GLM-4.7 (Standard, Complex Tasks)' },
+    { id: 'glm-4.5-air', name: 'GLM-4.5 Air (Lightweight, Faster)' },
+    { id: 'glm-4-plus', name: 'GLM-4 Plus (Most Capable)' },
+    { id: 'glm-4-0520', name: 'GLM-4-0520 (Recommended)' },
+    { id: 'glm-4', name: 'GLM-4 (Standard)' },
+    { id: 'glm-4-air', name: 'GLM-4 Air (Fast)' },
+    { id: 'glm-4-airx', name: 'GLM-4 AirX (Faster)' },
+    { id: 'glm-4-long', name: 'GLM-4 Long (128K Context)' },
+    { id: 'glm-4-flash', name: 'GLM-4 Flash (Cheapest)' },
+    { id: 'claude-sonnet-4-5-20250514', name: 'Claude 4.5 Sonnet' },
+    { id: 'claude-opus-4-5-20250514', name: 'Claude 4.5 Opus' },
+    { id: 'claude-sonnet-4-20250514', name: 'Claude 4 Sonnet' },
+    { id: 'claude-3-5-haiku-20241022', name: 'Claude 3.5 Haiku' },
+    { id: 'custom-model', name: 'Custom Model (specify in settings)' },
   ],
   openai: [
     { id: 'gpt-4o', name: 'GPT-4o (Recommended)' },
@@ -96,12 +113,13 @@ const PROVIDER_MODELS: Record<Provider, Array<{ id: string; name: string }>> = {
   ],
 };
 
-// Default settings
+// Default settings - use GLM API key with Z.ai Anthropic-compatible endpoint
 let settings: Settings = {
-  provider: 'anthropic',
-  apiKey: process.env.ANTHROPIC_API_KEY || process.env.OPENAI_API_KEY || process.env.GLM_API_KEY || '',
-  model: 'claude-sonnet-4-5-20250514',
+  provider: 'anthropic-compatible',
+  apiKey: process.env.GLM_API_KEY || process.env.ANTHROPIC_API_KEY || process.env.OPENAI_API_KEY || '',
+  model: 'glm-4.7',
   maxTokens: 16384,
+  baseURL: 'https://api.z.ai/api/anthropic',
 };
 
 // Sessions store
@@ -190,11 +208,12 @@ async function saveSession(session: Session) {
 
 // Create API clients
 function getAnthropicClient(): Anthropic | null {
-  if (!settings.apiKey || settings.provider !== 'anthropic') {
+  if (!settings.apiKey || (settings.provider !== 'anthropic' && settings.provider !== 'anthropic-compatible')) {
     return null;
   }
   return new Anthropic({
     apiKey: settings.apiKey,
+    baseURL: settings.baseURL,
   });
 }
 
@@ -205,6 +224,16 @@ function getOpenAIClient(): OpenAI | null {
   return new OpenAI({
     apiKey: settings.apiKey,
   });
+}
+
+// Unified client getter
+function getClient(): Anthropic | OpenAI | null {
+  if (settings.provider === 'openai' || settings.provider === 'glm') {
+    return getOpenAIClient();
+  } else if (settings.provider === 'anthropic' || settings.provider === 'anthropic-compatible') {
+    return getAnthropicClient();
+  }
+  return null;
 }
 
 // ============ API Routes ============
@@ -224,6 +253,7 @@ app.get('/api/providers', (req, res) => {
   res.json({
     providers: [
       { id: 'anthropic', name: 'Anthropic' },
+      { id: 'anthropic-compatible', name: 'Anthropic-Compatible (Custom Endpoint)' },
       { id: 'openai', name: 'OpenAI' },
       { id: 'glm', name: 'Zai GLM (Zhipu)' },
     ],
@@ -240,6 +270,7 @@ app.get('/api/settings', (req, res) => {
     apiKeyPreview: settings.apiKey ? `${settings.apiKey.slice(0, 10)}...${settings.apiKey.slice(-4)}` : null,
     systemPrompt: settings.systemPrompt,
     maxTokens: settings.maxTokens,
+    baseURL: settings.baseURL,
   });
 });
 
@@ -303,6 +334,23 @@ app.post('/api/test-key', async (req, res) => {
         success: true, 
         model: response.model,
         message: 'GLM API key is valid'
+      });
+    } else if (provider === 'anthropic-compatible') {
+      // Test with Z.ai endpoint using Anthropic SDK
+      const client = new Anthropic({ 
+        apiKey,
+        baseURL: 'https://api.z.ai/api/anthropic'
+      });
+      const response = await client.messages.create({
+        model: 'glm-4.7',
+        max_tokens: 10,
+        messages: [{ role: 'user', content: 'Say "ok"' }],
+      });
+      
+      res.json({ 
+        success: true, 
+        model: response.model,
+        message: 'Z.ai API key is valid'
       });
     } else {
       const client = new Anthropic({ apiKey });
@@ -815,8 +863,11 @@ app.post('/api/chat/stream', async (req, res) => {
         }
       }
     } else {
-      // Anthropic flow
-      const client = new Anthropic({ apiKey: settings.apiKey });
+      // Anthropic-compatible flow (uses Anthropic client with custom baseURL)
+      const client = new Anthropic({ 
+        apiKey: settings.apiKey,
+        baseURL: settings.baseURL,
+      });
       const anthropicTools = enableTools ? getAnthropicTools() : undefined;
       
       while (turnCount < maxTurns) {
