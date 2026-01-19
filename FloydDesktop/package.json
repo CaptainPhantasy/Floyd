@@ -1,0 +1,104 @@
+{
+  "name": "floyd-desktop",
+  "version": "0.1.0",
+  "description": "Floyd Desktop - GUI for the Floyd Agent Ecosystem",
+  "main": "dist-electron/main.js",
+  "type": "module",
+  "scripts": {
+    "predev": "npm run build:agent-core",
+    "dev": "NODE_ENV=development vite --config vite.config.dev.ts",
+    "prebuild": "npm run build:agent-core",
+    "build": "npm run build:electron && npm run build:renderer",
+    "build:electron": "tsc -p tsconfig.electron.json",
+    "build:renderer": "vite build",
+    "build:agent-core": "npm run build:agent-core:unix || npm run build:agent-core:win",
+    "build:agent-core:unix": "cd ../packages/floyd-agent-core && npm run build",
+    "build:agent-core:win": "cd ..\\packages\\floyd-agent-core && npm run build",
+    "verify:agent-core": "node -e \"const path=require('path');const fs=require('fs');const distPath=path.resolve('../packages/floyd-agent-core/dist');if(!fs.existsSync(distPath)){console.error('floyd-agent-core dist not found at '+distPath);process.exit(1);}console.log('floyd-agent-core dist verified');\"",
+    "preview": "vite preview",
+    "package": "npm run build && electron-builder",
+    "lint": "tsc --noEmit",
+    "test": "vitest",
+    "test:ui": "vitest --ui",
+    "test:coverage": "vitest --coverage"
+  },
+  "dependencies": {
+    "@anthropic-ai/sdk": "^0.71.2",
+    "@modelcontextprotocol/sdk": "^1.25.2",
+    "@radix-ui/react-context-menu": "^2.2.16",
+    "@radix-ui/react-dialog": "^1.1.4",
+    "@radix-ui/react-dropdown-menu": "^2.1.4",
+    "@radix-ui/react-scroll-area": "^1.2.2",
+    "@radix-ui/react-separator": "^1.1.1",
+    "@radix-ui/react-tabs": "^1.1.2",
+    "@radix-ui/react-toast": "^1.2.4",
+    "chokidar": "^3.6.0",
+    "class-variance-authority": "^0.7.1",
+    "clsx": "^2.1.1",
+    "floyd-agent-core": "file:../packages/floyd-agent-core",
+    "lucide-react": "^0.562.0",
+    "react": "^18.3.1",
+    "react-dom": "^18.3.1",
+    "react-markdown": "^10.1.0",
+    "react-syntax-highlighter": "^15.6.1",
+    "tailwind-merge": "^2.6.0",
+    "uuid": "^13.0.0",
+    "ws": "^8.18.0"
+  },
+  "devDependencies": {
+    "@testing-library/jest-dom": "^6.9.1",
+    "@testing-library/react": "^16.3.1",
+    "@testing-library/user-event": "^14.6.1",
+    "@types/node": "^22.10.6",
+    "@types/react": "^18.3.17",
+    "@types/react-dom": "^18.3.5",
+    "@types/react-syntax-highlighter": "^15.5.13",
+    "@types/uuid": "^10.0.0",
+    "@types/ws": "^8.5.13",
+    "@vitejs/plugin-react": "^4.3.4",
+    "@vitest/coverage-v8": "^4.0.17",
+    "@vitest/ui": "^4.0.17",
+    "autoprefixer": "^10.4.20",
+    "electron": "34.0.0",
+    "electron-builder": "^25.1.8",
+    "happy-dom": "^20.3.1",
+    "jsdom": "^27.4.0",
+    "postcss": "^8.4.49",
+    "tailwindcss": "^3.4.17",
+    "typescript": "^5.8.3",
+    "vite": "^6.3.5",
+    "vite-plugin-electron": "^0.29.0",
+    "vite-plugin-electron-renderer": "^0.14.6",
+    "vitest": "^4.0.17"
+  },
+  "build": {
+    "appId": "com.floyd.desktop",
+    "productName": "Floyd Desktop",
+    "icon": "build/icon.png",
+    "mac": {
+      "category": "public.app-category.developer-tools",
+      "target": [
+        "dmg",
+        "zip"
+      ]
+    },
+    "win": {
+      "target": [
+        "nsis",
+        "portable"
+      ]
+    },
+    "linux": {
+      "target": [
+        "AppImage",
+        "deb"
+      ],
+      "category": "Development"
+    },
+    "files": [
+      "dist-electron/**/*",
+      "dist-renderer/**/*",
+      "package.json"
+    ]
+  }
+}

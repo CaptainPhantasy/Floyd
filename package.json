@@ -1,5 +1,26 @@
 {
-  "dependencies": {
-    "ora": "^9.0.0"
+  "name": "floyd-workspace",
+  "version": "0.1.0",
+  "description": "FLOYD CLI - AI Coding Agent Workspace",
+  "private": true,
+  "workspaces": [
+    "packages/*",
+    "INK/floyd-cli",
+    "FloydChromeBuild/floydchrome",
+    "FloydDesktop"
+  ],
+  "scripts": {
+    "install:all": "npm install && npm run install:core && npm run install:cli && npm run install:desktop && npm run install:chrome",
+    "install:core": "cd packages/floyd-agent-core && npm install",
+    "install:cli": "cd INK/floyd-cli && npm install",
+    "install:desktop": "cd FloydDesktop && npm install",
+    "install:chrome": "cd FloydChromeBuild/floydchrome && npm install",
+    "build:core": "cd packages/floyd-agent-core && npm run build",
+    "build:desktop": "cd FloydDesktop && npm run build",
+    "dev:desktop": "cd FloydDesktop && npm run dev"
+  },
+  "devDependencies": {
+    "electron": "^34.0.0",
+    "typescript": "^5.8.3"
   }
 }

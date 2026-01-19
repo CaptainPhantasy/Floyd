@@ -17,7 +17,18 @@ FLOYD is your personal coding accomplice that:
 - Runs commands and tools (destructively, if you're not careful)
 - Remembers context across sessions via FLOYD-S SUPERCACHE™
 - Uses your existing GLM API key instead of demanding a kidney
-- Looks absolutely stunning in your terminal
+- Looks absolutely stunning in your terminal — OR in a desktop app!
+
+### Multiple Interfaces
+
+FLOYD comes in different flavors for different moods:
+
+| Interface | Description | Status |
+|-----------|-------------|--------|
+| **Ink CLI** | Terminal-based TUI (React Ink) | ✅ Complete |
+| **FloydDesktop** | Electron desktop app with proper GUI | 🚧 In Progress |
+| **FloydChrome** | Browser extension for web automation | ✅ Built |
+| **Go CLI** | Legacy Go-based version (DEPRECATED - use TypeScript CLI) | ✅ Complete |
 
 ## Installation
 
@@ -47,23 +58,65 @@ No API key? FLOYD will sit there and judge you silently.
 
 ## Usage
 
+### Terminal (Ink CLI)
+
 ```bash
-# Start FLOYD
 cd INK/floyd-cli
 npm start
-
-# FLOYD will greet you with a stunning ASCII banner
-# Then you type things and FLOYD types back
-# It's conversational! Revolutionary!
 ```
+
+### Desktop App (FloydDesktop)
+
+```bash
+cd FloydDesktop
+npm install
+npm run dev        # Development mode
+npm run package    # Create distributable
+```
+
+### Chrome Extension
+
+```bash
+cd FloydChromeBuild/floydchrome
+npm install
+# Load as unpacked extension in Chrome
+```
+
+### Go CLI (Legacy)
+
+> **⚠️ DEPRECATED:** The Go-based CLI is archived. Use the TypeScript Ink CLI instead.
+
+```bash
+go build -o floyd ./cmd/floyd
+./floyd
+```
+
+---
+
+FLOYD will greet you with a stunning ASCII banner (or a shiny GUI window, if you're fancy).
+Then you type things and FLOYD types back.
+It's conversational! Revolutionary!
 
 ## Commands
 
 | Command | Description |
 |---------|-------------|
+| `floyd-cli` | Start interactive CLI |
+| `floyd-cli --config` | Launch configuration interface |
+| `floyd-cli --monitor` | Launch monitor dashboard |
+| `floyd-cli --tmux` | Launch dual-screen TMUX mode |
 | Type anything | FLOYD will attempt to help |
 | Esc | Escape the existential dread |
 | ? | Toggle help (when you're hopelessly lost) |
+
+### Configuration Interface
+
+FLOYD includes a comprehensive configuration interface for:
+- **Monitor Config** - File watchers, MCP servers, monitoring toggles
+- **Agent Manager** - Create and configure agent profiles
+- **Prompt Library** - Manage prompt templates
+
+See [Configuration Interface User Manual](docs/CONFIG_INTERFACE_USER_MANUAL.md) for complete documentation.
 
 ## FLOYD-S SUPERCACHE™
 
@@ -91,33 +144,54 @@ FLOYD can do things to your files:
 ## Project Structure
 
 ```
-INK/floyd-cli/
-├── src/agent/       # The brain
-├── src/mcp/         # Tool integration
-├── src/store/       # Session persistence
-├── src/theme/       # Make it pretty
-├── src/ui/          # Ink components
-└── source/app.tsx   # Main entry point
+FLOYD_CLI/
+├── packages/
+│   └── floyd-agent-core/   # Shared TypeScript agent core
+├── INK/
+│   └── floyd-cli/          # Terminal CLI (React Ink)
+├── FloydDesktop/           # Electron desktop app 🚧
+│   ├── electron/           # Main process
+│   ├── src/                # React UI
+│   └── IMPLEMENTATION.md   # Build guide
+├── FloydChromeBuild/       # Chrome extension
+│   └── floydchrome/
+│       ├── mcp/             # MCP server
+│       ├── tools/           # Browser automation
+│       └── native-messaging/ # Host bridge
+├── agent/                   # ⚠️ Legacy Go code - archived, use TypeScript version
+├── tui/                     # ⚠️ Legacy Go code - archived, use TypeScript version
+└── docs/                    # Documentation
 ```
+
+**Note:** The Go-based agent is legacy. New development focuses on the TypeScript shared core that powers both CLI and Desktop.
 
 ## Status
 
-- ✅ Agent core implemented
+- ✅ TypeScript migration complete — Go code archived to `.archive/2026-01-16-go-tui-retirement/`
+- ✅ Ink CLI (Terminal TUI) fully functional
+- ✅ Shared `packages/floyd-agent-core/` powers CLI and Desktop
 - ✅ MCP client working
 - ✅ Session persistence
 - ✅ Chrome extension bridge
 - ✅ ASCII banner looks fly
+- 🚧 FloydDesktop (Electron app) in development
 - ⏳ World domination (in progress)
 
 ## Quick Test
 
 ```bash
+# Terminal version
 cd INK/floyd-cli
 npm install
 npm run build
 npm start
 
-# Expected: A stunning terminal interface appears
+# Desktop version (if you like windows)
+cd FloydDesktop
+npm install
+npm run dev
+
+# Expected: A stunning interface appears
 # Unexpected: Nothing, because you forgot to set GLM_API_KEY
 ```
 

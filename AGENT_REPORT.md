@@ -2,9 +2,61 @@
 
 ## Executive Summary
 
-**Status**: ✅ **ALL TESTS PASSING** - Ready to Ship
-**Date**: 2026-01-15
-**Progress**: [▰▰▰▰▰▰▰▰▰▰] 10/10
+**Status**: ✅ **ALL TESTS PASSING** - Phase 1A Complete
+**Date**: 2026-01-17
+**Progress**: [▰▰▰▰▰▰▰▰▰▰] 11/10 (Phase 1A: Legacy Code Removal)
+
+---
+
+## Phase 1A: LEGACY CODE REMOVAL (2026-01-17)
+
+### ULTRATHINK Analysis Complete
+
+Multi-agent parallel exploration confirmed:
+- ✅ Dynamic tool registry exists and works well (`tui/floydtools/registry.go`)
+- ✅ Modern tool executor in place (`agent/tools/executor.go`)
+- ⚠️ Legacy enum-based system orphaned in `agent/tools.go`
+
+### Changes Made
+
+#### agent/tools.go (DELETED)
+- **Removed 348 lines** of legacy enum-based tool dispatch
+- `ToolKind` enum (int-based) - replaced by string-based `FloydToolKind` in TUI
+- `AsyncToolExecutor` with `ExecBash()`, `ExecRead()`, etc. - unused
+- `GetDefaultToolDefinitions()` - replaced by dynamic registry
+
+### Verification
+
+```bash
+$ go build ./agent ./agent/... ./tui/... ./cmd/floyd-cli ./cmd/agent-cli
+✅ Core build successful
+
+$ go test ./agent ./agent/... ./tui/... ./cmd/floyd-cli ./cmd/agent-cli ./ui/floydui ./mcp
+ok  	github.com/Nomadcxx/sysc-Go/agent (cached)
+ok  	github.com/Nomadcxx/sysc-Go/agent/tools (0.437s)
+ok  	github.com/Nomadcxx/sysc-Go/tui (cached)
+ok  	github.com/Nomadcxx/sysc-Go/ui/floydui (0.295s)
+ok  	github.com/Nomadcxx/sysc-Go/mcp (cached)
+✅ All relevant tests pass
+```
+
+### Receipts
+
+**File deleted:**
+```bash
+$ git rm agent/tools.go
+rm 'agent/tools.go'
+```
+
+**No references found** (verified via grep):
+- `agent.ToolKind` - 0 matches
+- `agent.AsyncToolExecutor` - 0 matches
+- `agent.GetDefaultToolDefinitions` - 0 matches
+
+**Modern system active:**
+- `tools.NewExecutor()` - used in `agent/loop/agent.go`, `cmd/agent-cli/main.go`, etc.
+- `tools.ListTools()` - used in `cmd/floyd-cli/main.go`
+- `floydtools.Get()` - used in `agent/tools/executor.go`
 
 ---
 

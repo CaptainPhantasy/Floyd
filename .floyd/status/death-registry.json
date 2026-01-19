@@ -1,0 +1,9 @@
+{
+  "orchestratorDeaths": [],
+  "specialistFirings": [],
+  "totals": {
+    "orchestratorsKilled": 0,
+    "specialistsFired": 0
+  },
+  "notes": "This registry tracks agent accountability. When an orchestrator wastes Douglas's time or a specialist fails their duties, it is recorded here. The goal is ZERO entries."
+}

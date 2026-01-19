@@ -1,193 +1,349 @@
 # FLOYD AGENT
 
-**Last Updated:** 2026-01-12
+**Last Updated:** 2026-01-17
 
 ## Goal
 
 Build a GLM-4.7 powered coding agent that competes with Claude Code - using a $270/year unlimited GLM Mac Code plan instead of monthly $20 Claude subscriptions.
 
+## Architecture Overview
+
+FLOYD is now a **TypeScript-first** multi-platform agent system. The shared agent core (`packages/floyd-agent-core/`) powers multiple UI frontends:
+
+```
+                    ┌─────────────────────────────────────┐
+                    │   floyd-agent-core (TypeScript)     │
+                    │   ┌───────────────────────────────┐ │
+                    │   │  AgentEngine                  │ │
+                    │   │  - Streaming response         │ │
+                    │   │  - Tool calling orchestration │ │
+                    │   │  - Session management         │ │
+                    │   └───────────────────────────────┘ │
+                    │   ┌───────────────────────────────┐ │
+                    │   │  MCPClientManager             │ │
+                    │   │  - WebSocket server           │ │
+                    │   │  - stdio client               │ │
+                    │   │  - Tool aggregation           │ │
+                    │   └───────────────────────────────┘ │
+                    │   ┌───────────────────────────────┐ │
+                    │   │  SessionManager               │ │
+                    │   │  - JSON session storage       │ │
+                    │   │  - Conversation persistence   │ │
+                    │   └───────────────────────────────┘ │
+                    │   ┌───────────────────────────────┐ │
+                    │   │  PermissionManager            │ │
+                    │   │  - Tool authorization         │ │
+                    │   │  - Wildcard patterns          │ │
+                    │   └───────────────────────────────┘ │
+                    └───────────────────┬─────────────────┘
+                                        │
+                    ┌───────────────────┼───────────────────┐
+                    │                   │                   │
+            ┌───────▼──────┐  ┌────────▼────────┐  ┌──────▼───────┐
+            │ Ink CLI      │  │ FloydDesktop   │  │ FloydChrome  │
+            │ (Terminal)   │  │ (Electron)     │  │ (Extension)  │
+            └──────────────┘  └─────────────────┘  └──────────────┘
+```
+
 ## Current Status
 
-### ✅ Working
-- **Supercache Protocol** - Installed at `.floyd/AGENT_INSTRUCTIONS.md`
-- **3-Tier Cache Backend** - `cache/` package with reasoning (5min), project (24h), vault (7d)
-- **Tool Registry** - `bash`, `read`, `write`, `edit`, `multiedit`, `grep`, `ls`, `glob`, `cache`
-- **Agent Loop** - `agent/loop/` handles tool calling and streaming
-- **Protocol Manager** - `agent/floyd/` manages external memory and safety rules
-- **Global Install** - `floyd` and `pink-floyd` in `/usr/local/bin/`
-- **Agent API Connection** - Successfully connects and streams responses
+### ✅ Working (TypeScript Architecture)
 
-### ✅ Fixed Issues (Critical)
+#### Shared Agent Core (`packages/floyd-agent-core/`)
+- **AgentEngine** - Core AI orchestrator with streaming support
+- **MCPClientManager** - Multi-transport MCP client/server
+- **SessionManager** - JSON-based session persistence
+- **PermissionManager** - Tool authorization with wildcards
+- **Config** - Project configuration loader
 
-#### 1. Agent Not Responding (API 422 Error)
-**Symptom:** Agent would show "Thinking..." but never produce any response.
+#### Ink CLI (`INK/floyd-cli/`)
+- **React Ink Terminal UI** - Functional components with hooks
+- **Streaming responses** - Real-time token display
+- **Session management** - Load/save conversations
+- **MCP server mode** - Hosts WebSocket server for Chrome extension
+- **CRUSH theme** - CharmUI-inspired visual design
 
-**Root Cause:** The Anthropic-compatible API (`api.z.ai`) rejects messages with `role: "system"`. The API only accepts `"user"` or `"assistant"` roles. System prompts must be passed via the **`System` field** on the request, not as a message.
+#### FloydDesktop (`FloydDesktop/`)
+- **Electron app** - Desktop GUI with React renderer
+- **WebSocket MCP server** - Exposes agent to Chrome extension
+- **IPC bridge** - Communication between renderer and agent
+- **Session sidebar** - Browse and manage conversations
 
-**Error:** `API error (status 422): Input should be 'user' or 'assistant', input: "system"`
+#### FloydChrome (`FloydChromeBuild/floydchrome/`)
+- **Chrome extension** - Browser automation tools
+- **WebSocket MCP client** - Connects to Desktop/CLI
+- **Tool implementation** - Navigation, reading, interaction, tabs
+- **Permission sandboxing** - Safety rules for browser actions
 
-**Fix:** Updated `agent/floyd/protocol.go` `EnhancedChatRequest` to:
-- Use `prompt.LoadSystemPrompt(mode)` which returns a string
-- Set `req.System = systemPrompt` (correct API format)
-- Filter out any `role: "system"` messages from the conversation
+#### Session Management
+- JSON files stored in `.floyd/sessions/`
+- Full message history persistence
+- Session metadata (id, created, updated, title, workingDirectory)
 
-#### 2. TUI Panic on Channel Close
-**Symptom:** TUI would panic with "send on closed channel" after first agent response.
+#### MCP Integration
+- **WebSocket transport** - For Chrome extension connectivity
+- **stdio transport** - For local MCP servers
+- **Tool aggregation** - Unified tool list from all connections
+- **JSON-RPC 2.0** - Standard MCP protocol
 
-**Root Cause:** `TokenStreamChan` was being closed by a goroutine after each request, but subsequent requests would try to write to the closed channel.
+### 🔧 Maintenance Mode (Legacy Go)
 
-**Fix:** Implemented persistent channel pattern:
-- `TokenStreamChan` is created once in `NewModel` and **never closed**
-- Use sentinel value `\x00DONE` to signal stream completion
-- Added `waitForToken()` command loop to continuously read from channel
+⚠️ **RETIRED** - The original Go Bubbletea TUI has been **archived** to `.archive/2026-01-16-go-tui-retirement/`. It is not actively developed but may be referenced for architectural patterns.
 
-#### 3. Token Reading Loop Not Started
-**Symptom:** Agent connects but tokens are never displayed in the UI.
-
-**Root Cause:** When `thinkingStartedMsg` was received, it didn't return a `waitForToken()` command, so nothing was reading from the channel.
-
-**Fix:** Added `return m, tea.Batch(Tick(...), m.waitForToken())` to the `thinkingStartedMsg` handler.
-
-#### 4. strings.Builder Copy Panic
-**Symptom:** TUI panics with `"strings: illegal use of non-zero Builder copied by value"`.
-
-**Root Cause:** `strings.Builder` cannot be copied by value once it has been written to. Bubble Tea copies the Model struct on each `Update` call, which triggers this panic.
-
-**Fix:** Changed `CurrentResponse` from `strings.Builder` to `*strings.Builder` (pointer) in the Model struct, and initialized it as `&strings.Builder{}` in `NewModel`.
-
-#### 5. Other Fixed Issues
-- **TUI Stability** - Fixed crashes on resize and small screens
-- **Input Flickering** - Fixed cursor strobing on updates  
-- **Timeouts** - Increased limits for reliable tool execution (5m) and thinking (120s)
-- **Concurrency** - Fixed `copylocks` issues in Model struct
-
-### 🔄 In Progress
-- Simple CLI mode (`cmd/floyd-cli/` started but not integrated)
+Key archived components:
+- `agent/` - API client, protocol manager, tool loop
+- `cache/` - 3-tier SUPERCACHE backend (reasoning, project, vault)
+- `tui/` - Bubbletea UI components
+- `cmd/floyd/` - Main CLI entry point
 
 ## Project Structure
 
 ```
-├── agent/              # Core agent logic
-│   ├── client.go       # API client (GLM-4.7 via Anthropic-compatible endpoint)
-│   ├── floyd/          # FLOYD protocol manager
-│   ├── loop/           # Tool calling loop
-│   ├── message/        # Message types
-│   ├── prompt/         # System prompt loader
-│   └── tools/          # Tool executor and schema
-├── cache/              # 3-tier SUPERCACHE backend
-│   ├── frame.go        # Tier 1: reasoning (5min)
-│   ├── chronicle.go    # Tier 2: project (24h)
-│   ├── vault.go        # Tier 3: vault (7d)
-│   └── manager.go      # Unified cache manager
-├── cmd/                # Entry points
-│   ├── floyd/          # Main CLI/TUI (uses shared ui/floyd)
-│   ├── pink-floyd/     # TUI variant (same as floyd)
-│   └── floyd-cli/      # Simple CLI (in progress)
-├── tui/                # TUI components
-│   ├── floyd_mode.go   # Chrome tool templates (not implemented)
-│   └── floydtools/     # Tool implementations
-├── ui/floydui/         # Shared UI package
-│   ├── theme.go        # Theme definitions
-│   ├── styles.go       # Lipgloss styles
-│   ├── assets.go       # Banners, thinking phrases
-│   ├── model.go        # Core model
-│   ├── update.go       # Update logic
-│   └── view.go         # View rendering
-└── .floyd/             # External memory
-    ├── AGENT_INSTRUCTIONS.md  # Full FLOYD protocol
-    ├── master_plan.md         # Project goals
-    ├── progress.md            # Execution log
-    ├── scratchpad.md          # Error notes
-    ├── stack.md               # Tech stack
-    └── branch.md              # PR checklist
+├── packages/
+│   └── floyd-agent-core/        # Shared agent core (TypeScript)
+│       ├── src/
+│       │   ├── agent/
+│       │   │   ├── AgentEngine.ts    # Main AI orchestrator
+│       │   │   └── types.ts          # Message, ToolCall types
+│       │   ├── mcp/
+│       │   │   ├── client-manager.ts # Multi-transport MCP client
+│       │   │   ├── websocket-transport.ts
+│       │   │   └── types.ts
+│       │   ├── store/
+│       │   │   └── conversation-store.ts  # Session persistence
+│       │   ├── permissions/
+│       │   │   └── permission-manager.ts  # Tool authorization
+│       │   └── utils/
+│       │       └── config.ts         # Configuration loader
+│       └── package.json
+│
+├── INK/
+│   └── floyd-cli/                 # Ink CLI (React for terminals)
+│       ├── src/
+│       │   ├── app.tsx            # Main CLI component
+│       │   ├── cli.tsx            # CLI entry point
+│       │   ├── agent/             # Agent integration
+│       │   ├── ui/                # UI components
+│       │   │   ├── crush/         # CRUSH layout components
+│       │   │   ├── components/    # Reusable UI elements
+│       │   │   ├── layouts/       # Main layouts
+│       │   │   └── overlays/      # Modal overlays
+│       │   ├── permissions/       # Permission UI
+│       │   └── theme/             # Theme definitions
+│       └── package.json
+│
+├── FloydDesktop/                  # Electron desktop app
+│   ├── electron/
+│   │   ├── main.ts               # Electron main process
+│   │   ├── preload.ts            # Context bridge
+│   │   ├── ipc/                  # IPC handlers
+│   │   └── mcp/
+│   │       └── ws-server.ts      # WebSocket MCP server
+│   ├── src/
+│   │   ├── components/           # React components
+│   │   ├── hooks/                # Custom React hooks
+│   │   └── App.tsx               # Main app
+│   └── package.json
+│
+├── FloydChromeBuild/
+│   └── floydchrome/               # Chrome extension
+│       ├── src/
+│       │   ├── mcp/
+│       │   │   └── websocket-client.ts  # MCP WebSocket client
+│       │   ├── tools/             # Browser automation tools
+│       │   ├── safety/            # Permission systems
+│       │   ├── background.ts      # Extension background
+│       │   └── content.ts         # Content script
+│       ├── manifest.json
+│       └── package.json
+│
+├── .floyd/                        # Project workspace
+│   ├── sessions/                  # JSON session files
+│   ├── settings.json              # Project configuration
+│   ├── permissions.json           # Tool permissions
+│   └── AGENT_INSTRUCTIONS.md     # Full FLOYD protocol
+│
+└── .archive/                      # Archived code
+    └── 2026-01-16-go-tui-retirement/  # Go Bubbletea TUI (retired)
 ```
 
-## FLOYD-S SUPERCACHE Protocol
+## Tool System
 
-The 3-tier cache is defined in `.floyd/AGENT_INSTRUCTIONS.md`:
+Tools are provided via MCP (Model Context Protocol) from connected servers:
 
-```xml
-<floyd_s_supercache>
-  <tier_1_reasoning>
-    <tier_id>reasoning</tier_id>
-    <ttl>5 minutes</ttl>
-    <description>Current conversation context</description>
-  </tier_1_reasoning>
+| Transport | Purpose | Example |
+|-----------|---------|---------|
+| stdio | Local MCP servers | Filesystem operations, git |
+| WebSocket | Chrome extension | Browser navigation, page reading |
 
-  <tier_2_project>
-    <tier_id>project</tier_id>
-    <ttl>24 hours</ttl>
-    <description>Project-specific context</description>
-  </tier_2_project>
-
-  <tier_3_vault>
-    <tier_id>vault</tier_id>
-    <ttl>7 days</ttl>
-    <description>Reusable solutions</description>
-  </tier_3_vault>
-</floyd_s_supercache>
-```
-
-## Tools
+### Chrome Extension Tools
 
 | Tool | Description | Status |
 |------|-------------|--------|
-| `bash` | Run shell commands | ✅ |
-| `read` | Read file contents | ✅ |
-| `write` | Write files | ✅ |
-| `edit` | Find/replace in files | ✅ |
-| `multiedit` | Multiple edits at once | ✅ |
-| `grep` | Search files with regex | ✅ |
-| `ls` | List directories | ✅ |
-| `glob` | Find files by pattern | ✅ |
-| `cache` | Manage SUPERCACHE tiers | ✅ |
-| `Chrome: navigate` | Browser navigation | ❌ Template only |
-| `Chrome: computer` | Browser automation | ❌ Template only |
+| `chrome_navigate` | Navigate to URL | ✅ |
+| `chrome_read` | Read page content | ✅ |
+| `chrome_click` | Click element | ✅ |
+| `chrome_type` | Type text | ✅ |
+| `chrome_tabs` | Tab management | ✅ |
+| `chrome_screenshot` | Capture screenshot | ✅ |
+
+### Permission System
+
+Tools require authorization before execution:
+
+- **allow** - Tool can execute without confirmation
+- **deny** - Tool is blocked
+- **ask** - User must confirm (default)
+
+Permissions are stored in `.floyd/permissions.json` with wildcard support:
+- `*` - Allow all tools
+- `git-*` - Allow all git-prefixed tools
+- `chrome_*` - Allow all chrome tools
 
 ## API Configuration
 
 - **Endpoint:** `https://api.z.ai/api/anthropic`
-- **Model:** `claude-opus-4` → maps to GLM-4.7
+- **Model:** `claude-opus-4` (maps to GLM-4.7)
 - **Format:** Anthropic API compatible
-- **Streaming:** Supported
+- **Streaming:** Supported via async generators
 
-### Critical API Requirements
+### Environment Variables (priority order)
 
-1. **System prompts use `System` field**, NOT messages with `role: "system"`
-2. Messages array may only contain `role: "user"` or `role: "assistant"`
-3. The `EnhancedChatRequest` function in `agent/floyd/protocol.go` handles this correctly
+1. `ANTHROPIC_AUTH_TOKEN` - Primary API key
+2. `GLM_API_KEY` - Fallback API key
+3. `ZHIPU_API_KEY` - Fallback API key
+4. `~/.claude/settings.json` - Claude Code config (for compatibility)
 
-## Environment Variables
+## Session Management
+
+Sessions are stored as JSON files in `.floyd/sessions/`:
+
+```json
+{
+  "id": "uuid-v4",
+  "created": 1705480800000,
+  "updated": 1705481200000,
+  "title": "Chat title",
+  "messages": [
+    {"role": "system", "content": "..."},
+    {"role": "user", "content": "..."},
+    {"role": "assistant", "content": "..."}
+  ],
+  "workingDirectory": "/path/to/project"
+}
+```
+
+## MCP WebSocket Protocol
+
+The Chrome extension connects to FloydDesktop/CLI via WebSocket:
 
 ```
-ANTHROPIC_AUTH_TOKEN  # API key (primary)
-GLM_API_KEY           # API key (fallback)
-ZHIPU_API_KEY         # API key (fallback)
+Chrome Extension          FloydDesktop/CLI
+     (MCP Client)    ←→   (MCP Server)
+          ws://localhost:3000
+```
+
+### JSON-RPC Methods
+
+| Method | Direction | Description |
+|--------|-----------|-------------|
+| `initialize` | Client→Server | Connection handshake |
+| `tools/list` | Client→Server | List available tools |
+| `tools/call` | Client→Server | Execute a tool |
+| `agent/status` | Client→Server | Get agent state |
+| `agent/chat` | Client→Server | Send chat message |
+
+## Building and Running
+
+### Shared Agent Core
+
+```bash
+cd packages/floyd-agent-core
+npm install
+npm run build
+```
+
+### Ink CLI
+
+```bash
+cd INK/floyd-cli
+npm install
+npm run build
+npm start          # Run the CLI
+npm start -- --chrome  # Start with Chrome bridge (port 3000)
+```
+
+### FloydDesktop
+
+```bash
+cd FloydDesktop
+npm install
+npm run dev          # Development mode
+npm run build        # Production build
+npm run electron     # Run built app
+```
+
+### FloydChrome Extension
+
+```bash
+cd FloydChromeBuild/floydchrome
+npm install
+npm run build        # Build extension
+# Load unpacked extension in Chrome from ./dist
+```
+
+## Configuration
+
+### Project Configuration (`.floyd/settings.json`)
+
+```json
+{
+  "systemPrompt": "Custom system prompt",
+  "allowedTools": ["read", "write", "git-*"],
+  "mcpServers": {
+    "filesystem": {
+      "command": "npx",
+      "args": ["-y", "@modelcontextprotocol/server-filesystem", "/path/to/allow"]
+    }
+  }
+}
+```
+
+### Permissions (`.floyd/permissions.json`)
+
+```json
+{
+  "rules": [
+    {"pattern": "read", "level": "allow"},
+    {"pattern": "write", "level": "ask"},
+    {"pattern": "chrome_*", "level": "ask"},
+    {"pattern": "bash", "level": "deny"}
+  ]
+}
 ```
 
 ## Troubleshooting
 
-### Agent shows "Thinking..." but never responds
-1. Check API key is set: `echo $ANTHROPIC_AUTH_TOKEN` or `echo $GLM_API_KEY`
-2. Run test: `go run ./cmd/test_agent/main.go`
-3. Look for API error in output (e.g., 401, 422, 500)
+### Agent shows "Initializing..." but never ready
+1. Check API key: `echo $GLM_API_KEY` or `echo $ANTHROPIC_AUTH_TOKEN`
+2. Verify network connectivity to `api.z.ai`
+3. Check `.floyd/settings.json` for configuration errors
 
-### TUI panics with "send on closed channel"
-This was fixed. If it recurs, check that:
-- `TokenStreamChan` is never closed (use `\x00DONE` sentinel instead)
-- See `ui/floydui/update.go` and `ui/floydui/model.go` for the pattern
+### Chrome extension can't connect
+1. Ensure FloydDesktop or CLI is running with `--chrome` flag
+2. Verify WebSocket server on `ws://localhost:3000`
+3. Check extension background console for errors
 
-### TUI shows "Terminal too small"
-Resize your terminal to at least 20 lines height.
-
-### Agent times out (120s)
-- Check network connectivity to `api.z.ai`
-- Increase timeout in `ui/floydui/update.go` if needed
+### Session not loading
+1. Verify `.floyd/sessions/` directory exists
+2. Check JSON file is valid
+3. Ensure `workingDirectory` path is accessible
 
 ## Next Steps
 
-1. ~~Fix TUI~~ ✅ Fixed
-2. Implement Chrome tools (if needed)
-3. Add sub-agent orchestration (spawn specialists)
-4. Improve error handling and logging
-5. Complete simple CLI mode
+- [ ] Add more MCP server integrations (git, filesystem, etc.)
+- [ ] Implement multi-agent orchestration (spawn specialists)
+- [ ] Add streaming cursor effects for Ink CLI
+- [ ] Improve error handling and logging
+- [ ] Add test coverage for agent core
+- [ ] Document MCP server development guide

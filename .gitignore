@@ -48,3 +48,19 @@ TODO.md
 
 # Node / JS
 node_modules/
+
+# Electron / Desktop Build Artifacts
+FloydDesktop/dist/
+FloydDesktop/dist-electron/
+FloydDesktop/dist-renderer/
+*.dmg
+*.dmg.blockmap
+*.zip.blockmap
+*.asar
+
+# Screenshots and generated images (unless intentional documentation)
+Screenshot*.png
+Gemini_Generated_Image*
+
+# Chrome Extension Build
+FloydChromeBuild/floydchrome/dist/

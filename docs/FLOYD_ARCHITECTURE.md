@@ -2,136 +2,182 @@
 
 **File-Logged Orchestrator Yielding Deliverables**
 
+**Last Updated:** 2026-01-17
+
 ---
 
 ## Overview
 
-FLOYD is an autonomous AI coding agent built in Go, designed to compete with Claude Code while leveraging the GLM-4.7 API through an Anthropic-compatible proxy. It provides a terminal-based interface for AI-assisted software development with full filesystem access, intelligent caching, and structured protocol management.
+FLOYD is an autonomous AI coding agent designed to compete with Claude Code while leveraging the GLM-4.7 API through an Anthropic-compatible proxy. It provides multiple interfaces for AI-assisted software development with full filesystem access, intelligent caching, and structured protocol management.
 
 ### Components
 
 | Component | Status | Description |
 |-----------|--------|-------------|
-| **FLOYD CLI** | ✅ Complete | Terminal-based TUI agent |
+| **FLOYD CLI (Ink)** | ✅ Complete | Terminal-based TUI agent (TypeScript/React Ink) |
+| **FloydDesktop** | 🚧 In Progress | Electron desktop app with React UI |
 | **FloydChrome** | ✅ Built | Chrome extension for browser automation |
-| **3-Tier Cache** | ✅ Complete | SUPERCACHE with reasoning/project/vault tiers |
-| **Protocol Manager** | ✅ Complete | Safety rules and context injection |
+| **FLOYD Go Agent** | ⚠️ Retired | Legacy Go-based agent - DO NOT USE, archived to `.archive/2026-01-16-go-tui-retirement/` |
+| **Shared Agent Core** | ✅ Complete | `floyd-agent-core` package for all clients |
 
 ---
 
-## Core Architecture
+## Modern Architecture (TypeScript-Based)
 
 ```
-┌─────────────────────────────────────────────────────────────────┐
-│                         GLM-4.7 API                              │
-│                    (Anthropic-Compatible)                        │
-└─────────────────────────────────────────────────────────────────┘
-                               │
-                               ▼
-┌─────────────────────────────────────────────────────────────────┐
-│                        FLOYD AGENT                               │
-│  ┌─────────────┐  ┌─────────────┐  ┌─────────────────────────┐  │
-│  │   Prompt    │  │    Tool     │  │    Protocol Manager     │  │
-│  │   Loader    │  │   Loop      │  │  (Safety + Context)     │  │
-│  └─────────────┘  └─────────────┘  └─────────────────────────┘  │
-└─────────────────────────────────────────────────────────────────┘
-         │                  │                      │
-         ▼                  ▼                      ▼
-┌───────────────┐  ┌───────────────┐  ┌───────────────────────────┐
-│  BASH         │  │  FILESYSTEM   │  │  3-TIER SUPERCACHE        │
-│  - Commands   │  │  - read       │  │  ┌─────────────────────┐  │
-│  - Builds     │  │  - write      │  │  │ Reasoning (5 min)   │  │
-│  - Tests      │  │  - edit       │  │  ├─────────────────────┤  │
-│  - Git        │  │  - grep       │  │  │ Project (24 hours)  │  │
-│               │  │  - ls         │  │  ├─────────────────────┤  │
-│               │  │  - glob       │  │  │ Vault (7 days)      │  │
-└───────────────┘  └───────────────┘  └───────────────────────────┘
+┌─────────────────────────────────────────────────────────────────────────────┐
+│                           GLM-4.7 API (api.z.ai)                           │
+│                      (Anthropic-Compatible Proxy)                          │
+└─────────────────────────────────────────────────────────────────────────────┘
+                                        │
+                                        ▼
+┌─────────────────────────────────────────────────────────────────────────────┐
+│                     Shared Agent Core (floyd-agent-core)                    │
+│  ┌──────────────────┐  ┌──────────────────┐  ┌──────────────────────┐   │
+│  │   AgentEngine    │  │  MCP Client Mgr   │  │   Session Store      │   │
+│  │  (Orchestrator)  │  │  (Tool Discovery) │  │   (JSON Persistence)  │   │
+│  └──────────────────┘  └──────────────────┘  └──────────────────────┘   │
+│  ┌──────────────────┐  ┌──────────────────┐  ┌──────────────────────┐   │
+│  │  Permission Mgr  │  │   Tool Loop      │  │   Config Manager     │   │
+│  │  (Safety Rules)  │  │  (Max 10 turns)  │  │   (API Keys/Settings)│   │
+│  └──────────────────┘  └──────────────────┘  └──────────────────────┘   │
+└─────────────────────────────────────────────────────────────────────────────┘
+                          │                    │                    │
+         ┌────────────────┴─────────┐ ┌──────┴──────┐    ┌───────┴────────┐
+         ▼                          ▼             ▼             ▼
+┌────────────────┐      ┌──────────────────┐  ┌──────────┐  ┌──────────────────┐
+│  Ink CLI       │      │  FloydDesktop    │  │   Chrome │  │   Go CLI        │
+│  (Terminal TUI)│      │  (Electron App)  │  │ Extension│  │   (Legacy)      │
+│                │      │                  │  │          │  │                 │
+│ React Ink UI   │      │ React Web UI     │  │ Browser  │  │ Bubbletea TUI   │
+│ floyd-cli/     │      │ FloydDesktop/    │  │ floydchrome/│  agent/         │
+└────────────────┘      └──────────────────┘  └──────────┘  └──────────────────┘
+```
+
+---
+
+## FloydDesktop (Electron App)
+
+### Architecture
+
+```
+┌─────────────────────────────────────────────────────────────────────────────┐
+│                         FloydDesktop (Electron)                            │
+├─────────────────────────────────────────────────────────────────────────────┤
+│                                                                             │
+│  ┌───────────────────────────────────────────────────────────────────────┐  │
+│  │                    Main Process (Node.js)                              │  │
+│  │  ┌─────────────────────────────────────────────────────────────────┐  │  │
+│  │  │              Shared Agent Engine                                 │  │  │
+│  │  │  (imported from floyd-agent-core)                               │  │  │
+│  │  │                                                                 │  │  │
+│  │  │  - Anthropic SDK (via api.z.ai proxy)                          │  │  │
+│  │  │  - MCP Client Manager (WebSocket server on port 3000)           │  │  │
+│  │  │  - Session Manager (JSON storage)                               │  │  │
+│  │  │  - Permission Manager                                           │  │  │
+│  │  │  - Tool calling loop (max 10 turns)                             │  │  │
+│  │  └─────────────────────────────────────────────────────────────────┘  │  │
+│  │                                                                        │  │
+│  │  ┌─────────────────────────────────────────────────────────────────┐  │  │
+│  │  │                   IPC Bridge (AgentBridge)                       │  │  │
+│  │  │  - agent:sendMessage (streaming)                                │  │  │
+│  │  │  - agent:listTools                                              │  │  │
+│  │  │  - agent:getHistory                                             │  │  │
+│  │  │  - agent:loadSession                                            │  │  │
+│  │  │  - agent:newSession                                             │  │  │
+│  │  └─────────────────────────────────────────────────────────────────┘  │  │
+│  └───────────────────────────────────────────────────────────────────────┘  │
+│                                     ↕ IPC                                  │
+│  ┌───────────────────────────────────────────────────────────────────────┐  │
+│  │                  Renderer Process (React)                            │  │
+│  │  - Chat panel with streaming response                               │  │
+│  │  - File browser / workspace view                                    │  │
+│  │  - Tool call visualization (expandable cards)                       │  │
+│  │  - Session history sidebar                                          │  │
+│  │  - Settings panel                                                   │  │
+│  └───────────────────────────────────────────────────────────────────────┘  │
+│                                                                             │
+└─────────────────────────────────────────────────────────────────────────────┘
+                                          │
+                    ┌─────────────────────┴────────────────┐
+                    ↓                                       ↓
+        ┌─────────────────────┐               ┌─────────────────────────┐
+        │ Floyd Chrome        │               │ MCP Servers              │
+        │ Extension           │               │ (via stdio/WebSocket)   │
+        │                     │               │                          │
+        │ Connects via        │               │ - Filesystem            │
+        │ WebSocket to        │               │ - Git                   │
+        │ Desktop's MCP       │               │ - Search                │
+        │ server (port 3000)  │               │ - Browser automation    │
+        └─────────────────────┘               └─────────────────────────┘
+```
+
+### Key Design Decisions
+
+1. **Shared AgentEngine**: The `AgentEngine` from `floyd-agent-core` is imported by both CLI and Desktop
+2. **No WebSocket Bridge**: Everything is TypeScript - direct imports, no Go bridge needed
+3. **MCP Server**: Desktop runs WebSocket server on port 3000 for Chrome extension
+4. **React UI**: Desktop uses React (via Vite) instead of Ink terminal UI
+5. **JSON File Storage**: Session persistence via SessionManager (JSON files, not SQLite)
+
+### Project Structure
+
+```
+FloydDesktop/
+├── electron/
+│   ├── main.ts              # Electron main process
+│   ├── preload.ts           # Context bridge & IPC
+│   └── ipc/
+│       └── agent-bridge.ts  # IPC handlers for AgentEngine
+├── src/
+│   ├── App.tsx              # Root React component
+│   ├── components/
+│   │   ├── ChatPanel.tsx    # Chat interface
+│   │   ├── Sidebar.tsx      # Session history
+│   │   ├── ToolCallCard.tsx # Tool visualization
+│   │   └── Settings.tsx     # Configuration
+│   └── hooks/
+│       └── useAgent.ts      # AgentEngine hooks
+├── package.json
+└── vite.config.ts
 ```
 
 ---
 
 ## Tool Capabilities
 
-### 1. **Bash** - Shell Command Execution
-Execute any shell command directly on the user's system.
-```json
-{"command": "go build ./...", "timeout": 30000}
-```
-**Use Cases:**
-- Running builds and tests
-- Git operations
-- Package management (npm, pip, cargo)
-- System diagnostics
+### Filesystem Tools
 
-### 2. **Read** - File Content Access
-Read files with optional search and line limiting.
-```json
-{"file_path": "/path/to/file.go", "query": "func Error", "limit": 100}
-```
-**Use Cases:**
-- Understanding codebases
-- Reviewing configurations
-- Finding specific functions
+| Tool | Description | Input Schema |
+|------|-------------|--------------|
+| **Read** | Read file contents with optional search | `{file_path, query?, limit?}` |
+| **Write** | Create or overwrite files | `{file_path, content}` |
+| **Edit** | Surgical string replacement | `{file_path, old_string, new_string}` |
+| **MultiEdit** | Batch non-contiguous edits | `{file_path, edits[{old_string, new_string}]}` |
+| **Ls** | List directory entries | `{path?, ignore?[]}` |
+| **Glob** | Pattern-based file matching | `{pattern}` |
 
-### 3. **Write** - File Creation/Overwrite
-Create new files or completely replace existing ones.
-```json
-{"file_path": "/path/to/new_file.go", "content": "package main\n..."}
-```
-**Use Cases:**
-- Creating new source files
-- Writing configuration files
-- Generating documentation
+### Search Tools
 
-### 4. **Edit** - Surgical File Modification
-Find and replace specific text in files.
-```json
-{"file_path": "main.go", "old_string": "func old()", "new_string": "func new()"}
-```
-**Use Cases:**
-- Fixing bugs
-- Renaming functions
-- Updating imports
+| Tool | Description | Input Schema |
+|------|-------------|--------------|
+| **Grep** | Regex search across files | `{pattern, path?, glob?, output_mode?}` |
 
-### 5. **MultiEdit** - Batch Modifications
-Apply multiple non-contiguous edits in a single operation.
-```json
-{
-  "file_path": "main.go",
-  "edits": [
-    {"old_string": "error1", "new_string": "fixed1"},
-    {"old_string": "error2", "new_string": "fixed2"}
-  ]
-}
-```
+### System Tools
 
-### 6. **Grep** - Pattern Search
-Search across files using regex patterns.
-```json
-{"pattern": "TODO|FIXME", "path": ".", "glob": "*.go", "output_mode": "content"}
-```
-**Use Cases:**
-- Finding code patterns
-- Locating function definitions
-- Tracking TODOs
+| Tool | Description | Input Schema |
+|------|-------------|--------------|
+| **Bash** | Execute shell commands | `{command, timeout?}` |
 
-### 7. **Ls** - Directory Listing
-Explore project structure with smart filtering.
-```json
-{"path": ".", "ignore": [".git", "node_modules", "vendor"]}
-```
+### Cache Tools
 
-### 8. **Glob** - File Pattern Matching
-Find all files matching a glob pattern.
-```json
-{"pattern": "**/*.test.go"}
-```
-
-### 9. **Cache** - SUPERCACHE Management
-Store and retrieve context across sessions.
-```json
-{"action": "store", "tier": "project", "key": "arch_decisions", "value": "..."}
-```
+| Tool | Description | Input Schema |
+|------|-------------|--------------|
+| **CacheStore** | Store to SUPERCACHE tier | `{tier, key, value}` |
+| **CacheRetrieve** | Retrieve from SUPERCACHE | `{tier, key}` |
+| **CacheList** | List cache entries | `{tier}` |
+| **CacheClear** | Clear cache tier | `{tier}` |
+| **CacheStats** | Get cache statistics | `{}` |
 
 ---
 
@@ -145,114 +191,33 @@ Store and retrieve context across sessions.
 
 ---
 
-## Protocol Manager
+## Monorepo Structure
 
-### Safety Rules
-- ❌ NEVER push to main/master
-- ❌ NEVER delete files without confirmation
-- ❌ NEVER run destructive commands without warning
-- ✓ Use feature branches
-- ✓ Prepare PR-ready changes
-
-### Context Injection
-FLOYD automatically loads from `.floyd/` directory:
-- `master_plan.md` - Project goals and objectives
-- `progress.md` - Execution log
-- `stack.md` - Technology stack definition
-- `scratchpad.md` - Error notes and working memory
-
-### Runtime Context
-Each request includes:
-- Current time and timezone
-- Working directory and repo name
-- Git branch information
-- Project type detection (Go, Node.js, Python, etc.)
-- User and shell environment
-
----
-
-## TUI Features
-
-- **Streaming responses** - Real-time token display
-- **Multiple themes** - Dark Side, Classic Pink, Neon Vapor, etc.
-- **Tool visualization** - Shows tool calls and results
-- **Progress indicators** - Animated thinking states
-- **Session persistence** - Conversation history saved to disk
-
----
-
-## Design Philosophy
-
-1. **Execute, Don't Advise** - FLOYD acts on tasks rather than just describing solutions
-2. **Verify Everything** - Builds and tests run after every change
-3. **Context is King** - External memory in `.floyd/` provides persistent project knowledge
-4. **Safety First** - Hard rules prevent destructive operations
-5. **Professional Output** - Clean formatting with tables, boxes, and checkmarks
-
----
-
-## FloydChrome Extension
-
-Browser automation extension for FLOYD, enabling web research and interaction capabilities.
-
-### Location
-```
-FloydChromeBuild/floydchrome/
-```
-
-### Architecture
-```
-┌─────────────────────────────────────────────────────────────────┐
-│                     FLOYD CLI                                    │
-│                  (Native Messaging)                              │
-└─────────────────────────────────────────────────────────────────┘
-                           ↕
-┌─────────────────────────────────────────────────────────────────┐
-│                  FloydChrome Extension                           │
-│  ┌─────────────┐  ┌─────────────┐  ┌─────────────────────────┐  │
-│  │ Background  │  │    MCP      │  │      Safety Layer       │  │
-│  │  Service    │  │   Server    │  │  (Sanitizer + Perms)    │  │
-│  └─────────────┘  └─────────────┘  └─────────────────────────┘  │
-└─────────────────────────────────────────────────────────────────┘
-                           ↕
-┌─────────────────────────────────────────────────────────────────┐
-│                     Browser (Chrome)                             │
-│  ┌─────────────┐  ┌─────────────┐  ┌─────────────────────────┐  │
-│  │  Navigate   │  │    Read     │  │       Interact          │  │
-│  │   URLs      │  │   Pages     │  │    Click/Type           │  │
-│  └─────────────┘  └─────────────┘  └─────────────────────────┘  │
-└─────────────────────────────────────────────────────────────────┘
-```
-
-### Phase 1 Tools (8 Implemented)
-
-| Tool | File | Description |
-|------|------|-------------|
-| `navigate` | tools/navigation.js | Navigate to URLs |
-| `read_page` | tools/reading.js | Extract page text |
-| `find_elements` | tools/reading.js | Query DOM elements |
-| `click` | tools/interaction.js | Click elements |
-| `type` | tools/interaction.js | Type into inputs |
-| `get_tabs` | tools/tabs.js | List open tabs |
-| `switch_tab` | tools/tabs.js | Switch active tab |
-| `close_tab` | tools/tabs.js | Close a tab |
-
-### Safety Features
-- **Prompt Injection Protection** - `safety/sanitizer.js`
-- **Permission Validation** - `safety/permissions.js`
-- **Manifest V3 Compliant** - Modern Chrome extension standards
-
-### Integration Points
-1. **Native Messaging** - `native-messaging/` host manifests
-2. **MCP Protocol** - `mcp/server.js` for FLOYD communication
-3. **Agent Stub** - `agent/floyd.js` ready for wiring
-
-### Installation
 ```bash
-cd FloydChromeBuild/floydchrome
-# Load as unpacked extension in Chrome
-# Then run:
-./native-messaging/install-host.sh <EXTENSION_ID>
+/Volumes/Storage/FLOYD_CLI/
+├── packages/
+│   └── floyd-agent-core/        # Shared TypeScript agent core
+│       ├── src/
+│       │   ├── agent/           # AgentEngine, orchestrator
+│       │   ├── mcp/             # MCP client manager
+│       │   ├── store/           # Session persistence
+│       │   ├── permissions/     # Safety rules
+│       │   └── utils/           # Configuration
+│       └── package.json
+├── INK/
+│   └── floyd-cli/               # CLI (React Ink UI, imports agent-core)
+├── FloydDesktop/                # Desktop (Electron + React, imports agent-core)
+│   ├── electron/
+│   ├── src/
+│   └── IMPLEMENTATION.md
+├── FloydChromeBuild/            # Chrome Extension
+│   └── floydchrome/
+│       ├── mcp/
+│       ├── tools/
+│       └── native-messaging/
+├── agent/                       # Go-based agent (legacy, being phased out)
+├── tui/                         # Go TUI components (legacy)
+└── docs/                        # Documentation
 ```
 
 ---
@@ -266,23 +231,83 @@ cd FloydChromeBuild/floydchrome
 | Format | Anthropic API compatible |
 | Streaming | Supported |
 
+### Environment Variables (priority order)
+
+1. `ANTHROPIC_AUTH_TOKEN`
+2. `GLM_API_KEY`
+3. `ZHIPU_API_KEY`
+4. `~/.claude/settings.json`
+
 ---
 
 ## Quick Start
 
+### FloydDesktop (Electron)
+
 ```bash
-# Build
-go build -o floyd ./cmd/floyd
-
-# Run
-./floyd
-
-# Initialize workspace
-/init
-
-# Get help
-/help
+cd FloydDesktop
+npm install
+npm run dev      # Development mode
+npm run build    # Production build
+npm run package  # Create distributable
 ```
+
+### Ink CLI (Modern - Recommended)
+
+The primary CLI interface built with TypeScript and React Ink. This is the actively maintained
+version that imports `floyd-agent-core`.
+
+```bash
+cd INK/floyd-cli
+npm install
+npm run build    # Production build
+npm start        # Run CLI (development mode)
+```
+
+### FloydChrome Extension
+
+```bash
+cd FloydChromeBuild/floydchrome
+npm install
+# Load as unpacked extension in Chrome
+./native-messaging/install-host.sh <EXTENSION_ID>
+```
+
+### Go CLI (RETIRED - DO NOT USE)
+
+**The original Go-based CLI is ARCHIVED as of 2026-01-16.**
+
+This version has been retired in favor of the TypeScript-based Ink CLI. The source code
+has been moved to `.archive/2026-01-16-go-tui-retirement/`.
+
+Use `INK/floyd-cli` (TypeScript + React Ink) for all new development.
+
+**Migration:** If you have existing Go CLI sessions, migrate to the Ink CLI by exporting
+your session data and importing into the new format.
+
+---
+
+## Design Philosophy
+
+1. **Execute, Don't Advise** - FLOYD acts on tasks rather than just describing solutions
+2. **Verify Everything** - Builds and tests run after every change
+3. **Context is King** - External memory in `.floyd/` provides persistent project knowledge
+4. **Safety First** - Hard rules prevent destructive operations
+5. **Professional Output** - Clean formatting with tables, boxes, and checkmarks
+6. **Shared Core** - All clients use the same `floyd-agent-core` package
+
+---
+
+## Status Matrix
+
+| Component | Implementation | Status | Notes |
+|-----------|----------------|--------|-------|
+| Shared Agent Core | TypeScript | ✅ Complete | AgentEngine, MCPClientManager, SessionManager, PermissionManager, Config |
+| Ink CLI | React Ink | ✅ Complete | Terminal UI |
+| FloydDesktop | Electron + React | 🚧 In Progress | See `FloydDesktop/IMPLEMENTATION.md` |
+| FloydChrome | Chrome Extension | ✅ Built | MCP server + tools |
+| Go CLI | Go | ⚠️ Retired | ARCHIVED - DO NOT USE - See `.archive/2026-01-16-go-tui-retirement/` |
+| Go TUI | Bubbletea | ⚠️ Retired | ARCHIVED - DO NOT USE - See `.archive/2026-01-16-go-tui-retirement/` |
 
 ---
 

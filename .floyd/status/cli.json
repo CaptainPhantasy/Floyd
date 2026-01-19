@@ -1,0 +1,22 @@
+{
+  "agent": "CLISpec",
+  "lastUpdate": "2026-01-18T00:00:00Z",
+  "currentTask": "Awaiting dispatch",
+  "phase": 5,
+  "progress": 0,
+  "blockers": [],
+  "dependencies": [],
+  "nextSync": null,
+  "messages": [],
+  "scope": {
+    "directory": "INK/floyd-cli/",
+    "sharedCore": "packages/floyd-agent-core/",
+    "target": "Claude Code parity",
+    "currentParity": 40
+  },
+  "ownsSharedCore": true,
+  "recentWork": [
+    "TypeScript migration complete",
+    "Agent-core package built"
+  ]
+}
