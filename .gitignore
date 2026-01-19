@@ -1,0 +1,71 @@
+# Binaries
+syscgo
+installer
+*.exe
+*.dll
+*.so
+*.dylib
+
+# Test binary
+*.test
+test_*.go
+
+# Output of the go coverage tool
+*.out
+
+# Go workspace file
+go.work
+
+# IDE
+.vscode/
+.idea/
+*.swp
+*.swo
+*~
+*.backup
+
+# Development
+.beads/
+.archive/
+sysc_src/
+
+# OS
+.DS_Store
+Thumbs.db
+
+# AI/Editor config files
+CLAUDE.md
+opencode.json
+syscgo-tui
+flf2bit
+
+# Development/design documents (internal only)
+*_DESIGN.md
+*_SYSTEM.md
+DESIGN_*.md
+NOTES.md
+TODO.md
+
+# Node / JS
+node_modules/
+
+# Electron / Desktop Build Artifacts
+FloydDesktop/dist/
+FloydDesktop/dist-electron/
+FloydDesktop/dist-renderer/
+*.dmg
+*.dmg.blockmap
+*.zip.blockmap
+*.asar
+
+# Screenshots and generated images (unless intentional documentation)
+Screenshot*.png
+Gemini_Generated_Image*
+
+# Chrome Extension Build
+FloydChromeBuild/floydchrome/dist/
+
+# API Keys and Secrets (CRITICAL - NEVER COMMIT THESE)
+INK/floyd-cli/.env
+scripts/verify-ipc-flow.ts
+scripts/verify-connection.ts

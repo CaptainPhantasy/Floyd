@@ -1,0 +1,135 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>FloydChrome</title>
+  <style>
+    body {
+      font-family: system-ui, -apple-system, sans-serif;
+      margin: 0;
+      padding: 16px;
+      background: #1a1a2e;
+      color: #eee;
+      min-height: 300px;
+      width: 350px;
+    }
+
+    h1 {
+      font-size: 18px;
+      margin: 0 0 16px 0;
+      color: #ff60ff;
+      display: flex;
+      align-items: center;
+      gap: 8px;
+    }
+
+    .status-row {
+      display: flex;
+      align-items: center;
+      gap: 8px;
+      margin-bottom: 12px;
+      padding: 8px;
+      background: #16213e;
+      border-radius: 6px;
+    }
+
+    .status-indicator {
+      width: 10px;
+      height: 10px;
+      border-radius: 50%;
+      background: #666;
+    }
+
+    .status-indicator.connected {
+      background: #4ade80;
+      box-shadow: 0 0 8px #4ade80;
+    }
+
+    .status-indicator.disconnected {
+      background: #f87171;
+    }
+
+    #connection-status {
+      flex: 1;
+      font-size: 14px;
+    }
+
+    button {
+      background: #ff60ff;
+      color: #1a1a2e;
+      border: none;
+      padding: 8px 16px;
+      border-radius: 6px;
+      font-weight: 600;
+      cursor: pointer;
+      transition: opacity 0.2s;
+    }
+
+    button:hover {
+      opacity: 0.9;
+    }
+
+    .info-section {
+      margin-top: 16px;
+      padding: 12px;
+      background: #16213e;
+      border-radius: 6px;
+      font-size: 12px;
+      color: #aaa;
+    }
+
+    .info-section h3 {
+      margin: 0 0 8px 0;
+      font-size: 12px;
+      color: #fff;
+    }
+
+    #message-log {
+      margin-top: 12px;
+      max-height: 150px;
+      overflow-y: auto;
+      font-family: monospace;
+      font-size: 11px;
+    }
+
+    .log-entry {
+      padding: 4px 0;
+      border-bottom: 1px solid #2a2a4e;
+    }
+
+    .logo {
+      width: 24px;
+      height: 24px;
+      background: linear-gradient(135deg, #ff60ff, #6060ff);
+      border-radius: 4px;
+    }
+  </style>
+</head>
+<body>
+  <h1>
+    <div class="logo"></div>
+    FloydChrome
+  </h1>
+
+  <div class="status-row">
+    <div id="status-indicator" class="status-indicator"></div>
+    <span id="connection-status">Checking...</span>
+  </div>
+
+  <button id="connect-btn">Connect</button>
+
+  <div class="info-section">
+    <h3>Connection Mode</h3>
+    <p>WebSocket: ws://localhost:3000 (FloydDesktop)</p>
+    <p>Fallback: Native Messaging (FLOYD CLI)</p>
+  </div>
+
+  <div class="info-section">
+    <h3>Activity Log</h3>
+    <div id="message-log"></div>
+  </div>
+
+  <script src="./index.js"></script>
+</body>
+</html>

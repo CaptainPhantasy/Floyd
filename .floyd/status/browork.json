@@ -1,0 +1,24 @@
+{
+  "agent": "BroworkSpec",
+  "lastUpdate": "2026-01-18T00:00:00Z",
+  "currentTask": "Awaiting dispatch",
+  "phase": 5,
+  "progress": 0,
+  "blockers": [],
+  "dependencies": ["desktop.json", "cli.json"],
+  "nextSync": null,
+  "messages": [],
+  "scope": {
+    "components": [
+      "FloydDesktop/src/components/BroworkPanel.tsx",
+      "FloydDesktop/electron/ipc/agent-ipc.ts"
+    ],
+    "target": "Claude Cowork parity",
+    "currentParity": 35
+  },
+  "recentWork": [
+    "Sub-agent spawning implemented",
+    "Real AgentEngine instances",
+    "Progress tracking working"
+  ]
+}
