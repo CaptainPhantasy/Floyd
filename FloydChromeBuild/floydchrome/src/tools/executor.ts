@@ -7,6 +7,7 @@ import { NavigationTools } from './navigation.js';
 import { ReadingTools } from './reading.js';
 import { InteractionTools } from './interaction.js';
 import { TabTools } from './tabs.js';
+import { ScreenshotTools } from './screenshot.js';
 import type { ToolName, ToolMetadata, ToolInput, ToolResult } from './types.js';
 
 export class ToolExecutor {
@@ -22,6 +23,9 @@ export class ToolExecutor {
       ['read_page', ReadingTools.readPage],
       ['get_page_text', ReadingTools.getPageText],
       ['find', ReadingTools.find],
+
+      // Screenshot (Computer Use)
+      ['screenshot', ScreenshotTools.screenshot],
 
       // Interaction
       ['click', InteractionTools.click],
@@ -75,6 +79,18 @@ export class ToolExecutor {
             tabId: { type: 'number', description: 'Tab ID (optional, uses active tab if not provided)' }
           },
           required: ['query']
+        }
+      }],
+      ['screenshot', {
+        name: 'screenshot',
+        description: 'Capture screenshot of page, element, or viewport. Returns base64-encoded image data for Computer Use/vision models.',
+        inputSchema: {
+          type: 'object',
+          properties: {
+            fullPage: { type: 'boolean', description: 'Capture full scrollable page (default: false)' },
+            selector: { type: 'string', description: 'CSS selector to capture specific element' },
+            tabId: { type: 'number', description: 'Tab ID (optional, uses active tab if not provided)' }
+          }
         }
       }],
       ['click', {

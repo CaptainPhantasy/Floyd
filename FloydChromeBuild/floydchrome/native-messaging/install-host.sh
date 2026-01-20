@@ -1,62 +1,96 @@
 #!/bin/bash
-# Install Native Messaging Host for FloydChrome
-# This script registers the native messaging host with Chrome
+
+# FloydChrome Native Messaging Host Installation Script
+# This script installs the native messaging host for Chrome on macOS
 
 set -e
 
-SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
-EXTENSION_DIR="$(cd "$SCRIPT_DIR/.." && pwd)"
+HOST_MANIFEST="/Volumes/Storage/FLOYD_CLI/FloydChromeBuild/floydchrome/native-messaging/com.floyd.chrome.json"
+HOST_BINARY="/Volumes/Storage/FLOYD_CLI/INK/floyd-cli/bin/floyd-chrome-host.js"
 
-# Detect OS
-if [[ "$OSTYPE" == "darwin"* ]]; then
-    # macOS
-    HOST_MANIFEST_DIR="$HOME/Library/Application Support/Google/Chrome/NativeMessagingHosts"
-    HOST_BINARY="$EXTENSION_DIR/native-messaging/floyd-chrome-host"
-elif [[ "$OSTYPE" == "linux-gnu"* ]]; then
-    # Linux
-    HOST_MANIFEST_DIR="$HOME/.config/google-chrome/NativeMessagingHosts"
-    HOST_BINARY="$EXTENSION_DIR/native-messaging/floyd-chrome-host"
-else
-    echo "Unsupported OS: $OSTYPE"
+# Chrome native messaging directory
+CHROME_DIR="$HOME/Library/Application Support/Google/Chrome/NativeMessagingHosts"
+CHROME_MANIFEST="$CHROME_DIR/com.floyd.chrome.json"
+
+# Chrome Beta native messaging directory (optional)
+CHROME_BETA_DIR="$HOME/Library/Application Support/Google/Chrome Beta/NativeMessagingHosts"
+CHROME_BETA_MANIFEST="$CHROME_BETA_DIR/com.floyd.chrome.json"
+
+# Brave browser native messaging directory (optional)
+BRAVE_DIR="$HOME/Library/Application Support/BraveSoftware/Brave-Browser/NativeMessagingHosts"
+BRAVE_MANIFEST="$BRAVE_DIR/com.floyd.chrome.json"
+
+# Edge browser native messaging directory (optional)
+EDGE_DIR="$HOME/Library/Application Support/Microsoft/Edge/NativeMessagingHosts"
+EDGE_MANIFEST="$EDGE_DIR/com.floyd.chrome.json"
+
+echo "🚀 Installing FloydChrome Native Messaging Host..."
+
+# Verify host binary exists
+if [ ! -f "$HOST_BINARY" ]; then
+    echo "❌ Error: Host binary not found at $HOST_BINARY"
     exit 1
 fi
 
-# Create directory if it doesn't exist
-mkdir -p "$HOST_MANIFEST_DIR"
+# Make host binary executable
+chmod +x "$HOST_BINARY"
+echo "✅ Made host binary executable"
 
-# Get extension ID (user will need to install extension first and get ID)
-echo "NOTE: You need to install the extension in Chrome first and get the Extension ID"
-echo "You can find it at chrome://extensions/"
-read -p "Enter Extension ID: " EXTENSION_ID
-
-if [ -z "$EXTENSION_ID" ]; then
-    echo "Error: Extension ID is required"
-    exit 1
-fi
-
-# Create manifest with actual extension ID
-MANIFEST_FILE="$HOST_MANIFEST_DIR/com.floyd.chrome.json"
-cat > "$MANIFEST_FILE" <<EOF
+# Create temporary manifest with actual path
+TEMP_MANIFEST="/tmp/com.floyd.chrome.json"
+cat > "$TEMP_MANIFEST" << EOF
 {
   "name": "com.floyd.chrome",
-  "description": "Native messaging host for FloydChrome extension",
+  "description": "FloydChrome Native Messaging Host",
   "path": "$HOST_BINARY",
   "type": "stdio",
   "allowed_origins": [
-    "chrome-extension://$EXTENSION_ID/"
+    "chrome-extension://*"
   ]
 }
 EOF
 
-# Make host binary executable (if it exists)
-if [ -f "$HOST_BINARY" ]; then
-    chmod +x "$HOST_BINARY"
+# Install for Google Chrome
+if [ -d "$CHROME_DIR" ] || mkdir -p "$CHROME_DIR"; then
+    cp "$TEMP_MANIFEST" "$CHROME_MANIFEST"
+    echo "✅ Installed for Google Chrome"
 fi
 
-echo "Native messaging host installed successfully!"
-echo "Manifest: $MANIFEST_FILE"
+# Install for Chrome Beta (if directory exists)
+if [ -d "$CHROME_BETA_DIR" ]; then
+    cp "$TEMP_MANIFEST" "$CHROME_BETA_MANIFEST"
+    echo "✅ Installed for Chrome Beta"
+fi
+
+# Install for Brave (if directory exists)
+if [ -d "$BRAVE_DIR" ]; then
+    cp "$TEMP_MANIFEST" "$BRAVE_MANIFEST"
+    echo "✅ Installed for Brave"
+fi
+
+# Install for Edge (if directory exists)
+if [ -d "$EDGE_DIR" ]; then
+    cp "$TEMP_MANIFEST" "$EDGE_MANIFEST"
+    echo "✅ Installed for Edge"
+fi
+
+# Clean up
+rm "$TEMP_MANIFEST"
+
 echo ""
-echo "Next steps:"
-echo "1. Build the native host binary (floyd-chrome-host)"
-echo "2. Install the Chrome extension"
-echo "3. Start FLOYD CLI with --chrome flag"
+echo "✨ Installation complete!"
+echo ""
+echo "The FloydChrome native messaging host has been installed for:"
+echo "  - Google Chrome"
+if [ -d "$CHROME_BETA_DIR" ]; then echo "  - Chrome Beta"; fi
+if [ -d "$BRAVE_DIR" ]; then echo "  - Brave"; fi
+if [ -d "$EDGE_DIR" ]; then echo "  - Edge"; fi
+echo ""
+echo "To use native messaging:"
+echo "  1. Make sure Floyd CLI MCP browser server is running"
+echo "  2. Reload the FloydChrome extension"
+echo "  3. The extension will connect via native messaging"
+echo ""
+echo "To uninstall:"
+echo "  rm \"$CHROME_MANIFEST\""
+echo ""

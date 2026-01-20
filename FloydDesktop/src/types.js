@@ -1,4 +1,0 @@
-/**
- * FloydDesktop - Shared Types
- */
-export {};

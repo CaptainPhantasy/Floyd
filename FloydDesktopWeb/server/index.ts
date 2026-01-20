@@ -19,9 +19,13 @@ import { BUILTIN_TOOLS, MCPClient } from './mcp-client.js';
 import { SkillsManager, Skill } from './skills-manager.js';
 import { ProjectsManager, Project } from './projects-manager.js';
 import { BroworkManager, AgentTask } from './browork-manager.js';
+import { WebSocketMCPServer } from './ws-mcp-server.js';
 
 // Load .env.local
 config({ path: '.env.local' });
+
+// Initialize WebSocket MCP server for Chrome extension
+let wsMcpServer: WebSocketMCPServer | null = null;
 
 // Initialize tool executor
 const toolExecutor = new ToolExecutor([
@@ -964,9 +968,26 @@ app.post('/api/chat/stream', async (req, res) => {
 // Start server
 const PORT = process.env.PORT || 3001;
 
-initDataDir().then(() => {
+// Also start WebSocket MCP server for Chrome extension
+initDataDir().then(async () => {
+  // Start Express API server
   app.listen(PORT, () => {
     console.log(`[Floyd Web Server] Running on http://localhost:${PORT}`);
     console.log(`[Floyd Web Server] API Key: ${settings.apiKey ? 'Configured' : 'NOT SET'}`);
   });
+
+  // Start WebSocket MCP server for Chrome extension
+  try {
+    wsMcpServer = new WebSocketMCPServer(3000);
+    wsMcpServer.registerTools(BUILTIN_TOOLS);
+    await wsMcpServer.start();
+    console.log('[Floyd Web Server] WebSocket MCP server started on port 3000 for Chrome extension');
+  } catch (error: any) {
+    if (error.code === 'EADDRINUSE') {
+      console.log('[Floyd Web Server] Port 3000 already in use - WebSocket MCP server not started');
+      console.log('[Floyd Web Server] Chrome extension will connect to existing MCP server');
+    } else {
+      console.error('[Floyd Web Server] Failed to start WebSocket MCP server:', error);
+    }
+  }
 });

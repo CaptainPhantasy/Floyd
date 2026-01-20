@@ -14,4 +14,6 @@ export { PROVIDER_DEFAULTS, DEFAULT_GLM_CONFIG, DEFAULT_ANTHROPIC_CONFIG, DEFAUL
 export { RiskLevel, classifyRisk, getRiskDescription, getRecommendedAction } from './permissions/risk-classifier.js';
 export * from './permissions/policies.js';
 export { PermissionStore } from './permissions/store.js';
+// STT (Speech-to-Text) module
+export { STTService, AudioRecorder, WhisperTranscriber, STTError, STTErrorCode, } from './stt/index.js';
 //# sourceMappingURL=index.js.map

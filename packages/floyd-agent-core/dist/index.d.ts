@@ -14,4 +14,7 @@ export { RiskLevel, classifyRisk, getRiskDescription, getRecommendedAction } fro
 export type { RiskAssessment } from './permissions/risk-classifier.js';
 export * from './permissions/policies.js';
 export { PermissionStore } from './permissions/store.js';
+export { STTService, AudioRecorder, WhisperTranscriber, STTError, STTErrorCode, } from './stt/index.js';
+export type { STTConfig, STTEvent, RecordingState, TranscriptionOptions, TranscriptionResult, } from './stt/index.js';
+export type { AudioRecorderConfig } from './stt/audio-recorder.js';
 //# sourceMappingURL=index.d.ts.map
