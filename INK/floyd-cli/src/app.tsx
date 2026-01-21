@@ -585,52 +585,6 @@ export default function App({name = 'User', chrome = false}: AppProps) {
 	);
 
 	// ============================================================================
-	// HELP OVERLAY
-	// ============================================================================
-
-	if (showHelp) {
-		return (
-			<Box
-				flexDirection="column"
-				padding={1}
-				width="100%"
-				height="100%"
-				borderStyle="round"
-				borderColor={floydTheme.colors.borderFocus}
-			>
-				<Text bold color={floydRoles.headerTitle}>
-					FLOYD CLI Help
-				</Text>
-				<Box marginTop={1} flexDirection="column">
-					<Text color={floydTheme.colors.fgBase}>Keyboard Shortcuts:</Text>
-					<Box flexDirection="column" marginLeft={1}>
-						<Text>Ctrl+P - Command Palette</Text>
-						<Text>Ctrl+M - Toggle Monitor Dashboard</Text>
-						<Text>Ctrl+T - Toggle Agent Visualization</Text>
-						<Text>Ctrl+/ - Toggle Help</Text>
-						<Text>? - Toggle Help (when not typing)</Text>
-						<Text>Enter - Send Message</Text>
-						<Text>Esc - Close dialog / Exit</Text>
-					</Box>
-				</Box>
-				<Box marginTop={1} flexDirection="column">
-					<Text color={floydTheme.colors.fgBase}>Modes:</Text>
-					<Box flexDirection="column" marginLeft={1}>
-						<Text>Chat - Interactive conversation</Text>
-						<Text>Code - Code-focused assistance</Text>
-						<Text>Monitor - Real-time system monitoring</Text>
-					</Box>
-				</Box>
-				<Box marginTop={1}>
-					<Text color={floydRoles.hint} dimColor>
-						Press Esc or Ctrl+/ to close help
-					</Text>
-				</Box>
-			</Box>
-		);
-	}
-
-	// ============================================================================
 	// MONITOR DASHBOARD
 	// ============================================================================
 

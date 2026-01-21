@@ -234,6 +234,16 @@ ${content}\n\
   return { success: true, message: "Skill crystallized." };
 }
 
+async function gitDiff(staged = false) {
+  try {
+    const cmd = staged ? 'git diff --staged' : 'git diff';
+    const { stdout } = await execAsync(cmd);
+    return { stdout: stdout || '(No changes)' };
+  } catch (e: any) {
+    return { error: `Git diff failed: ${e.message}` };
+  }
+}
+
 // --- Tool 14: Spawn Shadow Workspace (Carbon Copy) ---
 async function spawnShadowWorkspace(id: string) {
   const shadowDir = path.join(process.cwd(), '.floyd', 'shadow', id);
@@ -284,6 +294,8 @@ export function createExplorerServer(): Server {
       { name: 'tui_puppeteer', description: 'Interact with TUI.', inputSchema: { type: 'object', properties: { command: { type: 'string' }, keys: { type: 'array' } }, required: ['command', 'keys'] } },
       { name: 'ast_navigator', description: 'Navigate code.', inputSchema: { type: 'object', properties: { query: { type: 'string' }, type: { type: 'string' } }, required: ['query', 'type'] } },
       { name: 'skill_crystallizer', description: 'Save skill.', inputSchema: { type: 'object', properties: { skillName: { type: 'string' }, filePath: { type: 'string' }, description: { type: 'string' } }, required: ['skillName', 'filePath', 'description'] } },
+      { name: 'git_diff', description: 'View git changes.', inputSchema: { type: 'object', properties: { staged: { type: 'boolean', description: 'Show staged changes' } } } },
+      { name: 'GITDIF', description: 'FAST git diff (alias).', inputSchema: { type: 'object', properties: { staged: { type: 'boolean', description: 'Show staged changes' } } } },
       
       // Safety Tool
       { name: 'spawn_shadow_workspace', description: 'Create a safe clone of the project to test dangerous changes.', inputSchema: { type: 'object', properties: { id: { type: 'string', description: 'Unique ID for shadow' } }, required: ['id'] } },
@@ -310,6 +322,7 @@ export function createExplorerServer(): Server {
       if (name === 'tui_puppeteer') return { content: [{ type: 'text', text: JSON.stringify(await tuiPuppeteer((args as any).command, (args as any).keys)) }] };
       if (name === 'ast_navigator') return { content: [{ type: 'text', text: JSON.stringify(await astNavigator((args as any).query, (args as any).type)) }] };
       if (name === 'skill_crystallizer') return { content: [{ type: 'text', text: JSON.stringify(await skillCrystallizer((args as any).skillName, (args as any).filePath, (args as any).description)) }] };
+      if (name === 'git_diff' || name === 'GITDIF') return { content: [{ type: 'text', text: JSON.stringify(await gitDiff((args as any).staged)) }] };
       
       throw new Error(`Unknown tool: ${name}`);
     } catch (e: any) { return { content: [{ type: 'text', text: `Error: ${e.message}` }], isError: true }; }

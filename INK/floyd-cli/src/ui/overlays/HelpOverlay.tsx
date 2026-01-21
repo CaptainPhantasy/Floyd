@@ -177,7 +177,7 @@ export function HelpOverlay({
 	const displayHotkeys = hotkeys || getDefaultHotkeys(onClose, onCommand);
 	const [selectedIndex, setSelectedIndex] = useState(0);
 
-	const groupedHotkeys = groupHotkeys(hotkeys);
+	const groupedHotkeys = groupHotkeys(displayHotkeys);
 	const flatHotkeys = Array.from(groupedHotkeys.values()).flat();
 
 	// Reset selectedIndex when hotkeys change or overlay opens

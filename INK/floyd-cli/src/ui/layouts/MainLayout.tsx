@@ -676,9 +676,14 @@ export function MainLayout({
 	quickActions = [],
 }: MainLayoutProps) {
 	const [input, setInput] = useState('');
-	// showHelp local state - controlled internally for keyboard shortcuts
-	// Don't sync with prop to avoid infinite loop
-	const [showHelp, setShowHelp] = useState(false);
+	// showHelp state from centralized store
+	const showHelp = useFloydStore(state => state.showHelp);
+	const setShowHelp = useCallback((value: boolean) => {
+		useFloydStore.getState().setOverlay('showHelp', value);
+	}, []);
+	const toggleHelp = useCallback(() => {
+		useFloydStore.getState().toggleOverlay('showHelp');
+	}, []);
 
 	// Overlay state from centralized store (consolidated)
 	// NOTE: Use stable selectors for values, useCallback for actions to prevent infinite re-render loops
@@ -1046,7 +1051,7 @@ export function MainLayout({
 
 		// Ctrl+/ toggles help overlay
 		if (key.ctrl && _inputKey === '/') {
-			setShowHelp(v => !v);
+			toggleHelp();
 			return;
 		}
 
@@ -1059,7 +1064,7 @@ export function MainLayout({
 		// This prevents triggering when typing sentences ending with "?" like "What is this?"
 		// Check: input must be empty (actual state value, not a timeout-based ref)
 		if (input.length === 0 && _inputKey === '?') {
-			setShowHelp(v => !v);
+			toggleHelp();
 			return;
 		}
 
@@ -1218,7 +1223,6 @@ export function MainLayout({
 			commands={augmentedCommands}
 			initialOpen={false}
 			openKeys={['/']}  // Add / as a trigger key
-			onCommandSelected={handleCommandSelected}
 		>
 			<Box flexDirection="column" padding={0} width="100%">
 				{/* ASCII Banner - hide on narrow screens */}

@@ -211,23 +211,22 @@ export function CommandPalette({
 		if (key.return && filteredCommands.length > 0) {
 			const selected = filteredCommands[selectedIndex];
 			if (selected && !selected.disabled) {
-				// Insert command text into parent input field (if callback provided)
-				// Otherwise execute action directly (for backwards compatibility)
+				// 1. Execute action if defined
+				if (selected.action) {
+					try {
+						selected.action();
+					} catch (error) {
+						console.error('[CommandPalette] Command execution failed:', error);
+					}
+				}
+
+				// 2. Insert text into input field if callback provided
 				if (onCommandSelected) {
 					const textToInsert = selected.insertText || selected.label;
 					onCommandSelected(textToInsert);
-					onClose();
-				} else {
-					// Backwards compatible: execute action if no insert callback
-					try {
-						selected.action();
-						onClose();
-					} catch (error) {
-						// Error handling: keep palette open and log error
-						console.error('[CommandPalette] Command execution failed:', error);
-						// Could show error message to user here
-					}
 				}
+
+				onClose();
 			}
 			return;
 		}
