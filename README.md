@@ -2,14 +2,16 @@
   <img src="ASSETS/code_cli.png" alt="FLOYD CLI" width="800"/>
 </p>
 
-<p align="center">
-  <img src="ASSETS/chrome.png" width="400" />
-  <img src="ASSETS/browork.png" width="400" />
-</p>
-<p align="center">
-  <img src="ASSETS/desktop.png" width="400" />
-  <img src="ASSETS/curse'm.png" width="400" />
-</p>
+<table align="center">
+  <tr>
+    <td align="center"><img src="ASSETS/chrome.png" width="400" alt="Floyd Chrome Extension"/></td>
+    <td align="center"><img src="ASSETS/browork.png" width="400" alt="Browork Sub-Agents"/></td>
+  </tr>
+  <tr>
+    <td align="center"><img src="ASSETS/desktop.png" width="400" alt="Floyd Desktop Web"/></td>
+    <td align="center"><img src="ASSETS/curse'm.png" width="400" alt="Curse'm IDE"/></td>
+  </tr>
+</table>
 
 # ***~Meet - FLOYD~***
 
