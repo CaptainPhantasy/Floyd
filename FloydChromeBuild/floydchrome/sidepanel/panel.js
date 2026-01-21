@@ -3,6 +3,16 @@
  * Standalone agent mode UI
  */
 
+// Theme toggle button
+const themeToggle = document.getElementById('theme-toggle');
+if (themeToggle) {
+  themeToggle.addEventListener('click', () => {
+    if (typeof toggleTheme === 'function') {
+      toggleTheme();
+    }
+  });
+}
+
 // Tab switching
 document.querySelectorAll('.tab-button').forEach(button => {
   button.addEventListener('click', () => {
@@ -35,11 +45,11 @@ async function updateStatus() {
     if (response.connected) {
       statusIndicator.classList.add('connected');
       statusIndicator.classList.remove('disconnected');
-      statusText.textContent = 'Connected to FLOYD CLI';
+      statusText.textContent = 'Connected to Floyd Desktop';
     } else {
       statusIndicator.classList.add('disconnected');
       statusIndicator.classList.remove('connected');
-      statusText.textContent = 'Disconnected - Waiting for FLOYD CLI';
+      statusText.textContent = 'Disconnected - Waiting for Floyd Desktop';
     }
   } catch (error) {
     console.error('Failed to get status:', error);
@@ -53,7 +63,7 @@ async function loadTools() {
     const toolsList = document.getElementById('toolsList');
     
     if (!response.metadata || Object.keys(response.metadata).length === 0) {
-      toolsList.innerHTML = '<p>No tools available</p>';
+      toolsList.innerHTML = '<p>No tools available. Make sure Floyd Desktop is running.</p>';
       return;
     }
     
@@ -82,7 +92,7 @@ async function loadLogs() {
     
     logsContainer.innerHTML = actionLog.slice(-50).reverse().map(log => {
       const date = new Date(log.timestamp);
-      const status = log.result?.success ? 'success' : 'error';
+      const status = log.success ? 'success' : 'error';
       return `
         <div class="log-entry ${status}">
           <span class="log-timestamp">${date.toLocaleTimeString()}</span>
@@ -105,15 +115,20 @@ document.getElementById('executeButton').addEventListener('click', async () => {
   if (!task) return;
   
   button.disabled = true;
-  outputArea.innerHTML = '<p>Processing task...</p>';
+  outputArea.innerHTML = '<p>Sending task to Floyd Desktop...</p>';
   
   try {
-    // STUB: This will call the actual FLOYD agent when wired up
-    outputArea.innerHTML = `
-      <p><strong>Task:</strong> ${task}</p>
-      <p><strong>Status:</strong> FLOYD agent stub - implementation pending</p>
-      <p>When the FLOYD agent is wired up, this will execute browser automation tasks.</p>
-    `;
+    const response = await chrome.runtime.sendMessage({ type: 'execute_task', task });
+    if (response.success) {
+      outputArea.innerHTML = `
+        <p><strong>Task sent!</strong></p>
+        <p>${task}</p>
+        <p>Floyd is processing your request. Check the Desktop app for details.</p>
+      `;
+      input.value = '';
+    } else {
+      outputArea.innerHTML = `<p class="error">Error: ${response.error}</p>`;
+    }
   } catch (error) {
     outputArea.innerHTML = `<p class="error">Error: ${error.message}</p>`;
   } finally {

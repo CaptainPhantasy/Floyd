@@ -43,7 +43,7 @@ export class ScreenshotTools {
       const result = await chrome.debugger.sendCommand(
         { tabId: targetTabId },
         'Page.captureScreenshot'
-      );
+      ) as { data: string };
 
       const dataUrl = `data:image/png;base64,${result.data}`;
 
@@ -100,7 +100,10 @@ export class ScreenshotTools {
       const metricsResult = await chrome.debugger.sendCommand(
         { tabId: targetTabId },
         'Page.getLayoutMetrics'
-      );
+      ) as {
+        contentSize: { width: number; height: number };
+        layoutViewport: { clientWidth: number; clientHeight: number };
+      };
 
       const contentSize = metricsResult.contentSize;
       const viewport = metricsResult.layoutViewport;
@@ -122,7 +125,7 @@ export class ScreenshotTools {
         }
       );
 
-      const dataUrl = `data:image/png;base64,${result.data}`;
+      const dataUrl = `data:image/png;base64,${(result as { data: string }).data}`;
 
       return {
         success: true,
@@ -228,7 +231,7 @@ export class ScreenshotTools {
         }
       );
 
-      const dataUrl = `data:image/png;base64,${result.data}`;
+      const dataUrl = `data:image/png;base64,${(result as { data: string }).data}`;
 
       return {
         success: true,

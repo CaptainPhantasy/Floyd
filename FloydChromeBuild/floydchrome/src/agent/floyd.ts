@@ -73,9 +73,9 @@ export class FloydAgent {
       maxReconnectAttempts: config?.maxReconnectAttempts || 10
     };
 
-    // Check for API key in environment for standalone mode
+    // Check for API key in environment for standalone mode (Node.js only)
     this.standaloneApiConfig.apiKey = (config as any)?.apiKey ||
-      (typeof process !== 'undefined' ? (process.env.ANTHROPIC_AUTH_TOKEN || process.env.GLM_API_KEY) : null);
+      ((globalThis as any).process?.env?.ANTHROPIC_AUTH_TOKEN || (globalThis as any).process?.env?.GLM_API_KEY || null);
   }
 
   /**

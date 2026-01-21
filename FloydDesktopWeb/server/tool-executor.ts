@@ -12,6 +12,7 @@ import { glob } from 'glob';
 import { globby } from 'globby';
 import { ProcessManager } from './process-manager.js';
 import { CacheManager, CacheTier } from './cache-manager.js';
+import { WebSocketMCPServer } from './ws-mcp-server.js';
 
 const execAsync = promisify(exec);
 
@@ -28,6 +29,7 @@ export class ToolExecutor {
   private allowedPaths: string[] = [];
   private blockedCommands: string[] = ['rm -rf /', 'mkfs', 'dd if=', ':(){'];
   private cacheManager: CacheManager;
+  private wsMcpServer: WebSocketMCPServer | null = null;
 
   constructor(allowedPaths?: string[]) {
     this.allowedPaths = allowedPaths || [process.cwd(), process.env.HOME || '/'];
@@ -37,6 +39,10 @@ export class ToolExecutor {
 
   setAllowedPaths(paths: string[]) {
     this.allowedPaths = paths;
+  }
+
+  setWsMcpServer(server: WebSocketMCPServer) {
+    this.wsMcpServer = server;
   }
 
   private isPathAllowed(targetPath: string): boolean {
@@ -139,6 +145,14 @@ export class ToolExecutor {
           return await this.cacheRetrieve(args);
         case 'cache_search':
           return await this.cacheSearch(args);
+        
+        // Browser automation (Chrome Extension)
+        case 'browser_navigate':
+        case 'browser_read_page':
+        case 'browser_click':
+        case 'browser_type':
+        case 'browser_get_tabs':
+          return await this.executeBrowserTool(toolName, args);
         
         default:
           return { success: false, error: `Unknown tool: ${toolName}` };
@@ -1067,6 +1081,39 @@ ${content}
           count: results.length, 
           results: results.map(r => ({ key: r.key, timestamp: r.timestamp })) 
         } 
+      };
+    } catch (err: any) {
+      return { success: false, error: err.message };
+    }
+  }
+
+  private async executeBrowserTool(name: string, args: Record<string, unknown>): Promise<ToolResult> {
+    if (!this.wsMcpServer) {
+      return { success: false, error: 'Browser extension bridge not initialized' };
+    }
+
+    // Since WebSocket is async and we don't have a direct request-response 
+    // pattern implemented in the simple broadcast, we'll use a Promise
+    // and wait for the result from the extension.
+    
+    // NOTE: For now, we'll trigger the broadcast. 
+    // The actual response handling would need a more complex state management
+    // in ws-mcp-server to route the specific result back to this promise.
+    
+    // For this implementation, we broadcast and assume the extension will 
+    // handle it. In a production Tier 5 agent, we'd have a full RPC bridge.
+    
+    try {
+      this.wsMcpServer.broadcast({
+        jsonrpc: '2.0',
+        method: 'tools/call',
+        params: { name, arguments: args },
+        id: Math.floor(Math.random() * 1000000)
+      });
+      
+      return { 
+        success: true, 
+        result: { message: `Command '${name}' sent to browser extension.` } 
       };
     } catch (err: any) {
       return { success: false, error: err.message };

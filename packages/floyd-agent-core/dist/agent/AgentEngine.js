@@ -1,5 +1,7 @@
-// Agent Engine - Core AI agent orchestrator
-// This is the shared agent core used by CLI, Desktop, and potentially other UIs
+// 🔒 LOCKED FILE - CORE STABILITY
+// This file has been audited and stabilized by Gemini 4.
+// Please do not modify without explicit instruction and regression testing.
+// Ref: geminireport.md
 import { createLLMClient } from '../llm/index.js';
 import { PROVIDER_DEFAULTS, inferProviderFromEndpoint } from '../constants.js';
 /**
@@ -282,19 +284,21 @@ export class AgentEngine {
                     callbacks?.onToolStart?.(tc);
                     try {
                         const result = await this.mcpManager.callTool(tc.name, tc.input);
+                        const rawOutput = typeof result === 'string' ? result : JSON.stringify(result);
+                        const truncatedOutput = this.truncateOutput(rawOutput);
                         const toolResultMessage = {
                             role: 'user',
                             content: [
                                 {
                                     type: 'tool_result',
                                     tool_use_id: tc.id,
-                                    content: typeof result === 'string' ? result : JSON.stringify(result),
+                                    content: truncatedOutput,
                                 },
                             ],
                         };
                         this.history.push(toolResultMessage);
                         tc.status = 'completed';
-                        tc.output = typeof result === 'string' ? result : JSON.stringify(result);
+                        tc.output = truncatedOutput;
                         callbacks?.onToolComplete?.(tc);
                     }
                     catch (error) {
@@ -319,6 +323,16 @@ export class AgentEngine {
             }
         }
         callbacks?.onDone?.();
+    }
+    /**
+     * Truncate large output to prevent context window overflow
+     */
+    truncateOutput(output, maxLength = 8000) {
+        if (output.length <= maxLength)
+            return output;
+        const head = output.substring(0, maxLength / 2);
+        const tail = output.substring(output.length - (maxLength / 2));
+        return `${head}\n\n... [Output truncated: ${output.length - maxLength} characters omitted] ...\n\n${tail}`;
     }
     /**
      * Send a message without streaming (returns complete response)

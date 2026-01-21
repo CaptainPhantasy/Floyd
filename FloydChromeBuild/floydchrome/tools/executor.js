@@ -12,25 +12,28 @@ export class ToolExecutor {
   constructor() {
     this.tools = {
       // Navigation
-      navigate: NavigationTools.navigate,
+      browser_navigate: NavigationTools.navigate,
       
       // Reading
-      read_page: ReadingTools.readPage,
+      browser_read_page: ReadingTools.readPage,
       get_page_text: ReadingTools.getPageText,
       find: ReadingTools.find,
       
       // Interaction
-      click: InteractionTools.click,
-      type: InteractionTools.type,
+      browser_click: InteractionTools.click,
+      browser_type: InteractionTools.type,
       
       // Tabs
       tabs_create: TabTools.createTab,
-      get_tabs: TabTools.getTabs
+      browser_get_tabs: TabTools.getTabs
     };
 
+    // Set global reference for agent/floyd.js to access
+    globalThis.toolExecutor = this;
+
     this.toolMetadata = {
-      navigate: {
-        name: 'navigate',
+      browser_navigate: {
+        name: 'browser_navigate',
         description: 'Navigate to a URL',
         inputSchema: {
           type: 'object',
@@ -41,8 +44,8 @@ export class ToolExecutor {
           required: ['url']
         }
       },
-      read_page: {
-        name: 'read_page',
+      browser_read_page: {
+        name: 'browser_read_page',
         description: 'Get semantic accessibility tree of the page',
         inputSchema: {
           type: 'object',
@@ -51,30 +54,8 @@ export class ToolExecutor {
           }
         }
       },
-      get_page_text: {
-        name: 'get_page_text',
-        description: 'Extract visible text content from the page',
-        inputSchema: {
-          type: 'object',
-          properties: {
-            tabId: { type: 'number', description: 'Tab ID (optional, uses active tab if not provided)' }
-          }
-        }
-      },
-      find: {
-        name: 'find',
-        description: 'Locate element by natural language query',
-        inputSchema: {
-          type: 'object',
-          properties: {
-            query: { type: 'string', description: 'Natural language description of element to find' },
-            tabId: { type: 'number', description: 'Tab ID (optional, uses active tab if not provided)' }
-          },
-          required: ['query']
-        }
-      },
-      click: {
-        name: 'click',
+      browser_click: {
+        name: 'browser_click',
         description: 'Click element at coordinates or by selector',
         inputSchema: {
           type: 'object',
@@ -86,8 +67,8 @@ export class ToolExecutor {
           }
         }
       },
-      type: {
-        name: 'type',
+      browser_type: {
+        name: 'browser_type',
         description: 'Type text into focused element',
         inputSchema: {
           type: 'object',
@@ -98,18 +79,8 @@ export class ToolExecutor {
           required: ['text']
         }
       },
-      tabs_create: {
-        name: 'tabs_create',
-        description: 'Open a new tab',
-        inputSchema: {
-          type: 'object',
-          properties: {
-            url: { type: 'string', description: 'URL to open (optional)' }
-          }
-        }
-      },
-      get_tabs: {
-        name: 'get_tabs',
+      browser_get_tabs: {
+        name: 'browser_get_tabs',
         description: 'List all open tabs',
         inputSchema: {
           type: 'object',

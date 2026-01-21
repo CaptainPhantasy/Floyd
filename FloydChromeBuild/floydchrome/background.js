@@ -16,19 +16,20 @@ chrome.runtime.onInstalled.addListener(initialize);
 async function initialize() {
   console.log('[FloydChrome] Initializing...');
 
-  // Initialize MCP Server for FLOYD CLI connection
+  // Initialize MCP Server for Floyd Desktop connection
   mcpServer = new MCPServer();
   
-  // Initialize FLOYD Agent stub (will be wired up later)
+  // Initialize FLOYD Agent
   floydAgent = new FloydAgent();
+  await floydAgent.initialize({ port: 3005 });
 
-  // Attempt to connect to FLOYD CLI
-  const connected = await mcpServer.connect();
+  // Attempt to connect to Floyd Desktop
+  const connected = await mcpServer.connect(3005);
   
   if (connected) {
-    console.log('[FloydChrome] MCP Server connected to FLOYD CLI');
+    console.log('[FloydChrome] Connected to Floyd Desktop');
   } else {
-    console.log('[FloydChrome] MCP Server waiting for FLOYD CLI connection');
+    console.log('[FloydChrome] Waiting for Floyd Desktop...');
   }
 
   // Set up side panel action
@@ -43,6 +44,17 @@ chrome.runtime.onMessage.addListener((message, sender, sendResponse) => {
     sendResponse({
       connected: mcpServer?.isConnected || false
     });
+    return true;
+  }
+
+  if (message.type === 'execute_task') {
+    if (floydAgent) {
+      floydAgent.processTask(message.task)
+        .then(res => sendResponse(res))
+        .catch(err => sendResponse({ success: false, error: err.message }));
+      return true;
+    }
+    sendResponse({ success: false, error: 'Floyd agent not initialized' });
     return true;
   }
 

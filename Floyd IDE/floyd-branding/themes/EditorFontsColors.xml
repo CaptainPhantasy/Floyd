@@ -1,0 +1,20 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!DOCTYPE font-colors PUBLIC "-//NetBeans//DTD Editor Fonts and Colors settings 1.1//EN" "http://www.netbeans.org/dtds/EditorFontsColors-1.1.dtd">
+<font-colors>
+    <fontcolor name="keyword" bgColor="0E111A" fgColor="AB18E4" bold="true"/>
+    <fontcolor name="string" bgColor="0E111A" fgColor="371DF4"/>
+    <fontcolor name="comment" bgColor="0E111A" fgColor="5C5B62" italic="true"/>
+    <fontcolor name="number" bgColor="0E111A" fgColor="A015A7"/>
+    <fontcolor name="operator" bgColor="0E111A" fgColor="ffffff"/>
+    <fontcolor name="identifier" bgColor="0E111A" fgColor="ffffff"/>
+    <fontcolor name="background" bgColor="0E111A" fgColor="ffffff"/>
+    
+    <!-- Additional syntax elements -->
+    <fontcolor name="char" bgColor="0E111A" fgColor="371DF4"/>
+    <fontcolor name="field" bgColor="0E111A" fgColor="ffffff"/>
+    <fontcolor name="method" bgColor="0E111A" fgColor="AB18E4"/>
+    <fontcolor name="parameter" bgColor="0E111A" fgColor="ffffff"/>
+    <fontcolor name="class" bgColor="0E111A" fgColor="AB18E4" bold="true"/>
+    <fontcolor name="interface" bgColor="0E111A" fgColor="AB18E4" bold="true"/>
+    <fontcolor name="annotation" bgColor="0E111A" fgColor="A015A7"/>
+</font-colors>

@@ -187,6 +187,11 @@ export function HelpOverlay({
 
 	// Handle keyboard input within the overlay
 	useInput((input, key) => {
+		// Ctrl+Q - Quit the entire CLI immediately
+		if (key.ctrl && (input === 'q' || input === 'Q')) {
+			process.exit(0);
+		}
+
 		if (key.escape) {
 			onClose();
 			return;

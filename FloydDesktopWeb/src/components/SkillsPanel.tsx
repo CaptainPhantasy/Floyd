@@ -103,19 +103,19 @@ export function SkillsPanel({ isOpen, onClose }: SkillsPanelProps) {
 
   return (
     <div className="fixed inset-0 bg-black/50 z-50 flex justify-end">
-      <div className="w-[480px] bg-slate-800 h-full overflow-hidden flex flex-col">
+      <div className="w-[480px] bg-crush-elevated h-full overflow-hidden flex flex-col">
         {/* Header */}
-        <div className="p-4 border-b border-slate-700 flex items-center justify-between">
+        <div className="p-4 border-b border-crush-overlay flex items-center justify-between">
           <div className="flex items-center gap-2">
-            <Sparkles className="w-5 h-5 text-purple-400" />
+            <Sparkles className="w-5 h-5 text-crush-secondary" />
             <h2 className="font-semibold">Skills</h2>
             {activeSkills.length > 0 && (
-              <span className="text-xs bg-purple-500/20 text-purple-300 px-2 py-0.5 rounded-full">
+              <span className="text-xs bg-crush-secondary/20 text-crush-secondary px-2 py-0.5 rounded-full">
                 {activeSkills.length} active
               </span>
             )}
           </div>
-          <button onClick={onClose} className="text-slate-400 hover:text-white">
+          <button onClick={onClose} className="text-crush-text-secondary hover:text-crush-text-selected">
             ✕
           </button>
         </div>
@@ -124,19 +124,19 @@ export function SkillsPanel({ isOpen, onClose }: SkillsPanelProps) {
         <div className="flex-1 overflow-y-auto p-4 space-y-4">
           {loading ? (
             <div className="flex items-center justify-center py-8">
-              <Loader2 className="w-6 h-6 animate-spin text-slate-400" />
+              <Loader2 className="w-6 h-6 animate-spin text-crush-text-secondary" />
             </div>
           ) : (
             <>
               {/* Active skills summary */}
               {activeSkills.length > 0 && (
-                <div className="bg-purple-500/10 border border-purple-500/30 rounded-lg p-3">
-                  <div className="text-sm text-purple-300 font-medium mb-2">Active Skills</div>
+                <div className="bg-crush-secondary/10 border border-crush-secondary/30 rounded-lg p-3">
+                  <div className="text-sm text-crush-secondary font-medium mb-2">Active Skills</div>
                   <div className="flex flex-wrap gap-2">
                     {activeSkills.map(skill => (
                       <span 
                         key={skill.id}
-                        className="text-xs bg-purple-500/30 text-purple-200 px-2 py-1 rounded"
+                        className="text-xs bg-crush-secondary/30 text-crush-secondary px-2 py-1 rounded"
                       >
                         {skill.icon || '✨'} {skill.name}
                       </span>
@@ -148,7 +148,7 @@ export function SkillsPanel({ isOpen, onClose }: SkillsPanelProps) {
               {/* Skills by category */}
               {categories.map(category => (
                 <div key={category}>
-                  <div className="text-xs uppercase text-slate-500 font-medium mb-2">
+                  <div className="text-xs uppercase text-crush-text-subtle font-medium mb-2">
                     {category}
                   </div>
                   <div className="space-y-2">
@@ -156,10 +156,10 @@ export function SkillsPanel({ isOpen, onClose }: SkillsPanelProps) {
                       <div 
                         key={skill.id}
                         className={cn(
-                          'bg-slate-700/50 rounded-lg border transition-colors',
+                          'bg-crush-modal/50 rounded-lg border transition-colors',
                           skill.isActive 
-                            ? 'border-purple-500/50 bg-purple-500/10' 
-                            : 'border-slate-600'
+                            ? 'border-crush-secondary/50 bg-crush-secondary/10' 
+                            : 'border-crush-modal'
                         )}
                       >
                         <div 
@@ -171,7 +171,7 @@ export function SkillsPanel({ isOpen, onClose }: SkillsPanelProps) {
                           <span className="text-xl">{skill.icon || '✨'}</span>
                           <div className="flex-1 min-w-0">
                             <div className="font-medium text-sm">{skill.name}</div>
-                            <div className="text-xs text-slate-400 truncate">
+                            <div className="text-xs text-crush-text-secondary truncate">
                               {skill.description}
                             </div>
                           </div>
@@ -183,31 +183,31 @@ export function SkillsPanel({ isOpen, onClose }: SkillsPanelProps) {
                             }}
                             className={cn(
                               'w-8 h-8 rounded-full flex items-center justify-center',
-                              skill.isActive 
-                                ? 'bg-purple-500 text-white' 
-                                : 'bg-slate-600 text-slate-400 hover:bg-slate-500'
+                              skill.isActive
+                                ? 'bg-crush-primary text-crush-text-selected'
+                                : 'bg-crush-overlay text-crush-text-secondary hover:bg-crush-modal'
                             )}
                           >
                             <Check className="w-4 h-4" />
                           </button>
                           
                           {expandedSkill === skill.id ? (
-                            <ChevronDown className="w-4 h-4 text-slate-400" />
+                            <ChevronDown className="w-4 h-4 text-crush-text-secondary" />
                           ) : (
-                            <ChevronRight className="w-4 h-4 text-slate-400" />
+                            <ChevronRight className="w-4 h-4 text-crush-text-secondary" />
                           )}
                         </div>
                         
                         {expandedSkill === skill.id && (
-                          <div className="px-3 pb-3 border-t border-slate-600/50 mt-2 pt-2">
-                            <div className="text-xs text-slate-400 whitespace-pre-wrap">
+                          <div className="px-3 pb-3 border-t border-crush-modal/50 mt-2 pt-2">
+                            <div className="text-xs text-crush-text-secondary whitespace-pre-wrap">
                               {skill.instructions}
                             </div>
                             {skill.triggers && skill.triggers.length > 0 && (
                               <div className="mt-2">
-                                <span className="text-xs text-slate-500">Triggers: </span>
+                                <span className="text-xs text-crush-text-subtle">Triggers: </span>
                                 {skill.triggers.map((t, i) => (
-                                  <span key={i} className="text-xs bg-slate-600 px-1.5 py-0.5 rounded mr-1">
+                                  <span key={i} className="text-xs bg-crush-overlay px-1.5 py-0.5 rounded mr-1">
                                     {t}
                                   </span>
                                 ))}
@@ -216,7 +216,7 @@ export function SkillsPanel({ isOpen, onClose }: SkillsPanelProps) {
                             {skill.category === 'custom' && (
                               <button
                                 onClick={() => deleteSkill(skill.id)}
-                                className="mt-2 text-xs text-red-400 hover:text-red-300 flex items-center gap-1"
+                                className="mt-2 text-xs text-crush-error hover:text-red-300 flex items-center gap-1"
                               >
                                 <Trash2 className="w-3 h-3" />
                                 Delete skill
@@ -232,41 +232,41 @@ export function SkillsPanel({ isOpen, onClose }: SkillsPanelProps) {
 
               {/* Create new skill */}
               {showCreateForm ? (
-                <div className="bg-slate-700/50 rounded-lg border border-slate-600 p-4 space-y-3">
+                <div className="bg-crush-modal/50 rounded-lg border border-crush-modal p-4 space-y-3">
                   <div className="font-medium text-sm">Create New Skill</div>
                   
                   <input
                     placeholder="Skill name"
                     value={newSkill.name}
                     onChange={(e) => setNewSkill(p => ({ ...p, name: e.target.value }))}
-                    className="w-full bg-slate-800 border border-slate-600 rounded px-3 py-2 text-sm"
+                    className="w-full bg-crush-elevated border border-crush-modal rounded px-3 py-2 text-sm"
                   />
                   
                   <input
                     placeholder="Description"
                     value={newSkill.description}
                     onChange={(e) => setNewSkill(p => ({ ...p, description: e.target.value }))}
-                    className="w-full bg-slate-800 border border-slate-600 rounded px-3 py-2 text-sm"
+                    className="w-full bg-crush-elevated border border-crush-modal rounded px-3 py-2 text-sm"
                   />
                   
                   <textarea
                     placeholder="Instructions (what Claude should do when this skill is active)"
                     value={newSkill.instructions}
                     onChange={(e) => setNewSkill(p => ({ ...p, instructions: e.target.value }))}
-                    className="w-full bg-slate-800 border border-slate-600 rounded px-3 py-2 text-sm h-32 resize-none"
+                    className="w-full bg-crush-elevated border border-crush-modal rounded px-3 py-2 text-sm h-32 resize-none"
                   />
                   
                   <div className="flex gap-2">
                     <button
                       onClick={createSkill}
                       disabled={!newSkill.name || !newSkill.instructions}
-                      className="px-3 py-1.5 bg-purple-600 text-sm rounded hover:bg-purple-700 disabled:opacity-50"
+                      className="px-3 py-1.5 bg-crush-secondary text-sm rounded hover:bg-crush-grape disabled:opacity-50"
                     >
                       Create
                     </button>
                     <button
                       onClick={() => setShowCreateForm(false)}
-                      className="px-3 py-1.5 bg-slate-600 text-sm rounded hover:bg-slate-500"
+                      className="px-3 py-1.5 bg-crush-overlay text-sm rounded hover:bg-crush-modal"
                     >
                       Cancel
                     </button>
@@ -275,7 +275,7 @@ export function SkillsPanel({ isOpen, onClose }: SkillsPanelProps) {
               ) : (
                 <button
                   onClick={() => setShowCreateForm(true)}
-                  className="w-full py-2 border border-dashed border-slate-600 rounded-lg text-sm text-slate-400 hover:border-slate-500 hover:text-slate-300 flex items-center justify-center gap-2"
+                  className="w-full py-2 border border-dashed border-crush-modal rounded-lg text-sm text-crush-text-secondary hover:border-crush-overlay hover:text-crush-text-tertiary flex items-center justify-center gap-2"
                 >
                   <Plus className="w-4 h-4" />
                   Create Custom Skill

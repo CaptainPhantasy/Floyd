@@ -12,6 +12,7 @@
  */
 
 import {Box, Text} from 'ink';
+import React from 'react';
 import {Frame} from '../crush/Frame.js';
 import {floydTheme, crushTheme, statusColors} from '../../theme/crush-theme.js';
 
@@ -60,7 +61,7 @@ export interface ContextPanelProps {
 /**
  * ContextPanel - Right sidebar with contextual information
  */
-export function ContextPanel({
+function ContextPanelInner({
 	currentPlan = [],
 	filesTouched = [],
 	openDiffs,
@@ -207,4 +208,14 @@ export function ContextPanel({
 	);
 }
 
-export default ContextPanel;
+export const ContextPanel = React.memo(ContextPanelInner, (prevProps, nextProps) => {
+	// Memoize based on critical props
+	return (
+		prevProps.currentPlan === nextProps.currentPlan &&
+		prevProps.filesTouched === nextProps.filesTouched &&
+		prevProps.openDiffs === nextProps.openDiffs &&
+		prevProps.browserState === nextProps.browserState &&
+		prevProps.quickActions === nextProps.quickActions &&
+		prevProps.compact === nextProps.compact
+	);
+});

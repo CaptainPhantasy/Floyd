@@ -45,6 +45,7 @@ flf2bit
 DESIGN_*.md
 NOTES.md
 TODO.md
+UPDATE_GUIDE.md
 
 # Node / JS
 node_modules/

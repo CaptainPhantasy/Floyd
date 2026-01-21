@@ -16,17 +16,25 @@ export const DEFAULT_DEEPSEEK_CONFIG = {
     endpoint: 'https://api.deepseek.com/v1/chat/completions',
     model: 'deepseek-chat',
 };
-// Backwards compatibility - GLM config now points to Anthropic defaults
-export const DEFAULT_GLM_CONFIG = DEFAULT_ANTHROPIC_CONFIG;
+// Z.ai configuration (Anthropic-compatible endpoint)
+export const DEFAULT_ZAI_CONFIG = {
+    endpoint: 'https://api.z.ai/api/anthropic',
+    model: 'claude-sonnet-4-20250514',
+};
+// Backwards compatibility - GLM config now points to Z.ai
+export const DEFAULT_GLM_CONFIG = DEFAULT_ZAI_CONFIG;
 export const PROVIDER_DEFAULTS = {
     anthropic: DEFAULT_ANTHROPIC_CONFIG,
     openai: DEFAULT_OPENAI_CONFIG,
     deepseek: DEFAULT_DEEPSEEK_CONFIG,
+    zai: DEFAULT_ZAI_CONFIG,
 };
 /**
  * Determine provider from endpoint URL
  */
 export function inferProviderFromEndpoint(endpoint) {
+    if (endpoint.includes('api.z.ai'))
+        return 'zai';
     if (endpoint.includes('api.anthropic.com'))
         return 'anthropic';
     if (endpoint.includes('api.openai.com'))
@@ -41,7 +49,7 @@ export function inferProviderFromEndpoint(endpoint) {
  */
 export function isOpenAICompatible(endpoint) {
     // OpenAI and DeepSeek use OpenAI-compatible format
-    // Anthropic endpoint uses Anthropic format
-    return !endpoint.includes('api.anthropic.com');
+    // Anthropic and Z.ai use Anthropic format
+    return !endpoint.includes('api.anthropic.com') && !endpoint.includes('api.z.ai');
 }
 //# sourceMappingURL=constants.js.map

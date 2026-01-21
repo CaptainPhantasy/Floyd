@@ -10,7 +10,8 @@ export type ToolName =
   | 'click'
   | 'type'
   | 'tabs_create'
-  | 'get_tabs';
+  | 'get_tabs'
+  | 'screenshot';
 
 export interface ToolInput {
   url?: string;
@@ -20,6 +21,7 @@ export interface ToolInput {
   y?: number;
   selector?: string;
   text?: string;
+  fullPage?: boolean;
 }
 
 export interface ToolResult {

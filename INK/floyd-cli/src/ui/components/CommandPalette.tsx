@@ -198,6 +198,11 @@ export function CommandPalette({
 	useInput((input, key) => {
 		if (!isOpen) return;
 
+		// Ctrl+Q - Quit the entire CLI immediately
+		if (key.ctrl && (input === 'q' || input === 'Q')) {
+			process.exit(0);
+		}
+
 		if (key.escape) {
 			onClose();
 			return;
@@ -432,6 +437,10 @@ export function CommandPaletteTrigger({
 	const [isOpen, setIsOpen] = useState(initialOpen);
 
 	useInput((input, key) => {
+		// Ctrl+Q - Quit the entire CLI immediately
+		if (key.ctrl && (input === 'q' || input === 'Q')) {
+			process.exit(0);
+		}
 		// Ctrl+P to open
 		if (key.ctrl && input === 'p') {
 			setIsOpen(prev => !prev);

@@ -128,7 +128,7 @@ export function Frame({
 	const inkBorderStyle = getBorderStyle(borderStyle);
 
 	return (
-		<Box flexDirection="column">
+		<Box flexDirection="column" width={width}>
 			{shadow && (
 				<Box paddingLeft={1}>
 					<Text dimColor>

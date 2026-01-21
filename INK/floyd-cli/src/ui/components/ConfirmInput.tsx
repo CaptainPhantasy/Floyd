@@ -37,6 +37,11 @@ export function ConfirmInput({
 	);
 
 	useInput((input, key) => {
+		// Ctrl+Q - Quit the entire CLI immediately
+		if (key.ctrl && (input === 'q' || input === 'Q')) {
+			process.exit(0);
+		}
+
 		if (key.return) {
 			onConfirm(selected === 'yes');
 			return;

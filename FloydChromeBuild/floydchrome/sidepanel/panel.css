@@ -1,3 +1,8 @@
+/**
+ * Floyd Chrome Extension - Panel Styles
+ * Uses CSS variables for dynamic theme switching (CRUSH / Light)
+ */
+
 * {
   margin: 0;
   padding: 0;
@@ -6,10 +11,12 @@
 
 body {
   font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, Oxygen, Ubuntu, Cantarell, sans-serif;
-  background: #1a1a1a;
-  color: #e0e0e0;
+  /* Theme variables - set by theme.js via CSS custom properties */
+  background: var(--color-bg-base, #201F26);
+  color: var(--color-text-primary, #DFDBDD);
   height: 100vh;
   overflow: hidden;
+  transition: background 0.2s, color 0.2s;
 }
 
 .container {
@@ -18,46 +25,81 @@ body {
   height: 100vh;
 }
 
+/* Header */
 header {
   padding: 16px;
-  background: #2a2a2a;
-  border-bottom: 1px solid #3a3a3a;
+  background: var(--color-bg-elevated, #2d2c35);
+  border-bottom: 1px solid var(--color-bg-overlay, #3A3943);
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+}
+
+.header-left {
+  display: flex;
+  flex-direction: column;
 }
 
 header h1 {
   font-size: 18px;
   font-weight: 600;
-  margin-bottom: 8px;
-  color: #fff;
+  margin-bottom: 4px;
+  color: var(--color-accent-secondary, #FF60FF);
+  background: linear-gradient(135deg, var(--color-accent-secondary, #FF60FF), var(--color-accent-primary, #6B50FF));
+  -webkit-background-clip: text;
+  -webkit-text-fill-color: transparent;
+  background-clip: text;
 }
 
+/* Status */
 .status {
   display: flex;
   align-items: center;
   gap: 8px;
   font-size: 12px;
+  color: var(--color-text-secondary, #959AA2);
 }
 
 .status-indicator {
   width: 8px;
   height: 8px;
   border-radius: 50%;
-  background: #666;
+  background: var(--color-status-offline, #858392);
 }
 
 .status-indicator.connected {
-  background: #4caf50;
-  box-shadow: 0 0 4px #4caf50;
+  background: var(--color-status-ready, #12C78F);
+  box-shadow: 0 0 4px var(--color-status-ready, #12C78F);
 }
 
 .status-indicator.disconnected {
-  background: #f44336;
+  background: var(--color-status-error, #EB4268);
 }
 
+/* Theme Toggle Button */
+#theme-toggle {
+  background: var(--color-bg-modal, #4D4C57);
+  border: 1px solid var(--color-bg-overlay, #3A3943);
+  color: var(--color-text-secondary, #959AA2);
+  padding: 8px;
+  border-radius: 8px;
+  cursor: pointer;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  transition: all 0.2s;
+}
+
+#theme-toggle:hover {
+  background: var(--color-bg-overlay, #3A3943);
+  color: var(--color-text-primary, #DFDBDD);
+}
+
+/* Tabs */
 .tabs {
   display: flex;
-  background: #2a2a2a;
-  border-bottom: 1px solid #3a3a3a;
+  background: var(--color-bg-elevated, #2d2c35);
+  border-bottom: 1px solid var(--color-bg-overlay, #3A3943);
 }
 
 .tab-button {
@@ -65,20 +107,20 @@ header h1 {
   padding: 12px;
   background: transparent;
   border: none;
-  color: #999;
+  color: var(--color-text-secondary, #959AA2);
   cursor: pointer;
   font-size: 14px;
   transition: all 0.2s;
 }
 
 .tab-button:hover {
-  background: #333;
-  color: #fff;
+  background: var(--color-bg-overlay, #3A3943);
+  color: var(--color-text-primary, #DFDBDD);
 }
 
 .tab-button.active {
-  color: #4caf50;
-  border-bottom: 2px solid #4caf50;
+  color: var(--color-status-ready, #12C78F);
+  border-bottom: 2px solid var(--color-status-ready, #12C78F);
 }
 
 .tab-content {
@@ -93,6 +135,7 @@ header h1 {
   flex-direction: column;
 }
 
+/* Agent Panel */
 .agent-panel {
   display: flex;
   flex-direction: column;
@@ -109,10 +152,10 @@ header h1 {
 #taskInput {
   width: 100%;
   padding: 12px;
-  background: #2a2a2a;
-  border: 1px solid #3a3a3a;
+  background: var(--color-bg-elevated, #2d2c35);
+  border: 1px solid var(--color-bg-overlay, #3A3943);
   border-radius: 6px;
-  color: #e0e0e0;
+  color: var(--color-text-primary, #DFDBDD);
   font-family: inherit;
   font-size: 14px;
   resize: vertical;
@@ -120,13 +163,17 @@ header h1 {
 
 #taskInput:focus {
   outline: none;
-  border-color: #4caf50;
+  border-color: var(--color-accent-tertiary, #68FFD6);
+}
+
+#taskInput::placeholder {
+  color: var(--color-text-subtle, #706F7B);
 }
 
 .execute-button {
   padding: 12px 24px;
-  background: #4caf50;
-  color: white;
+  background: var(--color-accent-tertiary, #68FFD6);
+  color: var(--color-text-primary, #201F26);
   border: none;
   border-radius: 6px;
   font-size: 14px;
@@ -136,28 +183,31 @@ header h1 {
 }
 
 .execute-button:hover {
-  background: #45a049;
+  background: var(--color-accent-primary, #6B50FF);
+  color: var(--color-text-inverse, #FFFAF1);
 }
 
 .execute-button:disabled {
-  background: #666;
+  background: var(--color-bg-overlay, #3A3943);
+  color: var(--color-text-subtle, #706F7B);
   cursor: not-allowed;
 }
 
 .output-area {
   flex: 1;
   padding: 16px;
-  background: #2a2a2a;
+  background: var(--color-bg-elevated, #2d2c35);
   border-radius: 6px;
   overflow-y: auto;
   min-height: 200px;
 }
 
 .placeholder {
-  color: #666;
+  color: var(--color-text-subtle, #706F7B);
   font-style: italic;
 }
 
+/* Tools List */
 .tools-list {
   display: flex;
   flex-direction: column;
@@ -166,22 +216,23 @@ header h1 {
 
 .tool-item {
   padding: 12px;
-  background: #2a2a2a;
+  background: var(--color-bg-elevated, #2d2c35);
   border-radius: 6px;
-  border: 1px solid #3a3a3a;
+  border: 1px solid var(--color-bg-overlay, #3A3943);
 }
 
 .tool-item h3 {
   font-size: 14px;
   margin-bottom: 4px;
-  color: #fff;
+  color: var(--color-accent-secondary, #FF60FF);
 }
 
 .tool-item p {
   font-size: 12px;
-  color: #999;
+  color: var(--color-text-secondary, #959AA2);
 }
 
+/* Logs */
 .logs-container {
   font-family: 'Courier New', monospace;
   font-size: 12px;
@@ -190,22 +241,41 @@ header h1 {
 
 .log-entry {
   padding: 4px 0;
-  border-bottom: 1px solid #2a2a2a;
+  border-bottom: 1px solid var(--color-bg-elevated, #2d2c35);
 }
 
 .log-entry.error {
-  color: #f44336;
+  color: var(--color-status-error, #EB4268);
 }
 
 .log-entry.success {
-  color: #4caf50;
+  color: var(--color-status-ready, #12C78F);
 }
 
 .log-entry.info {
-  color: #2196f3;
+  color: var(--color-accent-info, #00A4FF);
 }
 
 .log-timestamp {
-  color: #666;
+  color: var(--color-text-subtle, #706F7B);
   margin-right: 8px;
+}
+
+/* Scrollbar */
+::-webkit-scrollbar {
+  width: 8px;
+  height: 8px;
+}
+
+::-webkit-scrollbar-track {
+  background: var(--color-bg-base, #201F26);
+}
+
+::-webkit-scrollbar-thumb {
+  background: var(--color-bg-overlay, #3A3943);
+  border-radius: 4px;
+}
+
+::-webkit-scrollbar-thumb:hover {
+  background: var(--color-bg-modal, #4D4C57);
 }

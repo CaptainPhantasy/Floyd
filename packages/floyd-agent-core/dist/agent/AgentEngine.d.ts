@@ -96,6 +96,10 @@ export declare class AgentEngine {
      */
     sendMessage(content: string, callbacks?: AgentCallbacks): AsyncGenerator<string, void, unknown>;
     /**
+     * Truncate large output to prevent context window overflow
+     */
+    private truncateOutput;
+    /**
      * Send a message without streaming (returns complete response)
      */
     sendMessageComplete(content: string): Promise<string>;

@@ -9,11 +9,15 @@
 <body>
   <div class="container">
     <header>
-      <h1>FloydChrome</h1>
-      <div class="status" id="status">
-        <span class="status-indicator" id="statusIndicator"></span>
-        <span id="statusText">Initializing...</span>
+      <div class="header-left">
+        <h1>FloydChrome</h1>
+        <div class="status" id="status">
+          <span class="status-indicator" id="statusIndicator"></span>
+          <span id="statusText">Initializing...</span>
+        </div>
       </div>
+      <!-- Theme Toggle Button -->
+      <button id="theme-toggle" title="Toggle theme"></button>
     </header>
 
     <div class="tabs">
@@ -25,8 +29,8 @@
     <div class="tab-content active" id="agentTab">
       <div class="agent-panel">
         <div class="input-area">
-          <textarea 
-            id="taskInput" 
+          <textarea
+            id="taskInput"
             placeholder="What would you like FLOYD to do in the browser?"
             rows="4"
           ></textarea>
@@ -51,6 +55,8 @@
     </div>
   </div>
 
+  <!-- Theme system (must load before panel.js) -->
+  <script src="theme.js"></script>
   <script type="module" src="panel.js"></script>
 </body>
 </html>

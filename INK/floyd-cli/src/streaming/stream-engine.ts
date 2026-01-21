@@ -44,16 +44,17 @@ export interface StreamProcessorConfig {
 	debug?: boolean;
 }
 
-/**
- * Default configuration values
- */
-const DEFAULT_CONFIG: Required<StreamProcessorConfig> = {
-	maxBufferSize: 65536, // Increased to 64KB
-	flushInterval: 50,
-	rateLimitEnabled: false, // DISABLED - use natural flow, no blocking
-	maxTokensPerSecond: 1000, // Only used if rateLimitEnabled
-	debug: false,
-};
+	/**
+	 * Default configuration values
+	 * Optimized for GLM's fast token delivery (no jitter)
+	 */
+	const DEFAULT_CONFIG: Required<StreamProcessorConfig> = {
+		maxBufferSize: 65536, // Increased to 64KB
+		flushInterval: 16, // Optimized: ~60fps (faster updates)
+		rateLimitEnabled: false, // DISABLED - use natural flow, no blocking
+		maxTokensPerSecond: 10000, // High limit for GLM's fast tokens
+		debug: false,
+	};
 
 /**
  * StreamProcessor handles incoming LLM stream chunks with buffering and rate limiting

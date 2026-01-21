@@ -16,8 +16,12 @@ export declare const DEFAULT_DEEPSEEK_CONFIG: {
     readonly endpoint: "https://api.deepseek.com/v1/chat/completions";
     readonly model: "deepseek-chat";
 };
+export declare const DEFAULT_ZAI_CONFIG: {
+    readonly endpoint: "https://api.z.ai/api/anthropic";
+    readonly model: "claude-sonnet-4-20250514";
+};
 export declare const DEFAULT_GLM_CONFIG: {
-    readonly endpoint: "https://api.anthropic.com";
+    readonly endpoint: "https://api.z.ai/api/anthropic";
     readonly model: "claude-sonnet-4-20250514";
 };
 export declare const PROVIDER_DEFAULTS: {
@@ -32,6 +36,10 @@ export declare const PROVIDER_DEFAULTS: {
     readonly deepseek: {
         readonly endpoint: "https://api.deepseek.com/v1/chat/completions";
         readonly model: "deepseek-chat";
+    };
+    readonly zai: {
+        readonly endpoint: "https://api.z.ai/api/anthropic";
+        readonly model: "claude-sonnet-4-20250514";
     };
 };
 export type Provider = keyof typeof PROVIDER_DEFAULTS;

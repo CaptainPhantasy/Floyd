@@ -96,11 +96,20 @@ function TranscriptPanelInner({
 	height = 30,
 	maxMessages = 20,
 }: TranscriptPanelProps) {
-	const displayMessages = messages.slice(-maxMessages);
+	// Filter for unique messages by ID to prevent doubling issues
+	const uniqueMessages = Array.from(new Map(messages.map(m => [m.id, m])).values());
+	const displayMessages = uniqueMessages.slice(-maxMessages);
+
+	// Calculate a better content key for Viewport scrolling
+	// sum of content lengths + constant for headers/spacing
+	const contentKey = displayMessages.reduce((acc, msg) => {
+		const lines = typeof msg.content === 'string' ? msg.content.split('\n').length : 5;
+		return acc + lines + 3; // header + spacing
+	}, 0) + (streamingContent?.split('\n').length || 0);
 
 	return (
 		<Frame title=" TRANSCRIPT " borderStyle="round" borderVariant="focus" padding={2} width="100%">
-			<Viewport height={height} showScrollbar>
+			<Viewport height={height} showScrollbar contentKey={contentKey} isStreaming={isThinking || !!streamingContent}>
 				<Box flexDirection="column" gap={1} width="100%">
 					{/* Messages */}
 					{displayMessages.length === 0 && !streamingContent && (

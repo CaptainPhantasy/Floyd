@@ -8,8 +8,10 @@
  * @module store/floyd-store
  */
 
+import {useRef, useMemo, useCallback} from 'react';
 import {create} from 'zustand';
 import {persist, createJSONStorage} from 'zustand/middleware';
+import {produce} from 'immer';
 // Message type matches Anthropic SDK format
 export type Message = {
 	role: 'user' | 'assistant' | 'system' | 'tool';
@@ -18,6 +20,32 @@ export type Message = {
 	name?: string;
 };
 import type {AgentStatus} from '../ui/agent/types.js';
+
+// ============================================================================
+// UTILITY FUNCTIONS
+// ============================================================================
+
+/**
+ * Create a debounced function
+ * Limits how often a function can be called
+ */
+function debounce<T extends (...args: unknown[]) => unknown>(
+	fn: T,
+	delayMs: number,
+): (...args: Parameters<T>) => void {
+	let timeoutId: ReturnType<typeof setTimeout> | null = null;
+
+	return (...args: Parameters<T>) => {
+		if (timeoutId !== null) {
+			clearTimeout(timeoutId);
+		}
+
+		timeoutId = setTimeout(() => {
+			timeoutId = null;
+			fn(...args);
+		}, delayMs);
+	};
+}
 
 // ============================================================================
 // TYPES
@@ -270,6 +298,45 @@ interface ConfigSlice {
 }
 
 /**
+ * Overlay/modal state slice
+ */
+interface OverlaySlice {
+	/** Help overlay visibility */
+	showHelp: boolean;
+	/** Process monitor overlay visibility */
+	showMonitor: boolean;
+	/** Prompt library overlay visibility */
+	showPromptLibrary: boolean;
+	/** Agent builder overlay visibility */
+	showAgentBuilder: boolean;
+	/** Command palette overlay visibility */
+	showCommandPalette: boolean;
+	/** Config/settings overlay visibility */
+	showConfig: boolean;
+	/** Set overlay visibility by name */
+	setOverlay: (name: keyof OverlayState, value: boolean) => void;
+	/** Toggle overlay by name */
+	toggleOverlay: (name: keyof OverlayState) => void;
+	/** Close all overlays */
+	closeAllOverlays: () => void;
+	/** Check if any overlay is open */
+	hasOpenOverlay: () => boolean;
+}
+
+/**
+ * Individual overlay state keys
+ */
+type OverlayState = Pick<
+	OverlaySlice,
+	| 'showHelp'
+	| 'showMonitor'
+	| 'showPromptLibrary'
+	| 'showAgentBuilder'
+	| 'showCommandPalette'
+	| 'showConfig'
+>;
+
+/**
  * Main Floyd store state combining all slices
  */
 type FloydStore = ConversationSlice &
@@ -277,7 +344,8 @@ type FloydStore = ConversationSlice &
 	ToolsSlice &
 	RateLimitSlice &
 	SessionSlice &
-	ConfigSlice & {
+	ConfigSlice &
+	OverlaySlice & {
 		/** Reset entire store to initial state */
 		reset: () => void;
 		/** Get store version for migration */
@@ -353,6 +421,21 @@ const initialConfigState: Omit<ConfigSlice, 'toggleSafetyMode' | 'setSafetyMode'
 	safetyMode: 'ask', // Default to ASK mode for safety
 };
 
+const initialOverlayState: Omit<
+	OverlaySlice,
+	| 'setOverlay'
+	| 'toggleOverlay'
+	| 'closeAllOverlays'
+	| 'hasOpenOverlay'
+> = {
+	showHelp: false,
+	showMonitor: false,
+	showPromptLibrary: false,
+	showAgentBuilder: false,
+	showCommandPalette: false,
+	showConfig: false,
+};
+
 // ============================================================================
 // STORE CREATION
 // ============================================================================
@@ -398,29 +481,67 @@ export const useFloydStore = create<FloydStore>()(
 
 			setSafetyMode: (mode: 'yolo' | 'ask' | 'plan') => set({safetyMode: mode}),
 
-			addMessage: message =>
+			// ============================================================
+			// OVERLAY STATE
+			// ============================================================
+			...initialOverlayState,
+
+			setOverlay: (name, value) =>
 				set(state => {
-					const messages = [...state.messages, message];
-					// Trim to max messages if needed
-					const trimmed =
-						messages.length > state.maxMessages
-							? messages.slice(-state.maxMessages)
-							: messages;
-					return {
-						messages: trimmed,
-						session: {
-							...state.session,
-							messageCount: trimmed.length,
-							lastActivity: Date.now(),
-						},
-					};
+					const overlayName = name as keyof Extract<OverlaySlice, boolean>;
+					return {[overlayName]: value};
 				}),
 
+			toggleOverlay: name =>
+				set(state => {
+					const overlayName = name as keyof Extract<OverlaySlice, boolean>;
+					return {[overlayName]: !state[overlayName]};
+				}),
+
+			closeAllOverlays: () =>
+				set({
+					showHelp: false,
+					showMonitor: false,
+					showPromptLibrary: false,
+					showAgentBuilder: false,
+					showCommandPalette: false,
+					showConfig: false,
+				}),
+
+			hasOpenOverlay: () => {
+				const state = get();
+				return (
+					state.showHelp ||
+					state.showMonitor ||
+					state.showPromptLibrary ||
+					state.showAgentBuilder ||
+					state.showCommandPalette ||
+					state.showConfig
+				);
+			},
+
+			addMessage: message =>
+				set(produce(state => {
+					// Add new message efficiently using immer
+					state.messages.push(message);
+
+					// Trim to max messages if needed
+					if (state.messages.length > state.maxMessages) {
+						state.messages = state.messages.slice(-state.maxMessages);
+					}
+
+					// Update session metadata
+					state.session.messageCount = state.messages.length;
+					state.session.lastActivity = Date.now();
+				})),
+
 			updateMessage: (id, updates) =>
-				set(state => ({
-					messages: state.messages.map(msg =>
-						msg.id === id ? {...msg, ...updates} : msg,
-					),
+				set(produce(state => {
+					// Find and update message efficiently using immer
+					const messageIndex = state.messages.findIndex(msg => msg.id === id);
+					if (messageIndex !== -1) {
+						Object.assign(state.messages[messageIndex], updates);
+					}
 				})),
 
 			removeMessage: id =>
@@ -434,11 +555,18 @@ export const useFloydStore = create<FloydStore>()(
 					streamingContent: '',
 				}),
 
-			appendStreamingContent: content =>
-				set(state => ({
-					streamingContent: state.streamingContent + content,
-				})),
+			appendStreamingContent: (() => {
+				// Debounce streaming content updates to reduce state update frequency
+				const debouncedAppend = debounce((content: string) => {
+					set(state => ({
+						streamingContent: state.streamingContent + content,
+					}));
+				}, 50); // 50ms debounce for streaming
 
+				return (content: string) => {
+					debouncedAppend(content);
+				};
+			})(),
 			setStreamingContent: content => set({streamingContent: content}),
 
 			clearStreamingContent: () => set({streamingContent: ''}),
@@ -692,6 +820,7 @@ export const useFloydStore = create<FloydStore>()(
 					rateLimit: initialRateLimitState,
 					session: initialSessionState,
 					...initialConfigState,
+					...initialOverlayState,
 				}),
 		}),
 		{
@@ -776,6 +905,29 @@ export const selectIsAgentWorking = (state: FloydStore) =>
  */
 export const selectTotalToolCalls = (state: FloydStore) =>
 	Object.values(state.stats).reduce((sum, stat) => sum + stat.calls, 0);
+
+/**
+ * Get overlay state
+ */
+export const selectOverlays = (state: FloydStore) => ({
+	showHelp: state.showHelp,
+	showMonitor: state.showMonitor,
+	showPromptLibrary: state.showPromptLibrary,
+	showAgentBuilder: state.showAgentBuilder,
+	showCommandPalette: state.showCommandPalette,
+	showConfig: state.showConfig,
+});
+
+/**
+ * Check if any overlay is open
+ */
+export const selectHasOpenOverlay = (state: FloydStore) =>
+	state.showHelp ||
+	state.showMonitor ||
+	state.showPromptLibrary ||
+	state.showAgentBuilder ||
+	state.showCommandPalette ||
+	state.showConfig;
 
 // ============================================================================
 // TYPE DECLARATIONS

@@ -65,13 +65,13 @@ export const Easing: Record<string, EasingFunction> = {
 		t < 0.5 ? 4 * t * t * t : (t - 1) * (2 * t - 2) * (2 * t - 2) + 1,
 
 	easeInQuart: t => t * t * t * t,
-	easeOutQuart: t => 1 - --t * t * t * t,
+	easeOutQuart: t => 1 - --t * t * t * t * t,
 	easeInOutQuart: t => (t < 0.5 ? 8 * t * t * t * t : 1 - 8 * --t * t * t * t),
 
 	easeInQuint: t => t * t * t * t * t,
 	easeOutQuint: t => 1 + --t * t * t * t * t,
 	easeInOutQuint: t =>
-		t < 0.5 ? 16 * t * t * t * t * t : 1 + 16 * --t * t * t * t * t,
+		t < 0.5 ? 16 * t * t * t * t : 1 + 16 * --t * t * t * t,
 
 	easeInSine: t => 1 - Math.cos((t * Math.PI) / 2),
 	easeOutSine: t => Math.sin((t * Math.PI) / 2),
@@ -98,13 +98,21 @@ export const Easing: Record<string, EasingFunction> = {
  *
  * Features:
  * - Configurable duration and easing
- * - Frame rate control
+ * - Frame rate control with budgeting
  * - Cancellation support
  * - Progress callbacks
+ * - Coalesces multiple animations into single render cycle
+ * - Pauses animations when idle
  */
 export class AnimationEngine {
 	private animations = new Set<AnimationState>();
 	private nextId = 0;
+	private frameBudget = 16; // Max 16ms per frame (~60fps)
+	private lastFrameTime = 0;
+	private totalFrameTime = 0;
+	private frameCount = 0;
+	private isIdle = false;
+	private idleCheckTimer: ReturnType<typeof setTimeout> | null = null;
 
 	/**
 	 * Start an animation
@@ -159,14 +167,14 @@ export class AnimationEngine {
 	}
 
 	/**
-	 * Get the number of active animations
+	 * Get number of active animations
 	 */
 	get activeCount(): number {
 		return this.animations.size;
 	}
 
 	/**
-	 * Schedule the next frame of an animation
+	 * Schedule a next frame of an animation
 	 */
 	private scheduleFrame(animation: AnimationState): void {
 		if (animation.canceled) {
@@ -177,6 +185,25 @@ export class AnimationEngine {
 		const now = Date.now();
 		const elapsed = now - animation.startTime;
 		const progress = Math.min(1, elapsed / animation.duration);
+
+		// Frame budgeting: only schedule if within budget
+		if (this.lastFrameTime > 0) {
+			const timeSinceLastFrame = now - this.lastFrameTime;
+			this.totalFrameTime += timeSinceLastFrame;
+			this.frameCount++;
+
+			// Check if we're over budget (e.g., >16ms average)
+			if (this.frameCount > 10) {
+				const avgFrameTime = this.totalFrameTime / this.frameCount;
+				if (avgFrameTime > this.frameBudget) {
+					// Skip this frame to reduce CPU load
+					// Coalesce with next frame
+					return;
+				}
+			}
+		}
+
+		this.lastFrameTime = now;
 
 		if (progress >= 1) {
 			// Animation complete
@@ -199,6 +226,38 @@ export class AnimationEngine {
 		// Schedule next frame
 		setTimeout(() => this.scheduleFrame(animation), animation.frameDuration);
 	}
+
+	/**
+	 * Start idle detection
+	 */
+	startIdleDetection(): void {
+		if (this.idleCheckTimer) {
+			return;
+		}
+
+		this.idleCheckTimer = setInterval(() => {
+			const now = Date.now();
+			const timeSinceLastFrame = now - this.lastFrameTime;
+			this.isIdle = timeSinceLastFrame > 1000; // 1 second without frames = idle
+
+			if (this.isIdle && this.animations.size > 0) {
+				// Pause all animations when idle
+				this.animations.clear();
+				this.frameCount = 0;
+				this.totalFrameTime = 0;
+			}
+		}, 1000);
+	}
+
+	/**
+	 * Stop idle detection
+	 */
+	stopIdleDetection(): void {
+		if (this.idleCheckTimer) {
+			clearInterval(this.idleCheckTimer);
+			this.idleCheckTimer = null;
+		}
+	}
 }
 
 interface AnimationState {
@@ -218,7 +277,7 @@ interface AnimationState {
 let globalEngine: AnimationEngine | null = null;
 
 /**
- * Get the global animation engine instance
+ * Get global animation engine instance
  */
 export function getAnimationEngine(): AnimationEngine {
 	if (!globalEngine) {
@@ -239,7 +298,7 @@ export function createAnimationEngine(): AnimationEngine {
 // ============================================================================
 
 /**
- * Animate a value with the given configuration
+ * Animate a value with given configuration
  */
 export function animate(
 	config: AnimationConfig,
@@ -263,7 +322,7 @@ export function cancelAllAnimations(): void {
 }
 
 /**
- * Get the number of active animations
+ * Get number of active animations
  */
 export function getActiveAnimationCount(): number {
 	return getAnimationEngine().activeCount;

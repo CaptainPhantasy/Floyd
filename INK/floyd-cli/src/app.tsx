@@ -317,7 +317,7 @@ export default function App({name = 'User', chrome = false}: AppProps) {
 				const streamProcessor = new StreamProcessor({
 					rateLimitEnabled: true,
 					maxTokensPerSecond: 1000, // Increased for performance
-					flushInterval: 50,
+					flushInterval: 33, // 30fps for smooth updates
 					maxBufferSize: 65536, // Increased buffer
 				});
 
@@ -394,12 +394,10 @@ export default function App({name = 'User', chrome = false}: AppProps) {
 
 				// Finalize the message
 				clearStreamingContent();
-				addMessage({
-					id: assistantMsgId,
-					role: 'assistant',
+				updateMessage(assistantMsgId, {
 					content: currentAssistantMessage,
-					timestamp: Date.now(),
 					streaming: false,
+					timestamp: Date.now(),
 				});
 			} catch (error: unknown) {
 				const errorMessage = error instanceof Error ? error.message : String(error);
@@ -457,6 +455,17 @@ export default function App({name = 'User', chrome = false}: AppProps) {
 	});
 
 	// ============================================================================
+	// COMBINE MESSAGES FOR DISPLAY
+	// ============================================================================
+
+	// Use store messages as single source of truth (convert to ChatMessage format)
+	// Memoized to prevent infinite re-render loop in MainLayout
+	const allMessages: ChatMessage[] = useMemo(
+		() => storeMessages.map(toChatMessage),
+		[storeMessages]
+	);
+
+	// ============================================================================
 	// COMMAND PALETTE HANDLERS
 	// ============================================================================
 
@@ -467,16 +476,34 @@ export default function App({name = 'User', chrome = false}: AppProps) {
 					exit();
 					break;
 				case 'new-task':
+				case 'reset-session':
 					setTasks([]);
 					setToolExecutions([]);
 					setEvents([]);
 					useFloydStore.getState().clearMessages();
+					useFloydStore.getState().clearStreamingContent();
 					break;
 				case 'toggle-monitor':
 					toggleMonitor();
 					break;
 				case 'toggle-agent-viz':
 					setShowAgentViz(v => !v);
+					break;
+				case 'toggle-safety':
+					useFloydStore.getState().toggleSafetyMode();
+					break;
+				case 'export-transcript':
+					// Logic to save allMessages to a file
+					const fs = require('node:fs');
+					const transcriptPath = `transcript-${Date.now()}.md`;
+					const transcriptContent = allMessages.map(m => `[${m.role.toUpperCase()}] ${m.content}`).join('\n\n');
+					fs.writeFileSync(transcriptPath, transcriptContent);
+					addMessage({
+						id: `system-${Date.now()}`,
+						role: 'system',
+						content: `✅ Transcript exported to ${transcriptPath}`,
+						timestamp: Date.now(),
+					});
 					break;
 				case 'help':
 					// Toggle help overlay using store state
@@ -494,7 +521,7 @@ export default function App({name = 'User', chrome = false}: AppProps) {
 					break;
 			}
 		},
-		[exit, toggleHelp],
+		[exit, toggleHelp, allMessages, addMessage],
 	);
 
 	// Handle safety mode changes from MainLayout
@@ -508,14 +535,37 @@ export default function App({name = 'User', chrome = false}: AppProps) {
 		() => [
 			...commonCommands,
 			{
+				id: 'reset-session',
+				label: 'Reset Session',
+				description: 'Clear current conversation and reset agent state',
+				icon: '🧹',
+				action: () => handleCommand('reset-session'),
+			},
+			{
+				id: 'toggle-safety',
+				label: 'Toggle Safety Mode',
+				description: 'Cycle between YOLO, ASK, and PLAN modes',
+				icon: '🛡️',
+				action: () => handleCommand('toggle-safety'),
+			},
+			{
+				id: 'export-transcript',
+				label: 'Export Transcript',
+				description: 'Save conversation history to a markdown file',
+				icon: '💾',
+				action: () => handleCommand('export-transcript'),
+			},
+			{
 				id: 'toggle-monitor',
 				label: 'Toggle Monitor',
+				description: 'Show/hide system performance dashboard',
 				icon: '◐',
 				action: () => toggleMonitor(),
 			},
 			{
 				id: 'toggle-agent-viz',
 				label: 'Toggle Agent Viz',
+				description: 'Show/hide task checklist and tool timeline',
 				icon: '◉',
 				action: () => setShowAgentViz(v => !v),
 			},
@@ -532,17 +582,6 @@ export default function App({name = 'User', chrome = false}: AppProps) {
 			},
 		].map(cmd => ({...cmd, action: () => handleCommand(cmd.id)})),
 		[commonCommands, handleCommand, toggleMonitor]
-	);
-
-	// ============================================================================
-	// COMBINE MESSAGES FOR DISPLAY
-	// ============================================================================
-
-	// Use store messages as single source of truth (convert to ChatMessage format)
-	// Memoized to prevent infinite re-render loop in MainLayout
-	const allMessages: ChatMessage[] = useMemo(
-		() => storeMessages.map(toChatMessage),
-		[storeMessages]
 	);
 
 	// ============================================================================

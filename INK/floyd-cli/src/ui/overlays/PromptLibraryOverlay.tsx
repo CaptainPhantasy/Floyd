@@ -424,6 +424,11 @@ export function PromptLibraryOverlay({
 	// Handle keyboard input
 	useInput(
 		(input, key) => {
+			// Ctrl+Q - Quit the entire CLI immediately
+			if (key.ctrl && (input === 'q' || input === 'Q')) {
+				process.exit(0);
+			}
+
 			if (key.escape) {
 				onClose();
 				return;

@@ -32,6 +32,7 @@ import {
 	errorAnimation,
 } from './animations';
 import {borderWeights, crushBorders} from './borders';
+import {LAYOUT} from './layout';
 
 // ----------------------------------------------------------------------------
 // Color Palette
@@ -142,6 +143,12 @@ export {
 	getGradientBorder,
 	createFocusedMessageBorder,
 } from './borders';
+
+// ----------------------------------------------------------------------------
+// Layout Constants
+// ----------------------------------------------------------------------------
+
+export {LAYOUT};
 
 export type {
 	BorderStyle,

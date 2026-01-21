@@ -1,0 +1,42 @@
+{
+  "name": "NotionPromptScraper",
+  "description": "Extract ALL prompts from currently open Notion database at https://www.notion.so/LAI-OS-2cb8cbcf57bc80ddbe60cc4b51b126c4 and save to /Volumes/Storage/Prompt Library/
+
+Use browser automation tools (via FloydChrome extension):
+1. browser_read_page - Read Notion page structure
+2. browser_click - Click elements (pagination, expand rows)
+3. browser_find - Find specific prompt entries
+4. browser_screenshot - Capture screenshots for verification
+
+Save each prompt as markdown:
+---
+title: \"Prompt Name\"
+tags: [tag1, tag2]
+category: \"agent|tool|skill|prompt\"
+source: \"Notion - LAI-OS\"
+indexedAt: ISO timestamp
+---
+
+[Prompt content]
+
+EXTRACTION STEPS:
+1. Read current Notion page structure
+2. Identify all database rows/prompts
+3. For each prompt:
+   - Extract title/name
+   - Extract content/body
+   - Capture tags/metadata
+   - Save as markdown with frontmatter
+4. Handle pagination (if more than visible)
+5. Generate summary report
+
+Start by reading the page to understand its structure.",
+  "tools": [
+    "browser_read_page",
+    "browser_click",
+    "browser_find",
+    "browser_screenshot",
+    "write_file"
+  ],
+  "timeout": 300000
+}

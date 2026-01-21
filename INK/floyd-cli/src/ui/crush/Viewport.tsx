@@ -97,7 +97,7 @@ export function Viewport({
 
 	// Calculate max scroll based on content height
 	// This is a simplified calculation - in a real implementation,
-	// you'd measure the actual content height
+	// you'd measure actual content height
 	useEffect(() => {
 		// Estimate content height (this would need actual measurement in production)
 		// For now, we'll use a reasonable default that increases with content
@@ -147,7 +147,7 @@ export function Viewport({
 			borderColor={floydTheme.colors.border}
 		>
 			{/* Scrollable content */}
-			<Box flexDirection="column" marginTop={-scrollTop}>
+			<Box flexDirection="column" marginTop={-scrollTop} position="relative">
 				{children}
 			</Box>
 

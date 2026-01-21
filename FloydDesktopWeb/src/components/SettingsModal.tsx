@@ -150,11 +150,11 @@ export function SettingsModal({ isOpen, onClose, onSave }: SettingsModalProps) {
 
   return (
     <div className="fixed inset-0 bg-black/50 z-50 flex items-center justify-center p-4">
-      <div className="bg-slate-800 rounded-lg w-full max-w-lg max-h-[90vh] overflow-hidden flex flex-col">
+      <div className="bg-crush-elevated rounded-lg w-full max-w-lg max-h-[90vh] overflow-hidden flex flex-col">
         {/* Header */}
-        <div className="flex items-center justify-between p-4 border-b border-slate-700">
+        <div className="flex items-center justify-between p-4 border-b border-crush-overlay">
           <h2 className="text-lg font-semibold">Settings</h2>
-          <button onClick={onClose} className="text-slate-400 hover:text-white">
+          <button onClick={onClose} className="text-crush-text-secondary hover:text-crush-text-selected">
             <X className="w-5 h-5" />
           </button>
         </div>
@@ -163,7 +163,7 @@ export function SettingsModal({ isOpen, onClose, onSave }: SettingsModalProps) {
         <div className="flex-1 overflow-y-auto p-4 space-y-4">
           {/* Provider Selection */}
           <div>
-            <label className="block text-sm font-medium text-slate-300 mb-2">
+            <label className="block text-sm font-medium text-crush-text-tertiary mb-2">
               AI Provider
             </label>
             <div className="grid grid-cols-2 gap-2">
@@ -172,59 +172,59 @@ export function SettingsModal({ isOpen, onClose, onSave }: SettingsModalProps) {
                 className={cn(
                   'p-3 rounded-lg border text-left transition-colors',
                   provider === 'anthropic'
-                    ? 'border-sky-500 bg-sky-500/10 text-sky-300'
-                    : 'border-slate-600 hover:border-slate-500'
+                    ? 'border-crush-primary bg-crush-primary/10 text-crush-info'
+                    : 'border-crush-modal hover:border-crush-modal'
                 )}
               >
                 <div className="font-medium">Anthropic</div>
-                <div className="text-xs text-slate-400">Official API</div>
+                <div className="text-xs text-crush-text-secondary">Official API</div>
               </button>
               <button
                 onClick={() => handleProviderChange('anthropic-compatible')}
                 className={cn(
                   'p-3 rounded-lg border text-left transition-colors',
                   provider === 'anthropic-compatible'
-                    ? 'border-sky-500 bg-sky-500/10 text-sky-300'
-                    : 'border-slate-600 hover:border-slate-500'
+                    ? 'border-crush-primary bg-crush-primary/10 text-crush-info'
+                    : 'border-crush-modal hover:border-crush-modal'
                 )}
               >
                 <div className="font-medium">Anthropic-Compatible</div>
-                <div className="text-xs text-slate-400">Custom Endpoint</div>
+                <div className="text-xs text-crush-text-secondary">Custom Endpoint</div>
               </button>
               <button
                 onClick={() => handleProviderChange('openai')}
                 className={cn(
                   'p-3 rounded-lg border text-left transition-colors',
                   provider === 'openai'
-                    ? 'border-green-500 bg-green-500/10 text-green-300'
-                    : 'border-slate-600 hover:border-slate-500'
+                    ? 'border-crush-ready bg-crush-ready/10 text-crush-ready'
+                    : 'border-crush-modal hover:border-crush-modal'
                 )}
               >
                 <div className="font-medium">OpenAI</div>
-                <div className="text-xs text-slate-400">GPT Models</div>
+                <div className="text-xs text-crush-text-secondary">GPT Models</div>
               </button>
               <button
                 onClick={() => handleProviderChange('glm')}
                 className={cn(
                   'p-3 rounded-lg border text-left transition-colors',
                   provider === 'glm'
-                    ? 'border-purple-500 bg-purple-500/10 text-purple-300'
-                    : 'border-slate-600 hover:border-slate-500'
+                    ? 'border-crush-secondary bg-crush-secondary/10 text-crush-secondary'
+                    : 'border-crush-modal hover:border-crush-modal'
                 )}
               >
                 <div className="font-medium">Zai GLM</div>
-                <div className="text-xs text-slate-400">Zhipu AI</div>
+                <div className="text-xs text-crush-text-secondary">Zhipu AI</div>
               </button>
             </div>
           </div>
 
           {/* API Key */}
           <div>
-            <label className="block text-sm font-medium text-slate-300 mb-2">
+            <label className="block text-sm font-medium text-crush-text-tertiary mb-2">
               {provider === 'anthropic' || provider === 'anthropic-compatible' ? 'Anthropic' : provider === 'openai' ? 'OpenAI' : 'GLM'} API Key
             </label>
             {hasExistingKey && keyPreview && (
-              <div className="text-xs text-slate-500 mb-2">
+              <div className="text-xs text-crush-text-subtle mb-2">
                 Current: {keyPreview}
               </div>
             )}
@@ -237,12 +237,12 @@ export function SettingsModal({ isOpen, onClose, onSave }: SettingsModalProps) {
                   setTestResult(null);
                 }}
                 placeholder={hasExistingKey ? 'Enter new key to change' : `${provider === 'anthropic' || provider === 'anthropic-compatible' ? 'sk-ant-...' : provider === 'openai' ? 'sk-...' : 'xxxxxxxx.xxxxxxxx'}`}
-                className="flex-1 bg-slate-700 border border-slate-600 rounded px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-sky-500"
+                className="flex-1 bg-crush-modal border border-crush-modal rounded px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-crush-primary"
               />
               <button
                 onClick={handleTest}
                 disabled={testing || !apiKey}
-                className="px-4 py-2 bg-slate-600 rounded text-sm hover:bg-slate-500 disabled:opacity-50 flex items-center gap-2"
+                className="px-4 py-2 bg-crush-overlay rounded text-sm hover:bg-crush-modal disabled:opacity-50 flex items-center gap-2"
               >
                 {testing ? <Loader2 className="w-4 h-4 animate-spin" /> : 'Test'}
               </button>
@@ -250,7 +250,7 @@ export function SettingsModal({ isOpen, onClose, onSave }: SettingsModalProps) {
             {testResult && (
               <div className={cn(
                 'mt-2 text-sm flex items-center gap-2',
-                testResult.success ? 'text-green-400' : 'text-red-400'
+                testResult.success ? 'text-crush-ready' : 'text-crush-error'
               )}>
                 {testResult.success ? <CheckCircle2 className="w-4 h-4" /> : <AlertCircle className="w-4 h-4" />}
                 {testResult.message}
@@ -261,7 +261,7 @@ export function SettingsModal({ isOpen, onClose, onSave }: SettingsModalProps) {
           {/* Base URL - only for anthropic-compatible */}
           {provider === 'anthropic-compatible' && (
             <div>
-              <label className="block text-sm font-medium text-slate-300 mb-2">
+              <label className="block text-sm font-medium text-crush-text-tertiary mb-2">
                 API Endpoint URL
               </label>
               <input
@@ -269,9 +269,9 @@ export function SettingsModal({ isOpen, onClose, onSave }: SettingsModalProps) {
                 value={baseURL}
                 onChange={(e) => setBaseURL(e.target.value)}
                 placeholder="https://api.example.com/v1/messages"
-                className="w-full bg-slate-700 border border-slate-600 rounded px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-sky-500"
+                className="w-full bg-crush-modal border border-crush-modal rounded px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-crush-primary"
               />
-              <p className="text-xs text-slate-500 mt-1">
+              <p className="text-xs text-crush-text-subtle mt-1">
                 Enter the base URL of your Anthropic-compatible API endpoint.
               </p>
             </div>
@@ -279,13 +279,13 @@ export function SettingsModal({ isOpen, onClose, onSave }: SettingsModalProps) {
 
           {/* Model Selection */}
           <div>
-            <label className="block text-sm font-medium text-slate-300 mb-2">
+            <label className="block text-sm font-medium text-crush-text-tertiary mb-2">
               Model
             </label>
             <select
               value={model}
               onChange={(e) => setModel(e.target.value)}
-              className="w-full bg-slate-700 border border-slate-600 rounded px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-sky-500"
+              className="w-full bg-crush-modal border border-crush-modal rounded px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-crush-primary"
             >
               {models.map((m) => (
                 <option key={m.id} value={m.id}>
@@ -297,7 +297,7 @@ export function SettingsModal({ isOpen, onClose, onSave }: SettingsModalProps) {
 
           {/* Max Tokens */}
           <div>
-            <label className="block text-sm font-medium text-slate-300 mb-2">
+            <label className="block text-sm font-medium text-crush-text-tertiary mb-2">
               Max Tokens
             </label>
             <input
@@ -306,16 +306,16 @@ export function SettingsModal({ isOpen, onClose, onSave }: SettingsModalProps) {
               onChange={(e) => setMaxTokens(parseInt(e.target.value) || 4096)}
               min={256}
               max={128000}
-              className="w-full bg-slate-700 border border-slate-600 rounded px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-sky-500"
+              className="w-full bg-crush-modal border border-crush-modal rounded px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-crush-primary"
             />
-            <p className="text-xs text-slate-500 mt-1">
+            <p className="text-xs text-crush-text-subtle mt-1">
               Maximum response length. Higher = longer responses but more cost.
             </p>
           </div>
 
           {/* System Prompt */}
           <div>
-            <label className="block text-sm font-medium text-slate-300 mb-2">
+            <label className="block text-sm font-medium text-crush-text-tertiary mb-2">
               System Prompt (Optional)
             </label>
             <textarea
@@ -323,23 +323,23 @@ export function SettingsModal({ isOpen, onClose, onSave }: SettingsModalProps) {
               onChange={(e) => setSystemPrompt(e.target.value)}
               placeholder="Custom instructions for Floyd..."
               rows={4}
-              className="w-full bg-slate-700 border border-slate-600 rounded px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-sky-500 resize-none"
+              className="w-full bg-crush-modal border border-crush-modal rounded px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-crush-primary resize-none"
             />
           </div>
         </div>
 
         {/* Footer */}
-        <div className="flex justify-end gap-2 p-4 border-t border-slate-700">
+        <div className="flex justify-end gap-2 p-4 border-t border-crush-overlay">
           <button
             onClick={onClose}
-            className="px-4 py-2 bg-slate-600 rounded hover:bg-slate-500"
+            className="px-4 py-2 bg-crush-overlay rounded hover:bg-crush-modal"
           >
             Cancel
           </button>
           <button
             onClick={handleSave}
             disabled={saving}
-            className="px-4 py-2 bg-sky-600 rounded hover:bg-sky-700 disabled:opacity-50 flex items-center gap-2"
+            className="px-4 py-2 bg-crush-primary rounded hover:bg-crush-grape disabled:opacity-50 flex items-center gap-2"
           >
             {saving && <Loader2 className="w-4 h-4 animate-spin" />}
             Save

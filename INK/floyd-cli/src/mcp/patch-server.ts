@@ -187,7 +187,9 @@ export async function applyUnifiedDiff(
 					callback(null, content);
 				},
 				patched: (_index, patchedContent) => {
-					content = patchedContent;
+					if (patchedContent) {
+						content = patchedContent;
+					}
 				},
 				complete: _err => {
 					// Patch application complete

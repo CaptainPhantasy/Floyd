@@ -1,0 +1,38 @@
+# Floyd CURSE'M IDE - Legacy AI Official Theme
+# Palette Source: Floyd CLI Screen Palette
+
+## Primary Backgrounds (The Void)
+background=#0E111A
+# Deepest black/purple from background
+
+## Secondary Backgrounds (Panels/Sidebars)
+background_secondary=#1C165E
+# Deep Indigo from side panels
+
+## Text Colors
+foreground=#ffffff
+foreground_secondary=#5C5B62
+# Muted gray from palette for subtitles/comments
+
+## Accent Colors (Neon)
+accent_primary=#AB18E4
+# Electric Purple (Primary Action)
+accent_secondary=#371DF4
+# Electric Blue (Secondary Action/Focus)
+
+## UI Elements
+selection_background=#561DFF
+# Bright Blue/Purple for selections
+selection_foreground=#ffffff
+caret_color=#AB18E4
+
+## Borders & Dividers
+border_color=#231991
+# Dark Blue/Purple for subtle separation
+
+## Syntax Highlighting (Mapped to Palette)
+keyword=#AB18E4
+string=#371DF4
+comment=#5C5B62
+number=#A015A7
+operator=#ffffff

@@ -1,0 +1,47 @@
+{
+  "name": "@floyd/ui-theme",
+  "version": "1.0.0",
+  "description": "CRUSH Design System - Shared theme tokens for Floyd platforms",
+  "type": "module",
+  "main": "./dist/index.js",
+  "types": "./dist/index.d.ts",
+  "exports": {
+    ".": {
+      "types": "./dist/index.d.ts",
+      "import": "./dist/index.js"
+    },
+    "./tokens/*": {
+      "types": "./dist/tokens/*.d.ts",
+      "import": "./dist/tokens/*.js"
+    },
+    "./platform/tailwind": {
+      "types": "./dist/platform/tailwind.d.ts",
+      "import": "./dist/platform/tailwind.js"
+    },
+    "./platform/css": {
+      "types": "./dist/platform/css.d.ts",
+      "import": "./dist/platform/css.js"
+    }
+  },
+  "files": [
+    "dist",
+    "src"
+  ],
+  "scripts": {
+    "build": "tsc",
+    "watch": "tsc --watch",
+    "generate:tailwind": "node dist/platform/tailwind.js",
+    "generate:css": "node dist/platform/css.js"
+  },
+  "keywords": [
+    "floyd",
+    "crush",
+    "theme",
+    "design-system"
+  ],
+  "author": "Floyd",
+  "license": "MIT",
+  "devDependencies": {
+    "typescript": "^5.7.3"
+  }
+}

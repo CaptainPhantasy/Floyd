@@ -166,19 +166,19 @@ export function ProjectsPanel({ isOpen, onClose }: ProjectsPanelProps) {
 
   return (
     <div className="fixed inset-0 bg-black/50 z-50 flex justify-end">
-      <div className="w-[560px] bg-slate-800 h-full overflow-hidden flex flex-col">
+      <div className="w-[560px] bg-crush-elevated h-full overflow-hidden flex flex-col">
         {/* Header */}
-        <div className="p-4 border-b border-slate-700 flex items-center justify-between">
+        <div className="p-4 border-b border-crush-overlay flex items-center justify-between">
           <div className="flex items-center gap-2">
-            <FolderKanban className="w-5 h-5 text-blue-400" />
+            <FolderKanban className="w-5 h-5 text-crush-info" />
             <h2 className="font-semibold">Projects</h2>
             {activeId && (
-              <span className="text-xs bg-blue-500/20 text-blue-300 px-2 py-0.5 rounded-full">
+              <span className="text-xs bg-crush-info/20 text-crush-info px-2 py-0.5 rounded-full">
                 1 active
               </span>
             )}
           </div>
-          <button onClick={onClose} className="text-slate-400 hover:text-white">
+          <button onClick={onClose} className="text-crush-text-secondary hover:text-crush-text-selected">
             ✕
           </button>
         </div>
@@ -187,24 +187,24 @@ export function ProjectsPanel({ isOpen, onClose }: ProjectsPanelProps) {
         <div className="flex-1 overflow-y-auto">
           {loading ? (
             <div className="flex items-center justify-center py-8">
-              <Loader2 className="w-6 h-6 animate-spin text-slate-400" />
+              <Loader2 className="w-6 h-6 animate-spin text-crush-text-secondary" />
             </div>
           ) : selectedProject ? (
             // Project detail view
             <div className="p-4 space-y-4">
               <button
                 onClick={() => setSelectedProject(null)}
-                className="text-sm text-slate-400 hover:text-white flex items-center gap-1"
+                className="text-sm text-crush-text-secondary hover:text-crush-text-selected flex items-center gap-1"
               >
                 ← Back to projects
               </button>
 
               <div className="space-y-2">
                 <h3 className="font-semibold text-lg">{selectedProject.name}</h3>
-                <p className="text-sm text-slate-400">{selectedProject.description}</p>
+                <p className="text-sm text-crush-text-secondary">{selectedProject.description}</p>
                 
                 {selectedProject.rootPath && (
-                  <div className="flex items-center gap-2 text-sm text-slate-500">
+                  <div className="flex items-center gap-2 text-sm text-crush-text-subtle">
                     <FolderOpen className="w-4 h-4" />
                     {selectedProject.rootPath}
                   </div>
@@ -214,21 +214,21 @@ export function ProjectsPanel({ isOpen, onClose }: ProjectsPanelProps) {
                   {activeId === selectedProject.id ? (
                     <button
                       onClick={deactivateProject}
-                      className="px-3 py-1.5 bg-slate-600 text-sm rounded hover:bg-slate-500"
+                      className="px-3 py-1.5 bg-crush-overlay text-sm rounded hover:bg-crush-modal"
                     >
                       Deactivate
                     </button>
                   ) : (
                     <button
                       onClick={() => activateProject(selectedProject.id)}
-                      className="px-3 py-1.5 bg-blue-600 text-sm rounded hover:bg-blue-700"
+                      className="px-3 py-1.5 bg-crush-info text-sm rounded hover:bg-crush-working"
                     >
                       Activate Project
                     </button>
                   )}
                   <button
                     onClick={() => deleteProject(selectedProject.id)}
-                    className="px-3 py-1.5 bg-red-600/20 text-red-400 text-sm rounded hover:bg-red-600/30"
+                    className="px-3 py-1.5 bg-crush-error/20 text-crush-error text-sm rounded hover:bg-crush-error/30"
                   >
                     Delete
                   </button>
@@ -237,9 +237,9 @@ export function ProjectsPanel({ isOpen, onClose }: ProjectsPanelProps) {
 
               {/* Instructions */}
               {selectedProject.instructions && (
-                <div className="bg-slate-700/50 rounded-lg p-3">
-                  <div className="text-xs text-slate-500 uppercase font-medium mb-1">Instructions</div>
-                  <div className="text-sm text-slate-300 whitespace-pre-wrap">
+                <div className="bg-crush-modal/50 rounded-lg p-3">
+                  <div className="text-xs text-crush-text-subtle uppercase font-medium mb-1">Instructions</div>
+                  <div className="text-sm text-crush-text-tertiary whitespace-pre-wrap">
                     {selectedProject.instructions}
                   </div>
                 </div>
@@ -254,22 +254,22 @@ export function ProjectsPanel({ isOpen, onClose }: ProjectsPanelProps) {
                     {selectedProject.files.map((file, i) => (
                       <div 
                         key={i}
-                        className="flex items-center gap-2 bg-slate-700/50 rounded p-2"
+                        className="flex items-center gap-2 bg-crush-modal/50 rounded p-2"
                       >
                         {file.type === 'snippet' ? (
-                          <FileText className="w-4 h-4 text-yellow-400" />
+                          <FileText className="w-4 h-4 text-crush-warning" />
                         ) : (
-                          <File className="w-4 h-4 text-slate-400" />
+                          <File className="w-4 h-4 text-crush-text-secondary" />
                         )}
                         <div className="flex-1 min-w-0">
                           <div className="text-sm truncate">{file.name}</div>
-                          <div className="text-xs text-slate-500">
+                          <div className="text-xs text-crush-text-subtle">
                             {(file.size / 1024).toFixed(1)} KB
                           </div>
                         </div>
                         <button
                           onClick={() => removeFile(selectedProject.id, file.path)}
-                          className="text-slate-400 hover:text-red-400"
+                          className="text-crush-text-secondary hover:text-crush-error"
                         >
                           <X className="w-4 h-4" />
                         </button>
@@ -277,7 +277,7 @@ export function ProjectsPanel({ isOpen, onClose }: ProjectsPanelProps) {
                     ))}
                   </div>
                 ) : (
-                  <div className="text-sm text-slate-500 py-4 text-center">
+                  <div className="text-sm text-crush-text-subtle py-4 text-center">
                     No context files yet
                   </div>
                 )}
@@ -289,42 +289,42 @@ export function ProjectsPanel({ isOpen, onClose }: ProjectsPanelProps) {
                       placeholder="File path (e.g., /path/to/file.ts)"
                       value={newFilePath}
                       onChange={(e) => setNewFilePath(e.target.value)}
-                      className="flex-1 bg-slate-700 border border-slate-600 rounded px-3 py-2 text-sm"
+                      className="flex-1 bg-crush-modal border border-crush-modal rounded px-3 py-2 text-sm"
                     />
                     <button
                       onClick={() => addFile(selectedProject.id)}
                       disabled={!newFilePath}
-                      className="px-3 py-2 bg-slate-600 text-sm rounded hover:bg-slate-500 disabled:opacity-50"
+                      className="px-3 py-2 bg-crush-overlay text-sm rounded hover:bg-crush-modal disabled:opacity-50"
                     >
                       Add File
                     </button>
                   </div>
 
                   {showSnippetForm ? (
-                    <div className="bg-slate-700/50 rounded p-3 space-y-2">
+                    <div className="bg-crush-modal/50 rounded p-3 space-y-2">
                       <input
                         placeholder="Snippet name"
                         value={newSnippet.name}
                         onChange={(e) => setNewSnippet(p => ({ ...p, name: e.target.value }))}
-                        className="w-full bg-slate-800 border border-slate-600 rounded px-3 py-2 text-sm"
+                        className="w-full bg-crush-elevated border border-crush-modal rounded px-3 py-2 text-sm"
                       />
                       <textarea
                         placeholder="Snippet content"
                         value={newSnippet.content}
                         onChange={(e) => setNewSnippet(p => ({ ...p, content: e.target.value }))}
-                        className="w-full bg-slate-800 border border-slate-600 rounded px-3 py-2 text-sm h-24 resize-none"
+                        className="w-full bg-crush-elevated border border-crush-modal rounded px-3 py-2 text-sm h-24 resize-none"
                       />
                       <div className="flex gap-2">
                         <button
                           onClick={() => addSnippet(selectedProject.id)}
                           disabled={!newSnippet.name || !newSnippet.content}
-                          className="px-3 py-1.5 bg-blue-600 text-sm rounded hover:bg-blue-700 disabled:opacity-50"
+                          className="px-3 py-1.5 bg-crush-info text-sm rounded hover:bg-crush-working disabled:opacity-50"
                         >
                           Add Snippet
                         </button>
                         <button
                           onClick={() => setShowSnippetForm(false)}
-                          className="px-3 py-1.5 bg-slate-600 text-sm rounded hover:bg-slate-500"
+                          className="px-3 py-1.5 bg-crush-overlay text-sm rounded hover:bg-crush-modal"
                         >
                           Cancel
                         </button>
@@ -333,7 +333,7 @@ export function ProjectsPanel({ isOpen, onClose }: ProjectsPanelProps) {
                   ) : (
                     <button
                       onClick={() => setShowSnippetForm(true)}
-                      className="text-sm text-slate-400 hover:text-white"
+                      className="text-sm text-crush-text-secondary hover:text-crush-text-selected"
                     >
                       + Add text snippet
                     </button>
@@ -346,8 +346,8 @@ export function ProjectsPanel({ isOpen, onClose }: ProjectsPanelProps) {
             <div className="p-4 space-y-4">
               {/* Active project summary */}
               {activeId && (
-                <div className="bg-blue-500/10 border border-blue-500/30 rounded-lg p-3">
-                  <div className="text-sm text-blue-300 font-medium mb-1">Active Project</div>
+                <div className="bg-crush-info/10 border border-crush-info/30 rounded-lg p-3">
+                  <div className="text-sm text-crush-info font-medium mb-1">Active Project</div>
                   <div className="text-sm">
                     {projects.find(p => p.id === activeId)?.name}
                   </div>
@@ -362,10 +362,10 @@ export function ProjectsPanel({ isOpen, onClose }: ProjectsPanelProps) {
                       key={project.id}
                       onClick={() => setSelectedProject(project)}
                       className={cn(
-                        'bg-slate-700/50 rounded-lg border p-3 cursor-pointer transition-colors hover:bg-slate-700',
+                        'bg-crush-modal/50 rounded-lg border p-3 cursor-pointer transition-colors hover:bg-crush-modal',
                         activeId === project.id 
-                          ? 'border-blue-500/50' 
-                          : 'border-slate-600'
+                          ? 'border-crush-info/50' 
+                          : 'border-crush-modal'
                       )}
                     >
                       <div className="flex items-start justify-between">
@@ -373,13 +373,13 @@ export function ProjectsPanel({ isOpen, onClose }: ProjectsPanelProps) {
                           <div className="font-medium flex items-center gap-2">
                             {project.name}
                             {activeId === project.id && (
-                              <Check className="w-4 h-4 text-blue-400" />
+                              <Check className="w-4 h-4 text-crush-info" />
                             )}
                           </div>
-                          <div className="text-sm text-slate-400">
+                          <div className="text-sm text-crush-text-secondary">
                             {project.description}
                           </div>
-                          <div className="text-xs text-slate-500 mt-1">
+                          <div className="text-xs text-crush-text-subtle mt-1">
                             {project.files.length} context files
                           </div>
                         </div>
@@ -388,7 +388,7 @@ export function ProjectsPanel({ isOpen, onClose }: ProjectsPanelProps) {
                   ))}
                 </div>
               ) : (
-                <div className="text-center py-8 text-slate-500">
+                <div className="text-center py-8 text-crush-text-subtle">
                   <FolderKanban className="w-12 h-12 mx-auto mb-2 opacity-50" />
                   <div>No projects yet</div>
                   <div className="text-sm">Create a project to add context files</div>
@@ -397,48 +397,48 @@ export function ProjectsPanel({ isOpen, onClose }: ProjectsPanelProps) {
 
               {/* Create project form */}
               {showCreateForm ? (
-                <div className="bg-slate-700/50 rounded-lg border border-slate-600 p-4 space-y-3">
+                <div className="bg-crush-modal/50 rounded-lg border border-crush-modal p-4 space-y-3">
                   <div className="font-medium text-sm">Create New Project</div>
                   
                   <input
                     placeholder="Project name"
                     value={newProject.name}
                     onChange={(e) => setNewProject(p => ({ ...p, name: e.target.value }))}
-                    className="w-full bg-slate-800 border border-slate-600 rounded px-3 py-2 text-sm"
+                    className="w-full bg-crush-elevated border border-crush-modal rounded px-3 py-2 text-sm"
                   />
                   
                   <input
                     placeholder="Description"
                     value={newProject.description}
                     onChange={(e) => setNewProject(p => ({ ...p, description: e.target.value }))}
-                    className="w-full bg-slate-800 border border-slate-600 rounded px-3 py-2 text-sm"
+                    className="w-full bg-crush-elevated border border-crush-modal rounded px-3 py-2 text-sm"
                   />
                   
                   <input
                     placeholder="Root path (optional, e.g., /path/to/project)"
                     value={newProject.rootPath}
                     onChange={(e) => setNewProject(p => ({ ...p, rootPath: e.target.value }))}
-                    className="w-full bg-slate-800 border border-slate-600 rounded px-3 py-2 text-sm"
+                    className="w-full bg-crush-elevated border border-crush-modal rounded px-3 py-2 text-sm"
                   />
                   
                   <textarea
                     placeholder="Project instructions (optional)"
                     value={newProject.instructions}
                     onChange={(e) => setNewProject(p => ({ ...p, instructions: e.target.value }))}
-                    className="w-full bg-slate-800 border border-slate-600 rounded px-3 py-2 text-sm h-24 resize-none"
+                    className="w-full bg-crush-elevated border border-crush-modal rounded px-3 py-2 text-sm h-24 resize-none"
                   />
                   
                   <div className="flex gap-2">
                     <button
                       onClick={createProject}
                       disabled={!newProject.name}
-                      className="px-3 py-1.5 bg-blue-600 text-sm rounded hover:bg-blue-700 disabled:opacity-50"
+                      className="px-3 py-1.5 bg-crush-info text-sm rounded hover:bg-crush-working disabled:opacity-50"
                     >
                       Create
                     </button>
                     <button
                       onClick={() => setShowCreateForm(false)}
-                      className="px-3 py-1.5 bg-slate-600 text-sm rounded hover:bg-slate-500"
+                      className="px-3 py-1.5 bg-crush-overlay text-sm rounded hover:bg-crush-modal"
                     >
                       Cancel
                     </button>
@@ -447,7 +447,7 @@ export function ProjectsPanel({ isOpen, onClose }: ProjectsPanelProps) {
               ) : (
                 <button
                   onClick={() => setShowCreateForm(true)}
-                  className="w-full py-2 border border-dashed border-slate-600 rounded-lg text-sm text-slate-400 hover:border-slate-500 hover:text-slate-300 flex items-center justify-center gap-2"
+                  className="w-full py-2 border border-dashed border-crush-modal rounded-lg text-sm text-crush-text-secondary hover:border-crush-overlay hover:text-crush-text-tertiary flex items-center justify-center gap-2"
                 >
                   <Plus className="w-4 h-4" />
                   Create New Project

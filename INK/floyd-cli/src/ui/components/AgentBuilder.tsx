@@ -65,6 +65,12 @@ interface AgentNameStepProps {
 
 function AgentNameStep({agentName, onChange, onSubmit, onCancel}: AgentNameStepProps) {
 	useInput((input, key) => {
+		// Ctrl+Q - Quit the entire CLI
+		if (key.ctrl && (input === 'q' || input === 'Q')) {
+			process.exit(0);
+			return;
+		}
+		// Ctrl+C - Close this overlay
 		if (key.ctrl && input === 'c') {
 			onCancel();
 			return;
@@ -139,6 +145,12 @@ function CapabilitiesStep({
 	const [selectedIndex, setSelectedIndex] = useState(0);
 
 	useInput((input, key) => {
+		// Ctrl+Q - Quit the entire CLI
+		if (key.ctrl && (input === 'q' || input === 'Q')) {
+			process.exit(0);
+			return;
+		}
+		// Ctrl+C - Close this overlay
 		if (key.ctrl && input === 'c') {
 			onCancel();
 			return;
@@ -239,6 +251,12 @@ interface SystemPromptStepProps {
 
 function SystemPromptStep({prompt, onChange, onSubmit, onCancel}: SystemPromptStepProps) {
 	useInput((input, key) => {
+		// Ctrl+Q - Quit the entire CLI
+		if (key.ctrl && (input === 'q' || input === 'Q')) {
+			process.exit(0);
+			return;
+		}
+		// Ctrl+C - Close this overlay
 		if (key.ctrl && input === 'c') {
 			onCancel();
 			return;
@@ -307,7 +325,11 @@ interface SuccessStepProps {
 }
 
 function SuccessStep({config, onClose}: SuccessStepProps) {
-	useInput((_input, key) => {
+	useInput((input, key) => {
+		// Ctrl+Q - Quit the entire CLI
+		if (key.ctrl && (input === 'q' || input === 'Q')) {
+			process.exit(0);
+		}
 		if (key.return || key.escape) {
 			onClose();
 		}

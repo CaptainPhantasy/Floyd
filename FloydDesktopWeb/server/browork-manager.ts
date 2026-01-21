@@ -10,7 +10,9 @@ import { v4 as uuidv4 } from 'uuid';
 import { ToolExecutor } from './tool-executor.js';
 import { BUILTIN_TOOLS } from './mcp-client.js';
 
-type Provider = 'anthropic' | 'openai' | 'glm';
+type Provider = 'anthropic' | 'openai' | 'glm' | 'anthropic-compatible';
+
+export type { Provider };
 
 export type AgentStatus = 'pending' | 'running' | 'completed' | 'failed' | 'cancelled';
 
@@ -56,6 +58,7 @@ export class BroworkManager {
   private config: BroworkConfig = DEFAULT_CONFIG;
   private toolExecutor: ToolExecutor;
   private apiKey: string = '';
+  private baseURL?: string;
   private model: string = 'claude-sonnet-4-5-20250514';
   private provider: Provider = 'anthropic';
   private onUpdate?: (task: AgentTask) => void;
@@ -65,6 +68,7 @@ export class BroworkManager {
   }
 
   setApiKey(key: string) { this.apiKey = key; }
+  setBaseURL(url?: string) { this.baseURL = url; }
   setModel(model: string) { this.model = model; }
   setProvider(provider: Provider) { this.provider = provider; }
   setConfig(config: Partial<BroworkConfig>) { this.config = { ...this.config, ...config }; }
@@ -161,15 +165,17 @@ export class BroworkManager {
 Your task: ${task.name}
 Description: ${task.description}
 
-Instructions:
-1. Work autonomously to complete the task
-2. Use tools as needed to accomplish your goal
-3. Be efficient - don't make unnecessary tool calls
-4. Report progress as you work
-5. When finished, provide a clear summary of what you accomplished
+STANDARD OPERATIONS PROTOCOL:
+1. 🧭 SPATIAL AWARENESS: Use 'project_map' to orient yourself.
+2. 🛠️ SURGICAL EDITING: Use 'smart_replace' for code changes.
+3. 🌐 BROWSER EXTENSION (MANDATORY): 
+   - DO NOT USE standard Chromium/Puppeteer tools.
+   - USE THE 'browser_*' TOOLS ONLY. These connect to the Floyd Chrome Extension.
+   - Use 'browser_navigate', 'browser_read_page', 'browser_click', etc.
+4. 🧠 AUTONOMY: Work step by step to complete the task.
+5. 📊 REPORTING: Report progress and provide a clear summary when finished.
 
-You have access to file system tools, command execution, and code execution.
-Work step by step and complete the task.`;
+You have access to file system tools, command execution, and the Floyd Chrome Extension.`;
 
     this.log(task, 'info', `Agent started (${this.provider})`);
     task.progress = 10;
@@ -201,11 +207,14 @@ Work step by step and complete the task.`;
   }
 
   private async runAnthropicAgent(task: AgentTask, systemPrompt: string): Promise<void> {
-    const client = new Anthropic({ apiKey: this.apiKey });
+    const client = new Anthropic({ 
+      apiKey: this.apiKey,
+      baseURL: this.baseURL,
+    });
     const tools = BUILTIN_TOOLS.map(tool => ({
       name: tool.name,
       description: tool.description,
-      input_schema: tool.inputSchema,
+      input_schema: tool.inputSchema as unknown as { type: 'object'; properties: Record<string, { type: string; description?: string }>; required: string[] },
     }));
 
     const messages: any[] = [
@@ -288,7 +297,7 @@ Work step by step and complete the task.`;
       function: {
         name: tool.name,
         description: tool.description,
-        parameters: tool.inputSchema,
+        parameters: tool.inputSchema as unknown as { type: 'object'; properties: Record<string, { type: string; description?: string }>; required: string[] },
       },
     }));
 
@@ -327,6 +336,8 @@ Work step by step and complete the task.`;
           toolCallCount++;
           if (toolCallCount > this.config.maxToolCallsPerAgent) throw new Error('Max tool calls exceeded');
 
+          // Type narrowing: only function-type calls have the .function property
+          if (toolCall.type !== 'function') continue;
           const toolName = toolCall.function.name;
           const toolArgs = JSON.parse(toolCall.function.arguments);
 

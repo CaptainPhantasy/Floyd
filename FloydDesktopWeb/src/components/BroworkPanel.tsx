@@ -130,25 +130,25 @@ export function BroworkPanel({ isOpen, onClose }: BroworkPanelProps) {
   const getStatusIcon = (status: AgentTask['status']) => {
     switch (status) {
       case 'pending':
-        return <Clock className="w-4 h-4 text-slate-400" />;
+        return <Clock className="w-4 h-4 text-crush-text-secondary" />;
       case 'running':
-        return <Loader2 className="w-4 h-4 text-blue-400 animate-spin" />;
+        return <Loader2 className="w-4 h-4 text-crush-info animate-spin" />;
       case 'completed':
-        return <CheckCircle2 className="w-4 h-4 text-green-400" />;
+        return <CheckCircle2 className="w-4 h-4 text-crush-ready" />;
       case 'failed':
-        return <XCircle className="w-4 h-4 text-red-400" />;
+        return <XCircle className="w-4 h-4 text-crush-error" />;
       case 'cancelled':
-        return <Square className="w-4 h-4 text-yellow-400" />;
+        return <Square className="w-4 h-4 text-crush-warning" />;
     }
   };
 
   const getStatusColor = (status: AgentTask['status']) => {
     switch (status) {
-      case 'pending': return 'border-slate-600';
-      case 'running': return 'border-blue-500/50 bg-blue-500/5';
-      case 'completed': return 'border-green-500/50 bg-green-500/5';
-      case 'failed': return 'border-red-500/50 bg-red-500/5';
-      case 'cancelled': return 'border-yellow-500/50 bg-yellow-500/5';
+      case 'pending': return 'border-crush-modal';
+      case 'running': return 'border-crush-info/50 bg-crush-info/5';
+      case 'completed': return 'border-crush-ready/50 bg-crush-ready/5';
+      case 'failed': return 'border-crush-error/50 bg-crush-error/5';
+      case 'cancelled': return 'border-crush-warning/50 bg-crush-warning/5';
     }
   };
 
@@ -166,20 +166,20 @@ export function BroworkPanel({ isOpen, onClose }: BroworkPanelProps) {
 
   return (
     <div className="fixed inset-0 bg-black/50 z-50 flex justify-end">
-      <div className="w-[600px] bg-slate-800 h-full overflow-hidden flex flex-col">
+      <div className="w-[600px] bg-crush-elevated h-full overflow-hidden flex flex-col">
         {/* Header */}
-        <div className="p-4 border-b border-slate-700 flex items-center justify-between">
+        <div className="p-4 border-b border-crush-overlay flex items-center justify-between">
           <div className="flex items-center gap-2">
-            <Users className="w-5 h-5 text-cyan-400" />
+            <img src="/browork-logo.png" alt="Browork" className="w-5 h-5" />
             <h2 className="font-semibold">Browork</h2>
-            <span className="text-xs text-slate-400">Sub-Agent System</span>
+            <span className="text-xs text-crush-text-secondary">Sub-Agent System</span>
             {runningTasks.length > 0 && (
-              <span className="text-xs bg-blue-500/20 text-blue-300 px-2 py-0.5 rounded-full animate-pulse">
+              <span className="text-xs bg-crush-info/20 text-crush-info px-2 py-0.5 rounded-full animate-pulse">
                 {runningTasks.length} running
               </span>
             )}
           </div>
-          <button onClick={onClose} className="text-slate-400 hover:text-white">
+          <button onClick={onClose} className="text-crush-text-secondary hover:text-crush-text-selected">
             ✕
           </button>
         </div>
@@ -187,12 +187,12 @@ export function BroworkPanel({ isOpen, onClose }: BroworkPanelProps) {
         {/* Content */}
         <div className="flex-1 overflow-y-auto p-4 space-y-4">
           {/* Intro */}
-          <div className="bg-gradient-to-r from-cyan-500/10 to-purple-500/10 border border-cyan-500/30 rounded-lg p-4">
+          <div className="bg-gradient-to-r from-crush-tertiary/10 to-crush-secondary/10 border border-crush-tertiary/30 rounded-lg p-4">
             <div className="flex items-start gap-3">
-              <Sparkles className="w-5 h-5 text-cyan-400 mt-0.5" />
+              <Sparkles className="w-5 h-5 text-crush-tertiary mt-0.5" />
               <div>
-                <div className="font-medium text-cyan-300">Delegate tasks to autonomous agents</div>
-                <div className="text-sm text-slate-400 mt-1">
+                <div className="font-medium text-crush-tertiary">Delegate tasks to autonomous agents</div>
+                <div className="text-sm text-crush-text-secondary mt-1">
                   Browork spawns sub-agents that work independently on tasks. 
                   Each agent can use tools, execute code, and manage files.
                 </div>
@@ -202,9 +202,9 @@ export function BroworkPanel({ isOpen, onClose }: BroworkPanelProps) {
 
           {/* Create task form */}
           {showCreateForm ? (
-            <div className="bg-slate-700/50 rounded-lg border border-slate-600 p-4 space-y-3">
+            <div className="bg-crush-modal/50 rounded-lg border border-crush-modal p-4 space-y-3">
               <div className="font-medium text-sm flex items-center gap-2">
-                <Brain className="w-4 h-4 text-cyan-400" />
+                <Brain className="w-4 h-4 text-crush-tertiary" />
                 Create New Agent Task
               </div>
               
@@ -212,21 +212,21 @@ export function BroworkPanel({ isOpen, onClose }: BroworkPanelProps) {
                 placeholder="Task name (e.g., 'Refactor auth module')"
                 value={newTask.name}
                 onChange={(e) => setNewTask(p => ({ ...p, name: e.target.value }))}
-                className="w-full bg-slate-800 border border-slate-600 rounded px-3 py-2 text-sm"
+                className="w-full bg-crush-elevated border border-crush-modal rounded px-3 py-2 text-sm"
               />
               
               <textarea
                 placeholder="Detailed description of what the agent should do..."
                 value={newTask.description}
                 onChange={(e) => setNewTask(p => ({ ...p, description: e.target.value }))}
-                className="w-full bg-slate-800 border border-slate-600 rounded px-3 py-2 text-sm h-24 resize-none"
+                className="w-full bg-crush-elevated border border-crush-modal rounded px-3 py-2 text-sm h-24 resize-none"
               />
               
               <div className="flex gap-2">
                 <button
                   onClick={createTask}
                   disabled={!newTask.name || !newTask.description || loading}
-                  className="px-4 py-2 bg-cyan-600 text-sm rounded hover:bg-cyan-700 disabled:opacity-50 flex items-center gap-2"
+                  className="px-4 py-2 bg-crush-tertiary text-sm rounded hover:bg-crush-julep disabled:opacity-50 flex items-center gap-2"
                 >
                   {loading ? (
                     <Loader2 className="w-4 h-4 animate-spin" />
@@ -237,7 +237,7 @@ export function BroworkPanel({ isOpen, onClose }: BroworkPanelProps) {
                 </button>
                 <button
                   onClick={() => setShowCreateForm(false)}
-                  className="px-4 py-2 bg-slate-600 text-sm rounded hover:bg-slate-500"
+                  className="px-4 py-2 bg-crush-overlay text-sm rounded hover:bg-crush-modal"
                 >
                   Cancel
                 </button>
@@ -246,7 +246,7 @@ export function BroworkPanel({ isOpen, onClose }: BroworkPanelProps) {
           ) : (
             <button
               onClick={() => setShowCreateForm(true)}
-              className="w-full py-3 border border-dashed border-cyan-500/50 rounded-lg text-sm text-cyan-400 hover:border-cyan-400 hover:bg-cyan-500/5 flex items-center justify-center gap-2 transition-colors"
+              className="w-full py-3 border border-dashed border-crush-tertiary/50 rounded-lg text-sm text-crush-tertiary hover:border-crush-tertiary hover:bg-crush-tertiary/5 flex items-center justify-center gap-2 transition-colors"
             >
               <Plus className="w-4 h-4" />
               Create New Agent Task
@@ -260,7 +260,7 @@ export function BroworkPanel({ isOpen, onClose }: BroworkPanelProps) {
                 <div className="flex justify-end">
                   <button
                     onClick={clearFinished}
-                    className="text-xs text-slate-400 hover:text-white flex items-center gap-1"
+                    className="text-xs text-crush-text-secondary hover:text-crush-text-selected flex items-center gap-1"
                   >
                     <Trash2 className="w-3 h-3" />
                     Clear finished
@@ -285,20 +285,20 @@ export function BroworkPanel({ isOpen, onClose }: BroworkPanelProps) {
                     
                     <div className="flex-1 min-w-0">
                       <div className="font-medium text-sm">{task.name}</div>
-                      <div className="text-xs text-slate-400 truncate">
+                      <div className="text-xs text-crush-text-secondary truncate">
                         {task.description}
                       </div>
                     </div>
 
                     {task.status === 'running' && (
                       <div className="flex items-center gap-2">
-                        <div className="w-20 h-1.5 bg-slate-700 rounded-full overflow-hidden">
-                          <div 
-                            className="h-full bg-blue-500 transition-all"
+                        <div className="w-20 h-1.5 bg-crush-modal rounded-full overflow-hidden">
+                          <div
+                            className="h-full bg-crush-info transition-all"
                             style={{ width: `${task.progress}%` }}
                           />
                         </div>
-                        <span className="text-xs text-slate-400">{task.progress}%</span>
+                        <span className="text-xs text-crush-text-secondary">{task.progress}%</span>
                       </div>
                     )}
 
@@ -308,10 +308,10 @@ export function BroworkPanel({ isOpen, onClose }: BroworkPanelProps) {
                           e.stopPropagation();
                           cancelTask(task.id);
                         }}
-                        className="p-1 hover:bg-slate-600 rounded"
+                        className="p-1 hover:bg-crush-overlay rounded"
                         title="Cancel"
                       >
-                        <Square className="w-4 h-4 text-yellow-400" />
+                        <Square className="w-4 h-4 text-crush-warning" />
                       </button>
                     )}
 
@@ -321,25 +321,25 @@ export function BroworkPanel({ isOpen, onClose }: BroworkPanelProps) {
                           e.stopPropagation();
                           deleteTask(task.id);
                         }}
-                        className="p-1 hover:bg-slate-600 rounded"
+                        className="p-1 hover:bg-crush-overlay rounded"
                         title="Delete"
                       >
-                        <Trash2 className="w-4 h-4 text-slate-400" />
+                        <Trash2 className="w-4 h-4 text-crush-text-secondary" />
                       </button>
                     )}
 
                     {expandedTask === task.id ? (
-                      <ChevronDown className="w-4 h-4 text-slate-400" />
+                      <ChevronDown className="w-4 h-4 text-crush-text-secondary" />
                     ) : (
-                      <ChevronRight className="w-4 h-4 text-slate-400" />
+                      <ChevronRight className="w-4 h-4 text-crush-text-secondary" />
                     )}
                   </div>
 
                   {/* Expanded details */}
                   {expandedTask === task.id && (
-                    <div className="border-t border-slate-700 p-3 space-y-3">
+                    <div className="border-t border-crush-overlay p-3 space-y-3">
                       {/* Timing */}
-                      <div className="flex gap-4 text-xs text-slate-400">
+                      <div className="flex gap-4 text-xs text-crush-text-secondary">
                         <span>Created: {new Date(task.created).toLocaleTimeString()}</span>
                         {task.started && (
                           <span>Runtime: {formatTime(
@@ -353,9 +353,9 @@ export function BroworkPanel({ isOpen, onClose }: BroworkPanelProps) {
 
                       {/* Result or Error */}
                       {task.result && (
-                        <div className="bg-green-500/10 border border-green-500/30 rounded p-2">
-                          <div className="text-xs text-green-400 font-medium mb-1">Result</div>
-                          <div className="text-sm text-slate-300 whitespace-pre-wrap">
+                        <div className="bg-crush-ready/10 border border-crush-ready/30 rounded p-2">
+                          <div className="text-xs text-crush-ready font-medium mb-1">Result</div>
+                          <div className="text-sm text-crush-text-tertiary whitespace-pre-wrap">
                             {task.result.slice(0, 500)}
                             {task.result.length > 500 && '...'}
                           </div>
@@ -363,35 +363,35 @@ export function BroworkPanel({ isOpen, onClose }: BroworkPanelProps) {
                       )}
 
                       {task.error && (
-                        <div className="bg-red-500/10 border border-red-500/30 rounded p-2">
-                          <div className="text-xs text-red-400 font-medium mb-1 flex items-center gap-1">
+                        <div className="bg-crush-error/10 border border-crush-error/30 rounded p-2">
+                          <div className="text-xs text-crush-error font-medium mb-1 flex items-center gap-1">
                             <AlertTriangle className="w-3 h-3" />
                             Error
                           </div>
-                          <div className="text-sm text-slate-300">{task.error}</div>
+                          <div className="text-sm text-crush-text-tertiary">{task.error}</div>
                         </div>
                       )}
 
                       {/* Logs */}
                       {task.logs.length > 0 && (
                         <div>
-                          <div className="text-xs text-slate-500 font-medium mb-2 flex items-center gap-1">
+                          <div className="text-xs text-crush-text-subtle font-medium mb-2 flex items-center gap-1">
                             <Terminal className="w-3 h-3" />
                             Activity Log
                           </div>
-                          <div className="bg-slate-900 rounded p-2 max-h-48 overflow-y-auto space-y-1">
+                          <div className="bg-crush-base rounded p-2 max-h-48 overflow-y-auto space-y-1">
                             {task.logs.slice(-20).map((log, i) => (
                               <div 
                                 key={i}
                                 className={cn(
                                   'text-xs font-mono',
-                                  log.type === 'error' && 'text-red-400',
-                                  log.type === 'tool' && 'text-cyan-400',
-                                  log.type === 'thinking' && 'text-slate-400',
-                                  log.type === 'info' && 'text-green-400',
+                                  log.type === 'error' && 'text-crush-error',
+                                  log.type === 'tool' && 'text-crush-tertiary',
+                                  log.type === 'thinking' && 'text-crush-text-secondary',
+                                  log.type === 'info' && 'text-crush-ready',
                                 )}
                               >
-                                <span className="text-slate-600">
+                                <span className="text-crush-text-subtle">
                                   {new Date(log.timestamp).toLocaleTimeString()}
                                 </span>
                                 {' '}
@@ -407,17 +407,17 @@ export function BroworkPanel({ isOpen, onClose }: BroworkPanelProps) {
               ))}
             </div>
           ) : (
-            <div className="text-center py-8 text-slate-500">
-              <Users className="w-12 h-12 mx-auto mb-2 opacity-50" />
+            <div className="text-center py-8 text-crush-text-subtle">
+              <img src="/browork-logo.png" alt="Browork" className="w-12 h-12 mx-auto mb-2 opacity-50" />
               <div>No agent tasks yet</div>
               <div className="text-sm">Create a task to spawn an autonomous agent</div>
             </div>
           )}
 
           {/* Tips */}
-          <div className="bg-slate-700/30 rounded-lg p-3">
-            <div className="text-xs font-medium text-slate-400 mb-2">Example tasks:</div>
-            <ul className="text-xs text-slate-500 space-y-1">
+          <div className="bg-crush-modal/30 rounded-lg p-3">
+            <div className="text-xs font-medium text-crush-text-secondary mb-2">Example tasks:</div>
+            <ul className="text-xs text-crush-text-subtle space-y-1">
               <li>• "Analyze the codebase and create a README.md"</li>
               <li>• "Find all TODO comments and list them"</li>
               <li>• "Refactor the auth module to use async/await"</li>

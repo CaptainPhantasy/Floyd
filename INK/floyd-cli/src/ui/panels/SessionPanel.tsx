@@ -13,6 +13,7 @@
  */
 
 import {Box, Text} from 'ink';
+import React from 'react';
 import {Frame} from '../crush/Frame.js';
 import {WorkerBadge} from '../components/WorkerBadge.js';
 import {floydTheme, crushTheme, statusColors} from '../../theme/crush-theme.js';
@@ -101,7 +102,7 @@ function getWorkerStatusIndicator(status: WorkerState['status']): string {
 /**
  * SessionPanel - Left sidebar with session context
  */
-export function SessionPanel({
+function SessionPanelInner({
 	repoName,
 	techStack,
 	gitBranch,
@@ -119,16 +120,16 @@ export function SessionPanel({
 
 	return (
 		<Frame
-			title=" SESSION "
+			title="SESSION"
 			borderStyle="round"
 			borderVariant="focus"
 			padding={1}
 			width="100%"
 			height="100%"
 		>
-			<Box flexDirection="column" gap={1} width="100%">
+			<Box flexDirection="column" gap={0} width="100%">
 				{/* Repo Info */}
-				<Box flexDirection="column" marginBottom={1} width="100%">
+				<Box flexDirection="column" marginBottom={1} width="100%" alignItems="flex-start">
 					<Text bold color={crushTheme.accent.primary} wrap="truncate">
 						• {repoName}
 					</Text>
@@ -139,34 +140,40 @@ export function SessionPanel({
 					)}
 				</Box>
 
-				{/* Git Status */}
-				<Box flexDirection="column" marginBottom={1}>
-					<Box flexDirection="row" gap={1}>
-						<Text color={floydTheme.colors.fgBase}>Git:</Text>
-						<Text color={crushTheme.accent.info}>branch {gitBranch}</Text>
-						{gitStatus === 'dirty' ? (
-							<>
-								<Text color={statusColors.error}>•</Text>
-								<Text color={statusColors.error}>dirty</Text>
-								{fileCount !== undefined && (
-									<Text color={floydTheme.colors.fgSubtle}>
-										({fileCount} {fileCount === 1 ? 'file' : 'files'})
-									</Text>
-								)}
-							</>
-						) : (
-							<>
-								<Text color={statusColors.ready}>•</Text>
+				{/* Git Status - Stacked in frame, left justified */}
+				<Box flexDirection="column" marginBottom={1} width="100%" alignItems="flex-start">
+					<Box flexDirection="row" gap={1} width="100%">
+						<Text bold color={floydTheme.colors.fgMuted}>GIT</Text>
+					</Box>
+					<Box flexDirection="column" gap={0} width="100%" paddingX={1}>
+						<Box flexDirection="row" gap={1}>
+							<Text color={floydTheme.colors.fgSubtle}>Branch:</Text>
+							<Text color={crushTheme.accent.info}>{gitBranch}</Text>
+						</Box>
+						<Box flexDirection="row" gap={1}>
+							<Text color={floydTheme.colors.fgSubtle}>Status:</Text>
+							{gitStatus === 'dirty' ? (
+								<>
+									<Text color={statusColors.error}>dirty</Text>
+									{fileCount !== undefined && (
+										<Text color={floydTheme.colors.fgSubtle}>
+											({fileCount} {fileCount === 1 ? 'file' : 'files'})
+										</Text>
+									)}
+								</>
+							) : (
 								<Text color={statusColors.ready}>clean</Text>
-							</>
-						)}
+							)}
+						</Box>
 					</Box>
 				</Box>
 
-				{/* Safety Mode */}
-				<Box flexDirection="column" marginBottom={1}>
-					<Box flexDirection="row" gap={0}>
-						<Text color={floydTheme.colors.fgBase}>Safety: </Text>
+				{/* Safety Mode - Left justified under SAFETY */}
+				<Box flexDirection="column" marginBottom={1} width="100%" alignItems="flex-start">
+					<Box flexDirection="row" gap={1} width="100%">
+						<Text bold color={floydTheme.colors.fgMuted}>SAFETY</Text>
+					</Box>
+					<Box flexDirection="row" gap={0} width="100%">
 						<Box
 							borderStyle="single"
 							borderColor={
@@ -270,4 +277,14 @@ export function SessionPanel({
 	);
 }
 
-export default SessionPanel;
+export const SessionPanel = React.memo(SessionPanelInner, (prevProps, nextProps) => {
+	// Memoize based on critical props
+	return (
+		prevProps.repoName === nextProps.repoName &&
+		prevProps.techStack === nextProps.techStack &&
+		prevProps.gitBranch === nextProps.gitBranch &&
+		prevProps.gitStatus === nextProps.gitStatus &&
+		prevProps.safetyMode === nextProps.safetyMode &&
+		prevProps.compact === nextProps.compact
+	);
+});

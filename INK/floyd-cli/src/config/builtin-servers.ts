@@ -48,4 +48,10 @@ export const BUILTIN_SERVERS: Record<string, MCPServerConfig> = {
 		description: 'SUPERCACHE - 3-tier caching system (reasoning, project, vault)',
 		enabled: true,
 	},
+	explorer: {
+		name: 'explorer',
+		modulePath: join(serverDir, 'explorer-server.ts'),
+		description: 'Codebase exploration: project map, smart replace, symbol listing',
+		enabled: true,
+	},
 };

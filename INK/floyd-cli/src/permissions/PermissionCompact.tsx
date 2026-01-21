@@ -104,6 +104,11 @@ export function PermissionCompact({
 	useInput((input, key) => {
 		if (!visible || !focus) return;
 
+		// Ctrl+Q - Quit the entire CLI immediately
+		if (key.ctrl && (input === 'q' || input === 'Q')) {
+			process.exit(0);
+		}
+
 		if (key.escape) {
 			// ESC = deny once
 			onResponse({
