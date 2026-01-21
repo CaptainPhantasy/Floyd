@@ -316,9 +316,9 @@ export default function App({name = 'User', chrome = false}: AppProps) {
 				// Create stream processor with throttling
 				const streamProcessor = new StreamProcessor({
 					rateLimitEnabled: true,
-					maxTokensPerSecond: 75, // Increased from 25 for faster, more responsive display
+					maxTokensPerSecond: 1000, // Increased for performance
 					flushInterval: 50,
-					maxBufferSize: 4096,
+					maxBufferSize: 65536, // Increased buffer
 				});
 
 				// Create tag parser for thinking blocks

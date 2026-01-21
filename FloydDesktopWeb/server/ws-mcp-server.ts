@@ -31,7 +31,7 @@ export class WebSocketMCPServer {
   private messageId = 0;
   private tools: MCPTool[] = [];
 
-  constructor(port: number = 3000) {
+  constructor(port: number = 3005) {
     this.port = port;
     this.server = createHttpServer();
     this.wss = new WebSocketServer({ server: this.server });
@@ -75,23 +75,29 @@ export class WebSocketMCPServer {
   }
 
   private handleMessage(ws: WebSocket, message: MCPMessage): void {
-    const { method, params, id } = message;
+    const { method, params, id, result, error } = message;
+
+    // Handle results/errors from the extension
+    if (id !== undefined && (result || error) && !method) {
+      this.handleToolResult(ws, message);
+      return;
+    }
 
     switch (method) {
       case 'initialize':
-        this.handleInitialize(ws, id, params);
+        if (id !== undefined) this.handleInitialize(ws, id, params);
         break;
-      
+
       case 'tools/list':
-        this.handleListTools(ws, id);
+        if (id !== undefined) this.handleListTools(ws, id);
         break;
-      
+
       case 'tools/call':
-        this.handleToolCall(ws, id, params);
+        if (id !== undefined) this.handleToolCall(ws, id, params);
         break;
-      
+
       default:
-        this.sendError(ws, id, -32601, `Method not found: ${method}`);
+        if (id !== undefined) this.sendError(ws, id, -32601, `Method not found: ${method}`);
     }
   }
 
@@ -124,25 +130,32 @@ export class WebSocketMCPServer {
     });
   }
 
-  private async handleToolCall(ws: WebSocket, id: number, params: any): Promise<void> {
+  private handleToolCall(ws: WebSocket, id: number, params: any): void {
     const { name, arguments: args } = params;
 
-    // For now, just acknowledge the call
-    // In production, you would delegate to the actual tool executor
+    // Check if this is a response to a request we sent (Floyd -> Browser)
+    // Actually, in the current architecture, Floyd sends requests TO the extension.
+    // So the extension will send messages WITH an ID that we need to resolve.
+    
+    // For now, if we receive a tools/call, it means the AGENT called a tool
+    // and we need to broadcast it to the Chrome extension.
+    
     console.log(`[MCP-WS] Tool called: ${name}`, args);
 
-    this.sendMessage(ws, {
+    // We send the tool call to the Chrome extension
+    this.broadcast({
       jsonrpc: '2.0',
       id,
-      result: {
-        content: [
-          {
-            type: 'text',
-            text: `Tool ${name} executed successfully via FloydDesktopWeb`
-          }
-        ]
-      }
+      method: 'tools/call',
+      params: { name, arguments: args }
     });
+  }
+
+  // Add a way to handle results coming back from the extension
+  private handleToolResult(ws: WebSocket, message: MCPMessage): void {
+    // If the extension sends a result for a call we forwarded
+    console.log(`[MCP-WS] Received result from extension for id ${message.id}`);
+    // In a full implementation, we'd route this back to the ToolExecutor
   }
 
   private sendMessage(ws: WebSocket, message: MCPMessage): void {

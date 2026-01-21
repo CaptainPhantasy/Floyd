@@ -48,10 +48,10 @@ export interface StreamProcessorConfig {
  * Default configuration values
  */
 const DEFAULT_CONFIG: Required<StreamProcessorConfig> = {
-	maxBufferSize: 4096,
+	maxBufferSize: 65536, // Increased to 64KB
 	flushInterval: 50,
-	rateLimitEnabled: true,
-	maxTokensPerSecond: 25, // Slowed down for readable output (was 100)
+	rateLimitEnabled: false, // DISABLED - use natural flow, no blocking
+	maxTokensPerSecond: 1000, // Only used if rateLimitEnabled
 	debug: false,
 };
 
@@ -60,9 +60,9 @@ const DEFAULT_CONFIG: Required<StreamProcessorConfig> = {
  *
  * This class:
  * - Buffers incoming chunks to smooth out token delivery
- * - Applies rate limiting to prevent UI flooding
+ * - Non-blocking: processes immediately without artificial delays
  * - Emits events for each processed chunk
- * - Tracks completion state of the stream
+ * - Tracks completion state of stream
  */
 export class StreamProcessor extends EventEmitter {
 	private buffer: string[] = [];
@@ -74,6 +74,7 @@ export class StreamProcessor extends EventEmitter {
 	private isComplete = false;
 	private config: Required<StreamProcessorConfig>;
 	private flushTimer: ReturnType<typeof setTimeout> | null = null;
+	private contentVelocity = 0; // Track bytes per second for adaptive flushing
 
 	constructor(config: StreamProcessorConfig = {}) {
 		super();
@@ -135,7 +136,21 @@ export class StreamProcessor extends EventEmitter {
 		}
 
 		const timeSinceLastFlush = Date.now() - this.lastFlushTime;
-		const delay = Math.max(0, this.config.flushInterval - timeSinceLastFlush);
+		const now = Date.now();
+
+		// Adaptive flush interval: faster for high-velocity content, slower for low
+		// This prevents jitters during fast streams and reduces updates during slow streams
+		let delay: number;
+		if (this.contentVelocity > 50000) { // >50KB/sec
+			delay = 16; // ~60fps (fast streaming)
+		} else if (this.contentVelocity > 10000) { // >10KB/sec
+			delay = 33; // ~30fps (normal streaming)
+		} else {
+			delay = this.config.flushInterval; // Use configured (slow streaming)
+		}
+
+		// Ensure minimum delay to prevent zero-interval loops
+		delay = Math.max(16, delay - timeSinceLastFlush);
 
 		this.flushTimer = setTimeout(() => {
 			this.flush();
@@ -146,9 +161,9 @@ export class StreamProcessor extends EventEmitter {
 	/**
 	 * Flush buffered content to consumers
 	 *
-	 * Applies rate limiting if enabled
+	 * Non-blocking: processes immediately without await
 	 */
-	async flush(): Promise<void> {
+	flush(): void {
 		if (this.buffer.length === 0) {
 			return;
 		}
@@ -156,11 +171,18 @@ export class StreamProcessor extends EventEmitter {
 		const content = this.buffer.join('');
 		this.buffer = [];
 		this.bufferSize = 0;
-		this.lastFlushTime = Date.now();
 
-		if (this.config.rateLimitEnabled) {
-			await this.applyRateLimit(content.length);
+		const now = Date.now();
+		const timeSinceLastFlush = now - this.lastFlushTime;
+		this.lastFlushTime = now;
+
+		// Track content velocity for adaptive flushing
+		if (timeSinceLastFlush > 0) {
+			this.contentVelocity = content.length / (timeSinceLastFlush / 1000);
 		}
+
+		// Apply rate limiting (non-blocking, no await)
+		this.applyRateLimit(content.length);
 
 		this.emit('data', content);
 	}
@@ -170,7 +192,11 @@ export class StreamProcessor extends EventEmitter {
 	 *
 	 * @param tokenCount - Number of tokens to emit
 	 */
-	private async applyRateLimit(tokenCount: number): Promise<void> {
+	private applyRateLimit(tokenCount: number): void {
+		if (!this.config.rateLimitEnabled) {
+			return; // Skip rate limiting entirely - no blocking
+		}
+
 		const now = Date.now();
 		const timePassed = (now - this.lastTokenTime) / 1000;
 		this.lastTokenTime = now;
@@ -185,12 +211,9 @@ export class StreamProcessor extends EventEmitter {
 		const tokensToEmit = Math.min(tokenCount, this.tokenBucket);
 		this.tokenBucket -= tokensToEmit;
 
-		// If we need to wait for more tokens, delay appropriately
-		if (tokensToEmit < tokenCount) {
-			const remainingTokens = tokenCount - tokensToEmit;
-			const delay = (remainingTokens / this.config.maxTokensPerSecond) * 1000;
-			await new Promise(resolve => setTimeout(resolve, delay));
-		}
+		// If we need to limit, just emit what we have (non-blocking)
+		// The backpressure will naturally slow things down if rendering can't keep up
+		// Don't block or delay - let the render cycle handle pacing
 	}
 
 	/**

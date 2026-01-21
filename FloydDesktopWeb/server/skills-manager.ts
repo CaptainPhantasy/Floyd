@@ -146,6 +146,77 @@ const DEFAULT_SKILLS: Skill[] = [
     category: 'analysis',
     icon: '💡',
   },
+  {
+    id: 'doc-parity',
+    name: 'Documentation Parity',
+    description: 'Validates that code and documentation stay synchronized using real static analysis',
+    instructions: `When validating documentation parity:
+1. Use the 'project_map' tool to understand the codebase structure.
+2. Use 'list_symbols' to extract exported symbols from source files.
+3. Compare extracted symbols and signatures against the documentation.
+4. Report mismatches with severity levels (Critical, Warning, Info).
+5. Suggest auto-fixes where applicable (e.g., updating placeholders or removing orphaned entries).`,
+    triggers: ['validate docs', 'check documentation', 'doc parity', 'documentation drift'],
+    enabled: true,
+    category: 'coding',
+    icon: '📊',
+  },
+  {
+    id: 'ssot-validation',
+    name: 'SSOT Validation',
+    description: 'Validates Single Source of Truth (SSOT) files against actual code implementation',
+    instructions: `When performing SSOT validation:
+1. Identify SSOT files (e.g., *SSOT*.md, *ARCHITECTURE*.md, CLAUDE.md).
+2. Verify all file references and paths in the SSOT exist using 'list_directory' or 'get_file_info'.
+3. Use 'list_symbols' to confirm mentioned exports are actually present in the referenced files.
+4. Report any drift between the SSOT and reality.`,
+    triggers: ['ssot', 'architecture docs', 'truth sources'],
+    enabled: true,
+    category: 'analysis',
+    icon: '🎯',
+  },
+  {
+    id: 'explorer-superpowers',
+    name: 'Explorer (Spatial Awareness)',
+    description: 'High-level codebase navigation, structural analysis, and surgical editing',
+    instructions: `You have advanced "spatial awareness" superpowers:
+1. Use 'project_map' to get an instant mental map of the codebase without manual exploration.
+2. Use 'list_symbols' to understand a file's structure (classes, functions) before reading it.
+3. Use 'smart_replace' for robust surgical edits that don't rely on brittle context lines.
+4. Favor these high-level tools over granular file operations when analyzing project structure.`,
+    triggers: ['spatial awareness', 'codebase map', 'mental map', 'surgical edit'],
+    enabled: true,
+    category: 'automation',
+    icon: '🚀',
+  },
+  {
+    id: 'supercache',
+    name: 'Supercache (3-Tier Memory)',
+    description: 'Persistent knowledge and reasoning storage across turns',
+    instructions: `You have a 3-tier memory system to persist knowledge:
+1. TIER 1: 'reasoning' (Short-term) - Store complex multi-step reasoning or temporary variables.
+2. TIER 2: 'project' (Medium-term) - Store project-specific facts, architectural decisions, or build instructions.
+3. TIER 3: 'vault' (Long-term) - Store reusable wisdom, complex regex patterns, or specialized snippets.
+Always check 'cache_search' before repeating complex analysis.`,
+    triggers: ['cache', 'remember this', 'persist reasoning', 'save to vault'],
+    enabled: true,
+    category: 'automation',
+    icon: '⚡',
+  },
+  {
+    id: 'singularity-mode',
+    name: 'Singularity Mode (Self-Learning)',
+    description: 'Tier 4 protocols for active learning, truth seeking, and ghost testing',
+    instructions: `STANDARD OPERATIONS PROTOCOL (SINGULARITY MODE):
+1. 🧠 ACTIVE LEARNING: When you solve a hard problem, use 'skill_crystallizer' to save the pattern. Check patterns before starting new tasks.
+2. 👁️ GHOST TESTING: Use 'tui_puppeteer' to simulate user interactions and 'visual_verify' for snapshots.
+3. 🔬 TRUTH SEEKING: Don't guess APIs. Use 'runtime_schema_gen' to generate TypeScript interfaces from live data.
+4. 🧭 BRAIN SURGERY: Use 'ast_navigator' for precise definition/reference finding.`,
+    triggers: ['singularity', 'learn this', 'crystallize', 'schema gen'],
+    enabled: true,
+    category: 'automation',
+    icon: '🔮',
+  },
 ];
 
 export class SkillsManager {

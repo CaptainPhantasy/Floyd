@@ -34,7 +34,7 @@
  * @module ui/layouts/MainLayout
  */
 
-import {useState, useCallback, useRef, useEffect, useMemo, type ReactNode} from 'react';
+import {useState, useCallback, useRef, useEffect, useMemo, memo, type ReactNode} from 'react';
 
 import {useFloydStore} from '../../store/floyd-store.js';
 import {Box, Text, useInput, useApp} from 'ink';
@@ -68,6 +68,7 @@ import type {
 import {HelpOverlay, type Hotkey} from '../overlays/HelpOverlay.js';
 import {PromptLibraryOverlay} from '../overlays/PromptLibraryOverlay.js';
 import {VoiceInputButton} from '../components/VoiceInputButton.js';
+import {useSTT, type UseSTTReturn} from '../../stt/useSTT.js';
 
 // Agent Visualization
 import {type ThinkingStatus} from '../agent/ThinkingStream.js';
@@ -263,9 +264,9 @@ const FLOYD_GRADIENT_COLORS = [
 ];
 
 /**
- * Render the FLOYD ASCII banner with gradient colors
+ * Render FLOYD ASCII banner with gradient colors
  */
-function FloydAsciiBanner() {
+const FloydAsciiBanner = memo(function FloydAsciiBanner() {
 	return (
 		<Box flexDirection="column" marginBottom={1}>
 			{FLOYD_ASCII_LINES.map((line, rowIndex) => (
@@ -286,7 +287,7 @@ function FloydAsciiBanner() {
 			))}
 		</Box>
 	);
-}
+});
 
 // ============================================================================
 // STATUS BAR COMPONENT
@@ -302,7 +303,23 @@ interface StatusBarProps {
 	compact?: boolean;
 }
 
-function StatusBar({
+
+// ============================================================================
+// TRANSCRIPT PANEL - Now imported from panels/TranscriptPanel.tsx
+// ============================================================================
+
+// ============================================================================
+// AGENT VISUALIZATION PANEL
+// ============================================================================
+
+interface AgentVizPanelProps {
+	tasks: Task[];
+	toolExecutions: ToolExecution[];
+	events: StreamEvent[];
+}
+
+// Memoize StatusBar to prevent unnecessary re-renders
+const StatusBar = memo(function StatusBar({
 	userName,
 	cwd,
 	connectionStatus,
@@ -397,55 +414,33 @@ function StatusBar({
 			width="100%"
 		>
 			<Box width="100%" justifyContent="space-between" alignItems="center">
-				<Box flexDirection="row" gap={1} alignItems="center">
-					{/* FLOYD branding - ultra compact */}
-					<Text bold color={FLOYD_GRADIENT_COLORS[0]}>F</Text>
-					<Text bold color={FLOYD_GRADIENT_COLORS[1]}>L</Text>
-					<Text bold color={FLOYD_GRADIENT_COLORS[2]}>O</Text>
-					<Text bold color={FLOYD_GRADIENT_COLORS[3]}>Y</Text>
-					<Text bold color={FLOYD_GRADIENT_COLORS[4]}>D</Text>
-					<Text> </Text>
-					<Text color={roleColors.userLabel}>{userName}</Text>
-					<Text> </Text>
-					<Text color={crushTheme.accent.secondary}>{modeLabels[mode]}</Text>
-				</Box>
-
-				<Box flexDirection="row" gap={1} alignItems="center">
-					{/* Connection status - compact */}
-					<Text color={connectionColor}>
-						{connectionStatus === 'connected' && '●'}
-						{connectionStatus === 'connecting' && <Spinner type="dots" />}
-						{connectionStatus === 'disconnected' && '○'}
+				<Box flexDirection="row" gap={1}>
+					<Text bold color={FLOYD_GRADIENT_COLORS[0]}>
+						F
 					</Text>
-					<Text> </Text>
-					{/* Agent status - compact */}
-					{isThinking && (
-						<Text color={getAgentStatusColor()} wrap="truncate">
-							<Spinner type="dots" /> {whimsicalPhrase || 'Thinking'}
-						</Text>
-					)}
-					{!isThinking && (
-						<Text color={getAgentStatusColor()}>{getAgentStatusLabel()}</Text>
-					)}
+					<Text bold color={FLOYD_GRADIENT_COLORS[1]}>
+						L
+					</Text>
+					<Text bold color={FLOYD_GRADIENT_COLORS[2]}>
+						O
+					</Text>
+					<Text bold color={FLOYD_GRADIENT_COLORS[3]}>
+						Y
+					</Text>
+					<Text bold color={FLOYD_GRADIENT_COLORS[4]}>
+						D
+					</Text>
+					<Text color={roleColors.headerStatus}> CLI</Text>
+				</Box>
+				<Box flexDirection="row" gap={1}>
+					<Text bold color={modeLabels[mode]}>{modeLabels[mode]}</Text>
+					<Text color={connectionColor}>{connectionLabel}</Text>
+					<Text color={getAgentStatusColor()}>{getAgentStatusLabel()}</Text>
 				</Box>
 			</Box>
 		</Box>
 	);
-}
-
-// ============================================================================
-// TRANSCRIPT PANEL - Now imported from panels/TranscriptPanel.tsx
-// ============================================================================
-
-// ============================================================================
-// AGENT VISUALIZATION PANEL
-// ============================================================================
-
-interface AgentVizPanelProps {
-	tasks: Task[];
-	toolExecutions: ToolExecution[];
-	events: StreamEvent[];
-}
+});
 
 function AgentVizPanel({tasks, toolExecutions, events}: AgentVizPanelProps) {
 	// Convert tasks to Task type format
@@ -794,26 +789,32 @@ export function MainLayout({
 		showContextPanel,
 	} = layoutConfig;
 
-	// STT demo state (placeholder for actual STT integration)
-	const [isRecording, setIsRecording] = useState(false);
-	const [isTranscribing, setIsTranscribing] = useState(false);
+	// STT Integration
+	const {
+		isRecording,
+		isProcessing: isTranscribing,
+		startRecording,
+		stopRecording,
+		error: sttError,
+	}: UseSTTReturn = useSTT({
+		onTranscription: (text) => {
+			setInput(prev => prev + (prev ? ' ' : '') + text);
+		},
+		onError: (err) => {
+			// You might want to show this error in the UI
+			// For now, it's available in sttError
+		},
+	});
 
-	const handleVoiceInput = useCallback(() => {
-		if (!isThinking && !isRecording) {
-			setIsRecording(true);
-			setIsTranscribing(false);
-			// Demo transcription (3 second placeholder for STT)
-			setTimeout(() => {
-				setIsRecording(false);
-				setIsTranscribing(true);
-				setTimeout(() => {
-					setIsTranscribing(false);
-					const demoText = 'This is a demo transcription. Full STT integration coming soon.';
-					setInput(prev => prev + (prev ? ' ' : '') + demoText);
-				}, 1000);
-			}, 2000);
+	const handleVoiceInput = useCallback(async () => {
+		if (isThinking) return;
+		
+		if (isRecording) {
+			await stopRecording();
+		} else {
+			await startRecording();
 		}
-	}, [isThinking, isRecording]);
+	}, [isThinking, isRecording, startRecording, stopRecording]);
 
 	// Use ref to track input state for hotkey checks (prevents race conditions)
 	const inputRef = useRef(input);

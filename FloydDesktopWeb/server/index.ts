@@ -18,7 +18,7 @@ import { ToolExecutor } from './tool-executor.js';
 import { BUILTIN_TOOLS, MCPClient } from './mcp-client.js';
 import { SkillsManager, Skill } from './skills-manager.js';
 import { ProjectsManager, Project } from './projects-manager.js';
-import { BroworkManager, AgentTask } from './browork-manager.js';
+import { BroworkManager, AgentTask, Provider as BroworkProvider } from './browork-manager.js';
 import { WebSocketMCPServer } from './ws-mcp-server.js';
 
 // Load .env.local
@@ -62,6 +62,11 @@ interface Session {
   created: number;
   updated: number;
   messages: Message[];
+  customTitle?: string;  // Phase 1, Task 1.1
+  messageCount?: number;
+  pinned?: boolean;       // Phase 1, Task 1.4
+  archived?: boolean;     // Phase 3, Task 3.3
+  folder?: string;        // Phase 3, Task 3.2
 }
 
 type Provider = 'anthropic' | 'openai' | 'glm' | 'anthropic-compatible';
@@ -176,7 +181,9 @@ async function initDataDir() {
     if (settings.apiKey) {
       broworkManager.setApiKey(settings.apiKey);
     }
+    broworkManager.setBaseURL(settings.baseURL);
     broworkManager.setModel(settings.model);
+    broworkManager.setProvider(settings.provider);
     console.log('[Server] Browork manager initialized');
     
   } catch (error) {
@@ -280,17 +287,19 @@ app.get('/api/settings', (req, res) => {
 
 // Update settings
 app.post('/api/settings', async (req, res) => {
-  const { provider, apiKey, model, systemPrompt, maxTokens } = req.body;
+  const { provider, apiKey, model, systemPrompt, maxTokens, baseURL } = req.body;
   
   if (provider !== undefined) settings.provider = provider;
   if (apiKey !== undefined) settings.apiKey = apiKey;
   if (model !== undefined) settings.model = model;
   if (systemPrompt !== undefined) settings.systemPrompt = systemPrompt;
   if (maxTokens !== undefined) settings.maxTokens = maxTokens;
+  if (baseURL !== undefined) settings.baseURL = baseURL;
   
   // Update browork with new settings
   if (settings.apiKey) {
     broworkManager.setApiKey(settings.apiKey);
+    broworkManager.setBaseURL(settings.baseURL);
     broworkManager.setModel(settings.model);
     broworkManager.setProvider(settings.provider);
   }
@@ -558,19 +567,104 @@ app.post('/api/browork/clear', (req, res) => {
   res.json({ cleared });
 });
 
-// List sessions
+// Archive/unarchive session (Phase 3, Task 3.3)
+app.patch('/api/sessions/:id/archive', async (req, res) => {
+  const session = sessions.get(req.params.id);
+  if (!session) {
+    return res.status(404).json({ error: 'Session not found' });
+  }
+  
+  const { archived } = req.body;
+  
+  // Toggle archived state
+  session.archived = archived;
+  session.updated = Date.now();
+  
+  await saveSession(session);
+  
+  res.json({ 
+    success: true, 
+    session: {
+      id: session.id,
+      archived: session.archived,
+      updated: session.updated
+    }
+  });
+});
+
+// Assign session to folder (Phase 3, Task 3.2)
+app.patch('/api/sessions/:id/folder', async (req, res) => {
+  const session = sessions.get(req.params.id);
+  if (!session) {
+    return res.status(404).json({ error: 'Session not found' });
+  }
+  
+  const { folder } = req.body;
+  
+  // Assign folder (can be empty string to remove from folder)
+  session.folder = folder || undefined;
+  session.updated = Date.now();
+  
+  await saveSession(session);
+  
+  res.json({ 
+    success: true, 
+    session: {
+      id: session.id,
+      folder: session.folder,
+      updated: session.updated
+    }
+  });
+});
+
+// Get all folders (Phase 3, Task 3.2)
+app.get('/api/folders', (req, res) => {
+  const folders = new Set<string>();
+  
+  sessions.forEach(session => {
+    if (session.folder) {
+      folders.add(session.folder);
+    }
+  });
+  
+  res.json({ 
+    folders: Array.from(folders).sort()
+  });
+});
+
+// List sessions (updated to filter by folder and archived status)
 app.get('/api/sessions', (req, res) => {
-  const sessionList = Array.from(sessions.values())
+  const { folder, archived } = req.query;
+  
+  let sessionList = Array.from(sessions.values());
+  
+  // Filter by folder if specified
+  if (folder) {
+    sessionList = sessionList.filter(s => s.folder === folder);
+  }
+  
+  // Filter by archived status if specified
+  if (archived === 'true') {
+    sessionList = sessionList.filter(s => s.archived === true);
+  } else if (archived === 'false') {
+    sessionList = sessionList.filter(s => !s.archived);
+  }
+  
+  const result = sessionList
     .map(s => ({
       id: s.id,
       title: s.title,
       created: s.created,
       updated: s.updated,
       messageCount: s.messages.length,
+      customTitle: s.customTitle,
+      pinned: s.pinned,
+      archived: s.archived,
+      folder: s.folder,
     }))
     .sort((a, b) => b.updated - a.updated);
   
-  res.json(sessionList);
+  res.json(result);
 });
 
 // Create session
@@ -613,6 +707,362 @@ app.put('/api/sessions/:id', async (req, res) => {
   await saveSession(session);
   
   res.json(session);
+});
+
+// Rename session (Phase 1, Task 1.1)
+app.patch('/api/sessions/:id/rename', async (req, res) => {
+  const session = sessions.get(req.params.id);
+  if (!session) {
+    return res.status(404).json({ error: 'Session not found' });
+  }
+  
+  const { customTitle } = req.body;
+  
+  // Allow clearing custom title by setting to null or empty string
+  if (customTitle === null || customTitle === '') {
+    session.customTitle = undefined;
+  } else if (typeof customTitle === 'string' && customTitle.trim().length > 0) {
+    session.customTitle = customTitle.trim();
+  } else {
+    return res.status(400).json({ error: 'Invalid customTitle value' });
+  }
+  
+  session.updated = Date.now();
+  
+  await saveSession(session);
+  
+  res.json({ 
+    success: true, 
+    session: {
+      id: session.id,
+      title: session.title,
+      customTitle: session.customTitle,
+      displayTitle: session.customTitle || session.title,
+      updated: session.updated
+    }
+  });
+});
+
+// Regenerate last assistant response (Phase 1, Task 1.3)
+app.post('/api/sessions/:id/regenerate', async (req, res) => {
+  const session = sessions.get(req.params.id);
+  if (!session) {
+    return res.status(404).json({ error: 'Session not found' });
+  }
+
+  // Check if there's at least one assistant message to regenerate
+  const lastAssistantIndex = [...session.messages].reverse().findIndex(m => m.role === 'assistant');
+  if (lastAssistantIndex === -1) {
+    return res.status(400).json({ error: 'No assistant message to regenerate' });
+  }
+
+  const actualIndex = session.messages.length - 1 - lastAssistantIndex;
+  
+  // Remove the last assistant message and any messages after it
+  const messagesToKeep = session.messages.slice(0, actualIndex);
+  const userMessages = messagesToKeep.filter(m => m.role === 'user');
+  
+  if (userMessages.length === 0) {
+    return res.status(400).json({ error: 'No user message to respond to' });
+  }
+
+  // Set up SSE for streaming response
+  res.setHeader('Content-Type', 'text/event-stream');
+  res.setHeader('Cache-Control', 'no-cache');
+  res.setHeader('Connection', 'keep-alive');
+
+  let fullResponse = '';
+  
+  // Build system prompt
+  let systemPrompt = settings.systemPrompt || 'You are Floyd, a helpful AI assistant with access to tools for file system operations and command execution. Use tools when needed to help the user.';
+  
+  // Add active skills
+  const skillsContext = skillsManager.getSystemPromptAdditions();
+  if (skillsContext) {
+    systemPrompt += skillsContext;
+  }
+  
+  // Add project context
+  const projectContext = await projectsManager.getProjectContext();
+  if (projectContext) {
+    systemPrompt += projectContext;
+  }
+
+  try {
+    // Build API messages (excluding tools for regeneration)
+    const apiMessages = messagesToKeep
+      .filter(m => m.role === 'user' || m.role === 'assistant')
+      .map(m => ({
+        role: m.role,
+        content: m.content,
+      }));
+
+    if (settings.provider === 'openai' || settings.provider === 'glm') {
+      // OpenAI/GLM flow
+      const client = new OpenAI({ 
+        apiKey: settings.apiKey,
+        baseURL: settings.provider === 'glm' ? 'https://open.bigmodel.cn/api/paas/v4' : undefined,
+      });
+
+      const response = await client.chat.completions.create({
+        model: settings.model,
+        max_tokens: settings.maxTokens || 16384,
+        messages: [
+          { role: 'system', content: systemPrompt },
+          ...apiMessages,
+        ],
+        stream: true,
+      });
+
+      for await (const chunk of response) {
+        const delta = chunk.choices[0]?.delta?.content || '';
+        if (delta) {
+          fullResponse += delta;
+          res.write(`data: ${JSON.stringify({ type: 'text', content: delta })}\n\n`);
+        }
+      }
+    } else {
+      // Anthropic-compatible flow
+      const client = new Anthropic({ 
+        apiKey: settings.apiKey,
+        baseURL: settings.baseURL,
+      });
+
+      const response = await client.messages.create({
+        model: settings.model,
+        max_tokens: settings.maxTokens || 16384,
+        system: systemPrompt,
+        messages: apiMessages,
+        stream: true,
+      });
+
+      for await (const chunk of response) {
+        if (chunk.type === 'content_block_delta' && chunk.delta.type === 'text_delta') {
+          const text = chunk.delta.text;
+          fullResponse += text;
+          res.write(`data: ${JSON.stringify({ type: 'text', content: text })}\n\n`);
+        }
+      }
+    }
+
+    // Update session with regenerated response
+    session.messages = messagesToKeep;
+    session.messages.push({
+      role: 'assistant',
+      content: fullResponse,
+      timestamp: Date.now(),
+    });
+    session.updated = Date.now();
+    await saveSession(session);
+
+    res.write(`data: ${JSON.stringify({ 
+      type: 'done',
+      content: fullResponse,
+      sessionId: session.id
+    })}\n\n`);
+    res.end();
+
+  } catch (error: any) {
+    console.error('[Server] Regenerate error:', error);
+    res.write(`data: ${JSON.stringify({ type: 'error', error: error.message })}\n\n`);
+    res.end();
+  }
+});
+
+// Pin/unpin session (Phase 1, Task 1.4)
+app.patch('/api/sessions/:id/pin', async (req, res) => {
+  const session = sessions.get(req.params.id);
+  if (!session) {
+    return res.status(404).json({ error: 'Session not found' });
+  }
+  
+  const { pinned } = req.body;
+  
+  // Toggle pinned state
+  session.pinned = pinned;
+  session.updated = Date.now();
+  
+  await saveSession(session);
+  
+  res.json({ 
+    success: true, 
+    session: {
+      id: session.id,
+      pinned: session.pinned,
+      updated: session.updated
+    }
+  });
+});
+
+// Continue response (Phase 2, Task 2.2)
+app.post('/api/sessions/:id/continue', async (req, res) => {
+  const { id } = req.params;
+  
+  const session = sessions.get(id);
+  if (!session) {
+    return res.status(404).json({ error: 'Session not found' });
+  }
+  
+  if (session.messages.length === 0) {
+    return res.status(400).json({ error: 'No messages to continue from' });
+  }
+  
+  const lastMessage = session.messages[session.messages.length - 1];
+  if (lastMessage.role !== 'assistant') {
+    return res.status(400).json({ error: 'Last message is not from assistant' });
+  }
+  
+  // Set up SSE
+  res.setHeader('Content-Type', 'text/event-stream');
+  res.setHeader('Cache-Control', 'no-cache');
+  res.setHeader('Connection', 'keep-alive');
+  
+  try {
+    const client = getClient();
+    if (!client) {
+      return res.status(400).json({ error: 'API key not configured' });
+    }
+    
+    // Build system prompt with context
+    let systemPrompt = settings.systemPrompt || 'You are Floyd, a helpful AI assistant.';
+    const skillsContext = skillsManager.getSystemPromptAdditions();
+    if (skillsContext) {
+      systemPrompt += skillsContext;
+    }
+    const projectContext = await projectsManager.getProjectContext();
+    if (projectContext) {
+      systemPrompt += projectContext;
+    }
+    
+    // Build messages array, excluding the last incomplete assistant message
+    const apiMessages = session.messages.slice(0, -1).map(m => ({
+      role: m.role,
+      content: m.content,
+    }));
+    
+    let continuedContent = lastMessage.content;
+    
+    // Stream the continuation
+    if (settings.provider === 'openai' || settings.provider === 'glm') {
+      const openaiClient = new OpenAI({ 
+        apiKey: settings.apiKey,
+        baseURL: settings.provider === 'glm' ? 'https://open.bigmodel.cn/api/paas/v4' : undefined,
+      });
+      
+      const response = await openaiClient.chat.completions.create({
+        model: settings.model,
+        max_tokens: settings.maxTokens || 8192,
+        messages: [
+          { role: 'system', content: systemPrompt },
+          ...apiMessages,
+          { role: 'assistant', content: continuedContent }, // Include partial response
+        ],
+      });
+      
+      const assistantMessage = response.choices[0].message;
+      if (assistantMessage.content) {
+        continuedContent += assistantMessage.content;
+        res.write(`data: ${JSON.stringify({ type: 'text', content: assistantMessage.content })}\n\n`);
+      }
+      
+      // Update session with continued message
+      session.messages[session.messages.length - 1] = {
+        role: 'assistant',
+        content: continuedContent,
+        timestamp: Date.now(),
+      };
+      session.updated = Date.now();
+      await saveSession(session);
+      
+      res.write(`data: ${JSON.stringify({ type: 'done', content: continuedContent })}\n\n`);
+      res.end();
+      
+    } else {
+      // Anthropic-compatible flow
+      const anthropicClient = new Anthropic({ 
+        apiKey: settings.apiKey,
+        baseURL: settings.baseURL,
+      });
+      
+      const response = await anthropicClient.messages.create({
+        model: settings.model,
+        max_tokens: settings.maxTokens || 8192,
+        system: systemPrompt,
+        messages: [
+          ...apiMessages,
+          { role: 'assistant', content: continuedContent }, // Include partial response
+        ],
+      });
+      
+      for (const block of response.content) {
+        if (block.type === 'text') {
+          continuedContent += block.text;
+          res.write(`data: ${JSON.stringify({ type: 'text', content: block.text })}\n\n`);
+        }
+      }
+      
+      // Update session with continued message
+      session.messages[session.messages.length - 1] = {
+        role: 'assistant',
+        content: continuedContent,
+        timestamp: Date.now(),
+      };
+      session.updated = Date.now();
+      await saveSession(session);
+      
+      res.write(`data: ${JSON.stringify({ type: 'done', content: continuedContent })}\n\n`);
+      res.end();
+    }
+    
+  } catch (error: any) {
+    console.error('[Server] Continue error:', error);
+    res.write(`data: ${JSON.stringify({ type: 'error', error: error.message })}\n\n`);
+    res.end();
+  }
+});
+
+// Edit user message (Phase 2, Task 2.1)
+app.patch('/api/sessions/:id/messages/:messageIndex', async (req, res) => {
+  const { id } = req.params;
+  const messageIndex = parseInt(req.params.messageIndex);
+  const { content } = req.body;
+  
+  const session = sessions.get(id);
+  if (!session) {
+    return res.status(404).json({ error: 'Session not found' });
+  }
+  
+  if (messageIndex < 0 || messageIndex >= session.messages.length) {
+    return res.status(400).json({ error: 'Invalid message index' });
+  }
+  
+  const message = session.messages[messageIndex];
+  
+  if (message.role !== 'user') {
+    return res.status(400).json({ error: 'Can only edit user messages' });
+  }
+  
+  // Update the message content
+  message.content = content;
+  session.updated = Date.now();
+  
+  // Remove all messages after the edited one (cascading delete)
+  session.messages = session.messages.slice(0, messageIndex + 1);
+  
+  // Save the session
+  await saveSession(session);
+  
+  res.json({ 
+    success: true,
+    messages: session.messages,
+    session: {
+      id: session.id,
+      title: session.title,
+      customTitle: session.customTitle,
+      updated: session.updated,
+      messageCount: session.messages.length
+    }
+  });
 });
 
 // Delete session
@@ -658,7 +1108,7 @@ app.post('/api/chat', async (req, res) => {
   });
   
   try {
-    const response = await client.messages.create({
+    const response = await (client as Anthropic).messages.create({
       model: settings.model,
       max_tokens: settings.maxTokens || 8192,
       system: settings.systemPrompt,
@@ -669,8 +1119,8 @@ app.post('/api/chat', async (req, res) => {
     });
     
     const assistantContent = response.content
-      .filter(block => block.type === 'text')
-      .map(block => (block as { type: 'text'; text: string }).text)
+      .filter((block: any) => block.type === 'text')
+      .map((block: any) => block.text)
       .join('\n');
     
     // Add assistant message
@@ -717,7 +1167,7 @@ function getAnthropicTools() {
   return BUILTIN_TOOLS.map(tool => ({
     name: tool.name,
     description: tool.description,
-    input_schema: tool.inputSchema,
+    input_schema: tool.inputSchema as { type: 'object'; properties: Record<string, unknown>; required?: string[] },
   }));
 }
 
@@ -827,6 +1277,8 @@ app.post('/api/chat/stream', async (req, res) => {
           apiMessages.push(assistantMessage);
           
           for (const toolCall of assistantMessage.tool_calls) {
+            // Type narrowing: only function-type calls have the .function property
+            if (toolCall.type !== 'function') continue;
             const toolName = toolCall.function.name;
             const toolArgs = JSON.parse(toolCall.function.arguments);
             
@@ -978,13 +1430,13 @@ initDataDir().then(async () => {
 
   // Start WebSocket MCP server for Chrome extension
   try {
-    wsMcpServer = new WebSocketMCPServer(3000);
+    wsMcpServer = new WebSocketMCPServer(3005);
     wsMcpServer.registerTools(BUILTIN_TOOLS);
     await wsMcpServer.start();
-    console.log('[Floyd Web Server] WebSocket MCP server started on port 3000 for Chrome extension');
+    console.log('[Floyd Web Server] WebSocket MCP server started on port 3005 for Chrome extension');
   } catch (error: any) {
     if (error.code === 'EADDRINUSE') {
-      console.log('[Floyd Web Server] Port 3000 already in use - WebSocket MCP server not started');
+      console.log('[Floyd Web Server] Port 3005 already in use - WebSocket MCP server not started');
       console.log('[Floyd Web Server] Chrome extension will connect to existing MCP server');
     } else {
       console.error('[Floyd Web Server] Failed to start WebSocket MCP server:', error);

@@ -20,7 +20,7 @@ export class ChromeBridge {
   }> = new Map();
 
   async connect(options: BridgeOptions = {}): Promise<boolean> {
-    const ports = options.ports ?? [3000, 3001, 3002, 3003, 3004, 3005, 3006, 3007, 3008, 3009];
+    const ports = options.ports ?? [3005, 3000, 3001, 3002, 3003, 3004, 3006, 3007, 3008, 3009];
     const timeout = options.timeout ?? 5000;
 
     for (const port of ports) {

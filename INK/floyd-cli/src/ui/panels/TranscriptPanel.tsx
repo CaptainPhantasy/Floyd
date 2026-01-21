@@ -14,6 +14,7 @@
  */
 
 import {Box, Text} from 'ink';
+import React, {type ReactNode} from 'react';
 import Spinner from 'ink-spinner';
 import {Frame} from '../crush/Frame.js';
 import {Viewport} from '../crush/Viewport.js';
@@ -76,7 +77,7 @@ function getLabel(role: MessageRole): string {
 		case 'user':
 			return 'User';
 		case 'assistant':
-			return 'Assistant';
+			return 'FLOYD';
 		case 'system':
 			return 'System';
 		case 'tool':
@@ -86,7 +87,7 @@ function getLabel(role: MessageRole): string {
 	}
 }
 
-export function TranscriptPanel({
+function TranscriptPanelInner({
 	messages = [],
 	userName: _userName = 'User',
 	toolExecutions = [],
@@ -183,4 +184,13 @@ export function TranscriptPanel({
 	);
 }
 
-export default TranscriptPanel;
+export const TranscriptPanel = React.memo(TranscriptPanelInner, (prevProps, nextProps) => {
+	// Memoize based on critical props that trigger re-renders
+	return (
+		prevProps.messages === nextProps.messages &&
+		prevProps.streamingContent === nextProps.streamingContent &&
+		prevProps.isThinking === nextProps.isThinking &&
+		prevProps.maxMessages === nextProps.maxMessages &&
+		prevProps.height === nextProps.height
+	);
+});
