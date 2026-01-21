@@ -1,5 +1,7 @@
 # FLOYD
 
+![Floyd Banner](./assets/floyd-banner.jpeg)
+
 **The AI Ecosystem Born From a Moment of "Wait, We Can Just Build This Ourselves"**
 
 > *Because paying rent for an AI assistant feels wrong when you could just buy your own.*
