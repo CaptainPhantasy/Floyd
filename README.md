@@ -2,6 +2,15 @@
   <img src="ASSETS/code_cli.png" alt="FLOYD CLI" width="800"/>
 </p>
 
+<p align="center">
+  <img src="ASSETS/chrome.png" width="400" />
+  <img src="ASSETS/browork.png" width="400" />
+</p>
+<p align="center">
+  <img src="ASSETS/desktop.png" width="400" />
+  <img src="ASSETS/curse'm.png" width="400" />
+</p>
+
 # FLOYD CLI
 
 **The AI Coding Agent That Lives In Your Terminal (And Rent-Free In Your Head)**
