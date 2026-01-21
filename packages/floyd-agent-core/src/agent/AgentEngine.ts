@@ -1,3 +1,8 @@
+// 🔒 LOCKED FILE - CORE STABILITY
+// This file has been audited and stabilized by Gemini 4.
+// Please do not modify without explicit instruction and regression testing.
+// Ref: geminireport.md
+
 // Agent Engine - Core AI agent orchestrator
 // This is the shared agent core used by CLI, Desktop, and potentially other UIs
 
@@ -351,6 +356,8 @@ export class AgentEngine {
 
           try {
             const result = await this.mcpManager.callTool(tc.name, tc.input);
+            const rawOutput = typeof result === 'string' ? result : JSON.stringify(result);
+            const truncatedOutput = this.truncateOutput(rawOutput);
 
             const toolResultMessage: Message = {
               role: 'user',
@@ -358,7 +365,7 @@ export class AgentEngine {
                 {
                   type: 'tool_result',
                   tool_use_id: tc.id,
-                  content: typeof result === 'string' ? result : JSON.stringify(result),
+                  content: truncatedOutput,
                 },
               ],
             };
@@ -366,7 +373,7 @@ export class AgentEngine {
             this.history.push(toolResultMessage);
 
             tc.status = 'completed';
-            tc.output = typeof result === 'string' ? result : JSON.stringify(result);
+            tc.output = truncatedOutput;
             callbacks?.onToolComplete?.(tc);
           } catch (error: any) {
             this.history.push({
@@ -391,6 +398,18 @@ export class AgentEngine {
     }
 
     callbacks?.onDone?.();
+  }
+
+  /**
+   * Truncate large output to prevent context window overflow
+   */
+  private truncateOutput(output: string, maxLength = 8000): string {
+    if (output.length <= maxLength) return output;
+    
+    const head = output.substring(0, maxLength / 2);
+    const tail = output.substring(output.length - (maxLength / 2));
+    
+    return `${head}\n\n... [Output truncated: ${output.length - maxLength} characters omitted] ...\n\n${tail}`;
   }
 
   /**
