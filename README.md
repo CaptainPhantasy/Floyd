@@ -11,62 +11,147 @@
   <img src="ASSETS/curse'm.png" width="400" />
 </p>
 
-# FLOYD CLI
+# ***~Meet - FLOYD~***
 
-**The AI Coding Agent That Lives In Your Terminal (And Rent-Free In Your Head)**
+**The AI Ecosystem Born From a Moment of "Wait, We Can Just Build This Ourselves?”**
 
-> *Because paying $20/month for an AI coding assistant is for people who hate money.*
+*Because paying rent for an AI assistant feels wrong when you could just buy your own.*
 
-[https://github.com/CaptainPhantasy/Floyd-Code-CLI](https://github.com/CaptainPhantasy/Floyd-Code-CLI)
-
-## What is FLOYD?
-
-Meet Floyd. He thinks he's a Staff Engineer, but he's actually just a very enthusiastic TypeScript process running on your machine.
-
-He does everything those "other" AI assistants do, except:
-1. He runs in your CLI (where real developers live).
-2. He costs roughly 1/100th of the price (GLM-4 API keys are cheap, friends).
-3. He has **Zen Mode** (Ctrl+Z) because looking at code is stressful and sometimes you just need whitespace.
-
-## Features (The Serious Stuff, But Funnier)
-
-*   **Spatial Awareness**: Floyd has `project_map`. He knows where your files are. He won't ask "where is `utils.ts`?" like a lost puppy.
-*   **Surgical Hands**: He uses `smart_replace` to fix bugs without rewriting your entire file and deleting your comments.
-*   **SuperCaching™**: He remembers things. Three tiers of memory (Reasoning, Project, Vault) so you don't have to repeat yourself like a broken record.
-*   **Focus Management**: He knows not to hijack your keyboard shortcuts while you're typing. We taught him manners.
-
-## How To Use Him
-
-1.  **Clone this repo.**
-2.  **Install dependencies** (`npm install` inside `INK/floyd-cli`).
-3.  **Give him an API Key** (`export GLM_API_KEY=...`).
-4.  **Run him** (`npm start`).
-
-```bash
-# The magic command
-$ npm start
-
-# What happens next
-> "Hello! I am Floyd. I have read your entire codebase and I have notes."
-```
-
-## Shortcuts (For The Power Users)
-
-*   **Ctrl+Z**: Zen Mode. Hides the sidebars. Pure code. No distractions.
-*   **Ctrl+M**: Monitor Dashboard. Watch Floyd think in real-time.
-*   **Ctrl+P**: Command Palette. Because clicking is for the weak.
-
-## The "Senior Agent" Upgrade
-
-Floyd recently got a promotion. He now includes:
-*   **Explorer Server**: He can map your project structure in milliseconds.
-*   **Symbol Lister**: He reads `ctags` (basically) so he knows your function names without reading the implementation.
-*   **Scratchpad**: He keeps a to-do list in `.floyd/scratchpad.md`. He's organized. Are you?
-
-## Disclaimer
-
-Floyd is an experimental agent. He might write perfect code. He might delete your `node_modules` (he won't, we added safeguards, but life is a risk). Use with caution and `git commit` often.
+https://github.com/CaptainPhantasy/Floyd-Code-CLI
 
 ---
+**The "Legacy AI" Story**
 
-*Made with ❤️ and too much caffeine by [CaptainPhantasy](https://github.com/CaptainPhantasy).*
+You know the drill. There's *That Company* with the subscription that auto-renews faster than you can say "cancel." There's the premium coding buddy that costs more than your actual grocery budget. And there are the rate limits — those gentle reminders that you've asked too many questions today.
+
+Here at **Legacy AI** — a tiny microsaas shop tucked away in Brown County, Indiana (population: lovely, but please don't visit, our downtown is one building and it's usually closed) — we had a moment.
+
+We looked at our credit card bill. We looked at each other. We said:
+
+*"Hang on. This is just API calls in a trench coat. We could build this."*
+
+So we did.
+
+Floyd is what happens when you stop paying monthly for AI tools and start having fun.
+
+---
+**Meet The Family**
+
+We didn't stop at one tool. We built a whole little ecosystem — a collection of TypeScript scripts fueled by coffee, curiosity, and the occasional "bet we can't pull this off without getting a cease and desist.”
+
+**1. Floyd Code CLI**
+
+It lives in your terminal. It helps you code. It costs pennies. It has **Zen Mode** (Ctrl+Z) for when you just want code on your screen and nothing else.
+
+**2. Floyd for Chrome Extension**
+
+Lets Floyd see what you see in your browser. Great for documentation you're definitely going to read someday. Really, you will.
+
+**3. Floyd Desktop (Web)**
+
+Same agent goodness, but with buttons. For when you're feeling GUI-curious.
+
+**4. Browork**
+
+A sub-agent system that spawns little worker Floyds to do parallel tasks. Like having a team of tiny helpers, each one slightly more confused than the last. Oh by the way, which one’s Pink?
+
+**5. NEW THIS WEEK: CURSE’M - IDE**
+
+We looked at a certain *other* AI IDE with its certain *other* price tag and thought... you know what? Screw them boys too.
+
+The Floyd IDE entered development **this week**. It'll help you code. It won't cost a car payment. It's coming soon. We're excited. You should be too. Or at least politely interested.
+
+---
+**Why Floyd?**
+
+- **He knows your project**: Floyd has project_map — he knows where your files live without asking like a lost tourist.
+- **Surgical edits**: He fixes bugs without rewriting your whole file and deleting your comments. He's respectful like that.
+- **SuperCaching™**: Three tiers of memory so he doesn't make you repeat yourself:
+  - **Reasoning** (5 min) — Active conversations
+  - **Project** (24 hrs) — Session work
+  - **Vault** (7 days) — Reusable patterns
+- **Ctrl+Z Zen Mode**: The UI goes away. Just code. You, the screen, and pure focus.
+
+---
+**Quick Start**
+
+```bash
+# Clone the repo
+git clone https://github.com/CaptainPhantasy/Floyd-Code-CLI.git
+cd FLOYD_CLI/INK/floyd-cli
+
+# Install and build
+npm install
+npm run build
+npm link
+
+# Start Floyd
+floyd-cli
+```
+
+---
+**What Can Floyd Do?**
+
+- **Code**: Write, edit, and refactor TypeScript/JavaScript
+- **Chat**: Interactive terminal UI with syntax highlighting
+- **Remember**: SUPERCACHING keeps context across sessions
+- **Browse**: Prompt Library (integrates with Obsidian vaults if you're fancy)
+- **Monitor**: Watch Floyd think in real-time (TMUX dual-screen mode)
+
+---
+**Keyboard Shortcuts**
+
+| Shortcut | What It Does |
+| :--- | :--- |
+| **Ctrl+Shift+P** | Prompt Library |
+| **Ctrl+P** | Command Palette |
+| **Ctrl+M** | Monitor Dashboard |
+| **Ctrl+Z** | **Zen Mode** — UI goes bye bye |
+| **?** | Help overlay |
+
+---
+**Configuration**
+
+Bring your own API key, point Floyd at your code, and you're off.
+
+```text
+OPENAI_API_KEY=your_key_here
+FLOYD_CACHE_DIR=~/.floyd/cache
+FLOYD_VAULT_PATH=/path/to/Obsidian  # optional, but nice
+```
+
+---
+**Troubleshooting**
+
+```bash
+# The usual fix
+npm run build
+
+# The fresh start
+rm -rf node_modules package-lock.json
+npm install
+
+# The cache clear
+rm -rf ~/.floyd/cache/
+```
+
+Still stuck? Open an issue. We'll get to it. We promise. Eventually.
+
+---
+**The Fine Print**
+
+Floyd is an experimental agent from **Legacy AI**. He might write perfect code. He might hallucinate. He might make you rich.
+
+Use with caution. git commit often. Keep backups. And maybe buy us a coffee sometime.
+
+---
+**Version History**
+
+- **v0.1.0** (2026-01-20) — Born. SUPERCACHING, MCP, interactive UI.
+- **v0.2.0** (2026-01-21) — Desktop Web arrives.
+- **In Development** — The IDE. It's happening.
+
+---
+*Made with ❤️ and an unhealthy amount of machismo by Legacy AI from Little Nashville, in Brown County, Indiana.*
+
+*© 2026 Legacy AI – Small, scrappy, and done with overpriced AI tools.*
