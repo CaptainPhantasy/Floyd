@@ -1,0 +1,39 @@
+{
+    "servers": [
+        {
+            "name": "supabase",
+            "command": "npx",
+            "args": [
+                "-y",
+                "@modelcontextprotocol/server-supabase"
+            ],
+            "enabled": true,
+            "description": "Supabase MCP server for database operations"
+        },
+        {
+            "name": "filesystem",
+            "command": "npx",
+            "args": [
+                "-y",
+                "@modelcontextprotocol/server-filesystem",
+                "."
+            ],
+            "enabled": true,
+            "description": "Filesystem MCP server for file operations"
+        },
+        {
+            "name": "github",
+            "command": "npx",
+            "args": [
+                "-y",
+                "@modelcontextprotocol/server-github"
+            ],
+            "enabled": false,
+            "description": "GitHub MCP server for repository operations",
+            "env": {
+                "GITHUB_TOKEN": "${GITHUB_TOKEN}"
+            }
+        }
+    ],
+    "autoConnect": true
+}

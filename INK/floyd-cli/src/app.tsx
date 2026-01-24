@@ -31,6 +31,31 @@ import type {ThinkingStatus} from './ui/agent/ThinkingStream.js';
 import type {Task} from './ui/agent/TaskChecklist.js';
 import type {ToolExecution} from './ui/monitor/ToolTimeline.js';
 import type {StreamEvent} from './ui/monitor/EventStream.js';
+import {
+	TokenUsageDashboard,
+	ToolPerformanceDashboard,
+	ProductivityDashboard,
+	ErrorAnalysisDashboard,
+	MemoryDashboard,
+	ResponseTimeDashboard,
+	CostAnalysisDashboard,
+	CodeQualityDashboard,
+	AgentActivityDashboard,
+	WorkflowDashboard,
+	FileActivityDashboard,
+	GitActivityDashboard,
+	BrowserSessionDashboard,
+	ResourceDashboard,
+	SessionHistoryDashboard,
+} from './ui/dashboard/index.js';
+import {
+	selectTokenUsage,
+	selectToolPerformance,
+	selectErrors,
+	selectProductivity,
+	selectResponseTimes,
+	selectCosts,
+} from './store/floyd-store.js';
 import dotenv from 'dotenv';
 import {resolve} from 'node:path';
 
@@ -122,25 +147,33 @@ export default function App({name = 'User', chrome = false}: AppProps) {
 	// Refs for engine instances
 	const engineRef = useRef<AgentEngine | null>(null);
 
-	// Zustand store selectors
-	const storeMessages = useFloydStore(state => state.messages);
-	const streamingContent = useFloydStore(state => state.streamingContent);
-	const addMessage = useFloydStore(state => state.addMessage);
-	const updateMessage = useFloydStore(state => state.updateMessage);
-	const appendStreamingContent = useFloydStore(
-		state => state.appendStreamingContent,
-	);
-	const clearStreamingContent = useFloydStore(
-		state => state.clearStreamingContent,
-	);
-	const setAgentStoreStatus = useFloydStore(state => state.setStatus);
-	const safetyMode = useFloydStore(state => state.safetyMode);
-	const toggleSafetyMode = useFloydStore(state => state.toggleSafetyMode);
-
-	// Overlay state from store (consolidated)
+	// Zustand store selectors - stable references to prevent infinite re-render loops
 	// NOTE: Use stable selectors for values, useCallback for actions to prevent infinite re-render loops
-	const showHelp = useFloydStore(state => state.showHelp);
-	const showMonitor = useFloydStore(state => state.showMonitor);
+	const selectMessages = useCallback((state: any) => state.messages, []);
+	const selectStreamingContent = useCallback((state: any) => state.streamingContent, []);
+	const selectAddMessage = useCallback((state: any) => state.addMessage, []);
+	const selectUpdateMessage = useCallback((state: any) => state.updateMessage, []);
+	const selectAppendStreamingContent = useCallback((state: any) => state.appendStreamingContent, []);
+	const selectClearStreamingContent = useCallback((state: any) => state.clearStreamingContent, []);
+	const selectSetStatus = useCallback((state: any) => state.setStatus, []);
+	const selectSafetyMode = useCallback((state: any) => state.safetyMode, []);
+	const selectToggleSafetyMode = useCallback((state: any) => state.toggleSafetyMode, []);
+	const selectShowHelp = useCallback((state: any) => state.showHelp, []);
+	const selectShowMonitor = useCallback((state: any) => state.showMonitor, []);
+
+	const storeMessages = useFloydStore(selectMessages);
+	const streamingContent = useFloydStore(selectStreamingContent);
+	const addMessage = useFloydStore(selectAddMessage);
+	const updateMessage = useFloydStore(selectUpdateMessage);
+	const appendStreamingContent = useFloydStore(selectAppendStreamingContent);
+	const clearStreamingContent = useFloydStore(selectClearStreamingContent);
+	const setAgentStoreStatus = useFloydStore(selectSetStatus);
+	const safetyMode = useFloydStore(selectSafetyMode);
+	const toggleSafetyMode = useFloydStore(selectToggleSafetyMode);
+	const showHelp = useFloydStore(selectShowHelp);
+	const showMonitor = useFloydStore(selectShowMonitor);
+
+	// Overlay state setters
 	const setShowHelp = useCallback((value: boolean) => {
 		useFloydStore.getState().setOverlay('showHelp', value);
 	}, []);
@@ -153,7 +186,15 @@ export default function App({name = 'User', chrome = false}: AppProps) {
 	const toggleMonitor = useCallback(() => {
 		useFloydStore.getState().toggleOverlay('showMonitor');
 	}, []);
-	
+
+	// Dashboard hooks (must be at top level for Rules of Hooks)
+	const tokenData = useFloydStore(selectTokenUsage);
+	const toolData = useFloydStore(selectToolPerformance);
+	const errorData = useFloydStore(selectErrors);
+	const productivityData = useFloydStore(selectProductivity);
+	const responseTimeData = useFloydStore(selectResponseTimes);
+	const costData = useFloydStore(selectCosts);
+
 	const {exit} = useApp();
 
 	// ============================================================================
@@ -589,36 +630,104 @@ export default function App({name = 'User', chrome = false}: AppProps) {
 	// ============================================================================
 
 	if (showMonitor) {
-		const monitorData: MonitorData = {events, toolExecutions};
 		return (
-			<MonitorLayout
-				data={monitorData}
-				compact={false}
-				updateInterval={1000}
-				showEventStream={true}
-				showToolTimeline={toolExecutions.length > 0}
-				showSystemMetrics={true}
-				showGitActivity={false}
-				showBrowserState={false}
-				showAlertTicker={events.some(
-					e => e.severity === 'error' || e.severity === 'warning',
-				)}
-				showWorkerStateBoard={false}
-				header={
-					<Box
-						flexDirection="row"
-						justifyContent="space-between"
-						paddingX={1}
-						borderStyle="double"
-						borderColor={floydTheme.colors.borderFocus}
-					>
-						<Text bold color={floydRoles.headerTitle}>
-							FLOYD MONITOR
-						</Text>
-						<Text dimColor>Press Esc to return</Text>
+			<Box flexDirection="column" padding={1}>
+				<Box
+					flexDirection="row"
+					justifyContent="space-between"
+					paddingX={1}
+					paddingY={0}
+					borderStyle="double"
+					borderColor={floydTheme.colors.borderFocus}
+				>
+					<Text bold color={floydRoles.headerTitle}>
+						FLOYD MONITOR
+					</Text>
+					<Text dimColor>Press Esc to return</Text>
+				</Box>
+
+				<Box flexDirection="row" gap={1}>
+					<Box flexDirection="column" gap={1}>
+						<TokenUsageDashboard data={tokenData} />
+						<ToolPerformanceDashboard tools={toolData} />
+						<ProductivityDashboard data={productivityData} />
+						<ErrorAnalysisDashboard errors={errorData} />
 					</Box>
-				}
-			/>
+
+					<Box flexDirection="column" gap={1}>
+						<MemoryDashboard
+							projectCache={{name: 'Project', entries: 0, sizeBytes: 0, hits: 0, misses: 0, lastAccess: Date.now()}}
+							reasoningCache={{name: 'Reasoning', entries: 0, sizeBytes: 0, hits: 0, misses: 0, lastAccess: Date.now()}}
+							vaultCache={{name: 'Vault', entries: 0, sizeBytes: 0, hits: 0, misses: 0, lastAccess: Date.now()}}
+							totalMemoryMB={0}
+						/>
+						<ResponseTimeDashboard data={responseTimeData} />
+						<CostAnalysisDashboard data={costData} />
+						<CodeQualityDashboard
+							data={{
+								testCoverage: 0,
+								lintErrors: 0,
+								typeErrors: 0,
+								score: 100,
+							}}
+						/>
+					</Box>
+				</Box>
+
+				<Box flexDirection="row" gap={1}>
+					<AgentActivityDashboard
+						data={{
+							activeAgents: 0,
+							totalTasks: 0,
+							completedTasks: 0,
+							averageTime: 0,
+						}}
+					/>
+					<WorkflowDashboard
+						data={{
+							commonWorkflows: [],
+						}}
+					/>
+					<FileActivityDashboard
+						data={{
+							filesRead: 0,
+							filesWritten: 0,
+							filesModified: 0,
+							totalFiles: 0,
+						}}
+					/>
+				</Box>
+
+				<Box flexDirection="row" gap={1}>
+					<GitActivityDashboard
+						data={{
+							commits: 0,
+							branches: 1,
+							merges: 0,
+							lastCommit: 'No commits yet',
+						}}
+					/>
+					<BrowserSessionDashboard
+						data={{
+							pagesVisited: 0,
+							screenshots: 0,
+							interactions: 0,
+							activeTime: 0,
+						}}
+					/>
+					<ResourceDashboard
+						data={{
+							diskUsage: 0,
+							networkIO: 0,
+							tempFiles: 0,
+							openFiles: 0,
+						}}
+					/>
+					<SessionHistoryDashboard
+						data={[]}
+					/>
+				</Box>
+			</Box>
 		);
 	}
 

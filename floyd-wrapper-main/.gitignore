@@ -1,0 +1,63 @@
+# Dependencies
+node_modules/
+npm-debug.log*
+yarn-debug.log*
+yarn-error.log*
+# Lockfiles are now committed for reproducible builds
+# yarn.lock
+# pnpm-lock.yaml
+
+# Build outputs
+dist/
+build/
+*.tsbuildinfo
+
+# Environment files (contain sensitive API keys)
+.env
+.env.local
+.env.*.local
+.env.production
+
+# SUPERCACHE directories
+.floyd/cache/
+.floyd/temp/
+.floyd/.cache/
+
+# Floyd runtime state
+.floyd/floyd.db
+.floyd/history
+
+# Backup files
+*.backup
+*.bak
+*.ts.backup
+
+# IDE
+.vscode/
+.idea/
+*.swp
+*.swo
+*~
+.DS_Store
+
+# Testing
+coverage/
+.nyc_output/
+
+# Temporary files
+*.tmp
+*.temp
+.test-write
+
+# Logs
+logs/
+*.log
+
+# OS
+.DS_Store
+Thumbs.db
+
+# Internal agent and build documentation (may contain sensitive info)
+.loop/
+PRE_FLIGHT_COMPLETE.md
+*_PRE_FLIGHT*.md
