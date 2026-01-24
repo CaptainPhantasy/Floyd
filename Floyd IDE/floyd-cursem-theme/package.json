@@ -1,0 +1,54 @@
+{
+  "name": "floyd-cursem-theme",
+  "displayName": "FLOYD CURSE'M IDE Theme",
+  "description": "CRUSH Theme - Exact color match for Floyd CLI implementation by Legacy AI",
+  "version": "0.1.0",
+  "publisher": "legacy-ai",
+  "author": {
+    "name": "Douglas Talley",
+    "email": "doug@legacy.ai",
+    "url": "https://legacy.ai"
+  },
+  "license": "MIT",
+  "repository": {
+    "type": "git",
+    "url": "https://github.com/legacy-ai/floyd-cursem-theme"
+  },
+  "bugs": {
+    "url": "https://github.com/legacy-ai/floyd-cursem-theme/issues"
+  },
+  "engines": {
+    "vscode": "^1.80.0"
+  },
+  "categories": [
+    "Themes"
+  ],
+  "keywords": [
+    "floyd",
+    "crush",
+    "charm",
+    "purple",
+    "pink",
+    "dark theme",
+    "cli",
+    "terminal",
+    "legacy ai"
+  ],
+  "icon": "icons/cursem.png",
+  "contributes": {
+    "themes": [
+      {
+        "label": "Floyd CRUSH",
+        "uiTheme": "vs-dark",
+        "path": "./themes/floyd-crush.json"
+      }
+    ]
+  },
+  "devDependencies": {
+    "@vscode/vsce": "^2.19.0"
+  },
+  "scripts": {
+    "package": "vsce package",
+    "publish": "vsce publish"
+  }
+}

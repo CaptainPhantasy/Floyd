@@ -14,6 +14,7 @@ import {Box, Text, useInput} from 'ink';
 import {Frame} from '../crush/Frame.js';
 import {floydTheme} from '../../theme/crush-theme.js';
 import {crushTheme} from '../../theme/crush-theme.js';
+import {AVAILABLE_TOOLS, getDefaultToolStates} from '../../config/available-tools.js';
 
 export interface Hotkey {
 	/** Keyboard shortcut (e.g., "Ctrl+P", "F1", "?") */
@@ -41,6 +42,12 @@ export interface HelpOverlayProps {
 
 	/** Optional callback for command execution */
 	onCommand?: (commandId: string) => void;
+
+	/** Show tools section */
+	showTools?: boolean;
+
+	/** Tool toggle states (optional, will use defaults if not provided) */
+	toolStates?: Array<{name: string; enabled: boolean; icon?: string}>;
 }
 
 /**
@@ -172,13 +179,21 @@ export function HelpOverlay({
 	hotkeys,
 	title = ' KEYBOARD SHORTCUTS ',
 	onCommand,
+	showTools = false,
+	toolStates,
 }: HelpOverlayProps) {
 	// Use provided hotkeys or generate defaults with actions
 	const displayHotkeys = hotkeys || getDefaultHotkeys(onClose, onCommand);
 	const [selectedIndex, setSelectedIndex] = useState(0);
 
+	// Get tool states or use defaults
+	const tools = toolStates || getDefaultToolStates();
+
 	const groupedHotkeys = groupHotkeys(displayHotkeys);
 	const flatHotkeys = Array.from(groupedHotkeys.values()).flat();
+
+	// Combine hotkeys and tools for navigation
+	const totalItems = showTools ? flatHotkeys.length + tools.length : flatHotkeys.length;
 
 	// Reset selectedIndex when hotkeys change or overlay opens
 	useEffect(() => {
@@ -210,12 +225,12 @@ export function HelpOverlay({
 		}
 
 		if (key.downArrow) {
-			setSelectedIndex(prev => Math.min(flatHotkeys.length - 1, prev + 1));
+			setSelectedIndex(prev => Math.min(totalItems - 1, prev + 1));
 			return;
 		}
 
 		// Execute selected hotkey action
-		if (key.return && flatHotkeys[selectedIndex]?.action) {
+		if (key.return && selectedIndex < flatHotkeys.length && flatHotkeys[selectedIndex]?.action) {
 			const selected = flatHotkeys[selectedIndex];
 			if (selected.action) {
 				selected.action();
@@ -311,6 +326,72 @@ export function HelpOverlay({
 							</Box>
 						</Box>
 					))}
+
+					{/* Tools section */}
+					{showTools && (
+						<Box flexDirection="column" marginBottom={1}>
+							{/* Category header */}
+							<Text bold color={crushTheme.accent.tertiary}>
+								TOOLS ({tools.length} total)
+							</Text>
+
+							{/* Tools list */}
+							<Box flexDirection="column" marginLeft={2} marginTop={0}>
+								{tools.map((tool, index) => {
+									const globalIndex = flatHotkeys.length + index;
+									const isSelected = globalIndex === selectedIndex;
+									const toolKey = `tool-${tool.name}`;
+
+									return (
+										<Box
+											key={toolKey}
+											flexDirection="row"
+											paddingY={0}
+											justifyContent="flex-start"
+										>
+											{/* Selection indicator */}
+											<Text
+												color={
+													isSelected
+														? crushTheme.accent.primary
+														: floydTheme.colors.fgMuted
+												}
+											>
+												{isSelected ? '▶ ' : '  '}
+											</Text>
+
+											{/* Icon + Tool name */}
+											<Box width={35} justifyContent="flex-start">
+												<Text
+													bold={isSelected}
+													color={
+														isSelected
+															? crushTheme.accent.secondary
+															: floydTheme.colors.fgBase
+													}
+												>
+													{tool.icon && `${tool.icon} `}
+													{tool.name}
+												</Text>
+											</Box>
+
+											{/* Status */}
+											<Text
+												color={
+													tool.enabled
+														? floydTheme.colors.success
+														: floydTheme.colors.error
+												}
+												bold={tool.enabled}
+											>
+												[{tool.enabled ? 'ON' : 'OFF'}]
+											</Text>
+										</Box>
+									);
+								})}
+							</Box>
+						</Box>
+					)}
 
 					{/* Footer */}
 					<Box

@@ -1,3 +1,4 @@
+#!/usr/bin/env node
 /**
  * Floyd TUI Launcher - Launches full Ink-based TUI
  *

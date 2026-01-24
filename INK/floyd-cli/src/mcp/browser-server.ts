@@ -2,7 +2,7 @@
  * MCP Browser Server
  *
  * Provides browser automation tools via the FloydChrome extension.
- * Connects to the extension via WebSocket (ws://localhost:3000) and
+ * Connects to the extension via WebSocket (ws://localhost:3005) and
  * exposes browser tools as MCP tools for the Floyd CLI agent.
  *
  * Tools:
@@ -14,17 +14,23 @@
  * - browser_find: Find element by natural language query
  * - browser_get_tabs: List all open tabs
  * - browser_create_tab: Create new tab
+ * - browser_status: Check connection status to extension
  *
  * Architecture:
  * Floyd CLI (AgentEngine)
  *   ↓
  * MCP Browser Server (this file)
  *   ↓
- * WebSocket (ws://localhost:3000)
+ * WebSocket (ws://localhost:3005)
  *   ↓
  * FloydChrome Extension
  *   ↓
  * Chrome APIs (Debugger, Tabs, Scripting)
+ *
+ * Environment Variables:
+ * - FLOYD_EXTENSION_URL: Override default WebSocket URL (default: ws://localhost:3005)
+ * - MAX_RECONNECT: Maximum reconnection attempts (default: 3)
+ * - RECONNECT_INTERVAL: Delay between reconnect attempts in ms (default: 5000)
  */
 
 import { Server } from '@modelcontextprotocol/sdk/server/index.js';
@@ -61,12 +67,17 @@ export class MCPBrowserServer {
   }> = new Map();
   private connected = false;
   private reconnectAttempts = 0;
-  private maxReconnectAttempts = 10;
-  private reconnectInterval = 3000;
+  private maxReconnectAttempts: number;
+  private reconnectInterval: number;
 
-  private extensionUrl = 'ws://localhost:3000';
+  private extensionUrl: string;
 
   constructor() {
+    // Configuration from environment variables with defaults
+    this.extensionUrl = process.env.FLOYD_EXTENSION_URL || 'ws://localhost:3005';
+    this.maxReconnectAttempts = parseInt(process.env.MAX_RECONNECT || '3', 10);
+    this.reconnectInterval = parseInt(process.env.RECONNECT_INTERVAL || '5000', 10);
+
     this.server = new Server(
       {
         name: 'floyd-browser-server',
@@ -79,6 +90,7 @@ export class MCPBrowserServer {
       },
     );
 
+    console.error(`[MCP Browser] Configured for extension at ${this.extensionUrl}`);
     this.setupHandlers();
   }
 
@@ -224,6 +236,14 @@ export class MCPBrowserServer {
               },
             },
           },
+          {
+            name: 'browser_status',
+            description: 'Check connection status to FloydChrome extension',
+            inputSchema: {
+              type: 'object',
+              properties: {},
+            },
+          },
         ],
       };
     });
@@ -231,7 +251,32 @@ export class MCPBrowserServer {
     this.server.setRequestHandler(CallToolRequestSchema, async (request) => {
       const { name, arguments: args } = request.params;
 
-      // Ensure connected to extension
+      // Handle browser_status - doesn't require connection
+      if (name === 'browser_status') {
+        return {
+          content: [
+            {
+              type: 'text',
+              text: JSON.stringify({
+                ok: true,
+                code: 'BROWSER_STATUS_CHECK',
+                data: {
+                  connected: this.connected,
+                  extension_url: this.extensionUrl,
+                  reconnect_attempts: this.reconnectAttempts,
+                  max_reconnect_attempts: this.maxReconnectAttempts,
+                  reconnect_interval_ms: this.reconnectInterval,
+                  message: this.connected
+                    ? 'Connected to FloydChrome extension'
+                    : 'Not connected to FloydChrome extension',
+                },
+              }),
+            },
+          ],
+        };
+      }
+
+      // Ensure connected to extension for all other tools
       if (!this.connected) {
         await this.connect();
       }
@@ -242,12 +287,29 @@ export class MCPBrowserServer {
             {
               type: 'text',
               text: JSON.stringify({
-                error: 'Not connected to FloydChrome extension',
-                message: 'Please ensure the FloydChrome extension is installed and connected',
+                ok: false,
+                code: 'BROWSER_EXTENSION_UNAVAILABLE',
+                error: 'FloydChrome extension is not running',
+                message: `Browser tools are unavailable. Ensure FloydChrome extension is installed and connected to ${this.extensionUrl}`,
+                extension_url: this.extensionUrl,
+                reconnect_attempts: this.reconnectAttempts,
+                suggestion: this.reconnectAttempts >= this.maxReconnectAttempts
+                  ? 'Max reconnection attempts reached. Try starting the extension or restart Floyd CLI.'
+                  : 'Attempting to connect...',
+                tools_affected: [
+                  'browser_navigate',
+                  'browser_read_page',
+                  'browser_screenshot',
+                  'browser_click',
+                  'browser_type',
+                  'browser_find',
+                  'browser_get_tabs',
+                  'browser_create_tab',
+                ],
               }),
             },
           ],
-          isError: true,
+          isError: false, // Not an error - service unavailable
         };
       }
 
@@ -286,6 +348,8 @@ export class MCPBrowserServer {
             {
               type: 'text',
               text: JSON.stringify({
+                ok: false,
+                code: 'BROWSER_REQUEST_FAILED',
                 error: (error as Error).message,
                 tool: name,
               }),
@@ -370,17 +434,29 @@ export class MCPBrowserServer {
   private attemptReconnect(): void {
     if (this.reconnectAttempts >= this.maxReconnectAttempts) {
       console.error('[MCP Browser] Max reconnection attempts reached');
+      console.error(`[MCP Browser] Extension not available at ${this.extensionUrl}`);
       return;
     }
 
     this.reconnectAttempts++;
-    console.log(
-      `[MCP Browser] Reconnection attempt ${this.reconnectAttempts}/${this.maxReconnectAttempts}`,
-    );
+
+    // Rate-limit logging: only log every 3rd attempt and the final attempt
+    const shouldLog =
+      this.reconnectAttempts % 3 === 0 ||
+      this.reconnectAttempts === this.maxReconnectAttempts;
+
+    if (shouldLog) {
+      console.log(
+        `[MCP Browser] Reconnection attempt ${this.reconnectAttempts}/${this.maxReconnectAttempts} to ${this.extensionUrl}`,
+      );
+    }
 
     setTimeout(() => {
       this.connect().catch((error) => {
-        console.error('[MCP Browser] Reconnection failed:', error);
+        // Only log on final attempt or every 3rd failure
+        if (shouldLog) {
+          console.error('[MCP Browser] Reconnection failed:', error.message);
+        }
       });
     }, this.reconnectInterval);
   }

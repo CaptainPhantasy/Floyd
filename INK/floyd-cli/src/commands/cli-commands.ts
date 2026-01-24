@@ -8,6 +8,7 @@
  */
 
 import type {CommandDefinition} from './command-handler.js';
+import {vaultCommands} from './vault.js';
 
 // ============================================================================
 // TYPE DEFINITIONS
@@ -556,6 +557,7 @@ export const builtInCommands: Array<CommandDefinition<unknown, unknown>> = [
 	echoCommand as CommandDefinition,
 	pwdCommand as CommandDefinition,
 	cdCommand as CommandDefinition,
+	...vaultCommands,
 ];
 
 /**
@@ -587,6 +589,11 @@ export const utilityCommands: CommandDefinition<unknown, unknown>[] = [
 	pwdCommand as CommandDefinition<unknown, unknown>,
 	cdCommand as CommandDefinition<unknown, unknown>,
 ];
+
+/**
+ * Vault commands (Obsidian integration)
+ */
+export const obsidianCommands = vaultCommands;
 
 /**
  * Get command by name or alias (with proper typing)
@@ -662,6 +669,9 @@ export function showAllCommands(): string {
 		'',
 		'Utility:',
 		...utilityCommands.map(formatCommand),
+		'',
+		'Vault (Obsidian):',
+		...vaultCommands.map(formatCommand),
 		'',
 		'Use "help <command>" for detailed information.',
 	];

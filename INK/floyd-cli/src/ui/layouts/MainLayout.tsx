@@ -67,6 +67,7 @@ import type {
 } from '../panels/index.js';
 import {HelpOverlay, type Hotkey} from '../overlays/HelpOverlay.js';
 import {PromptLibraryOverlay} from '../overlays/PromptLibraryOverlay.js';
+import {FloydSessionSwitcherOverlay} from '../overlays/FloydSessionSwitcherOverlay.js';
 import {VoiceInputButton} from '../components/VoiceInputButton.js';
 import {useSTT, type UseSTTReturn} from '../../stt/useSTT.js';
 
@@ -689,17 +690,24 @@ export function MainLayout({
 	// NOTE: Use stable selectors for values, useCallback for actions to prevent infinite re-render loops
 	const showPromptLibrary = useFloydStore(state => state.showPromptLibrary);
 	const showAgentBuilder = useFloydStore(state => state.showAgentBuilder);
+	const showSessionSwitcher = useFloydStore(state => state.showSessionSwitcher);
 	const setShowPromptLibrary = useCallback((value: boolean) => {
 		useFloydStore.getState().setOverlay('showPromptLibrary', value);
 	}, []);
 	const setShowAgentBuilder = useCallback((value: boolean) => {
 		useFloydStore.getState().setOverlay('showAgentBuilder', value);
 	}, []);
+	const setShowSessionSwitcher = useCallback((value: boolean) => {
+		useFloydStore.getState().setOverlay('showSessionSwitcher', value);
+	}, []);
 	const togglePromptLibrary = useCallback(() => {
 		useFloydStore.getState().toggleOverlay('showPromptLibrary');
 	}, []);
 	const toggleAgentBuilder = useCallback(() => {
 		useFloydStore.getState().toggleOverlay('showAgentBuilder');
+	}, []);
+	const toggleSessionSwitcher = useCallback(() => {
+		useFloydStore.getState().toggleOverlay('showSessionSwitcher');
 	}, []);
 
 	const [currentSafetyMode, setCurrentSafetyMode] = useState<'yolo' | 'ask' | 'plan'>(safetyMode || 'ask');
@@ -1010,6 +1018,7 @@ export function MainLayout({
 		showHelp,
 		showPromptLibrary,
 		showAgentBuilder,
+		showSessionSwitcher,
 		showMonitorProp,
 	});
 	useEffect(() => {
@@ -1017,9 +1026,10 @@ export function MainLayout({
 			showHelp,
 			showPromptLibrary,
 			showAgentBuilder,
+			showSessionSwitcher,
 			showMonitorProp,
 		};
-	}, [showHelp, showPromptLibrary, showAgentBuilder, showMonitorProp]);
+	}, [showHelp, showPromptLibrary, showAgentBuilder, showSessionSwitcher, showMonitorProp]);
 
 	useInput((_inputKey, key) => {
 		// Ctrl+Q DEFINITIVE QUIT - Always first check, this is THE way to exit floyd-cli
@@ -1101,6 +1111,12 @@ export function MainLayout({
 		// Ctrl+M to toggle monitor dashboard
 		if (key.ctrl && _inputKey === 'm') {
 			onCommand?.('toggle-monitor');
+			return;
+		}
+
+		// Ctrl+K to toggle Floyd session switcher
+		if (key.ctrl && _inputKey === 'k') {
+			toggleSessionSwitcher();
 			return;
 		}
 
@@ -1214,6 +1230,16 @@ export function MainLayout({
 					setShowAgentBuilder(false);
 				}}
 				onClose={() => setShowAgentBuilder(false)}
+			/>
+		);
+	}
+
+	// Render Floyd Session Switcher overlay
+	if (showSessionSwitcher) {
+		return (
+			<FloydSessionSwitcherOverlay
+				onClose={() => setShowSessionSwitcher(false)}
+				currentSessionId="current"
 			/>
 		);
 	}

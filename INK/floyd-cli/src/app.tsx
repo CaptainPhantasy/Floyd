@@ -206,7 +206,7 @@ export default function App({name = 'User', chrome = false}: AppProps) {
 			try {
 				// Initialize shared MCPClientManager with built-in servers
 				const mcpManager = new MCPClientManager(BUILTIN_SERVERS);
-				
+
 				if (chrome) {
 					await mcpManager.startServer(3000); // Default port for Chrome bridge
 				}
@@ -260,14 +260,16 @@ export default function App({name = 'User', chrome = false}: AppProps) {
 						'Hello! I am Floyd (GLM-4 Powered). How can I help you today?',
 					timestamp: Date.now(),
 				};
-				addMessage(greeting);
+				// Use getState() directly to avoid including addMessage in dependencies
+				useFloydStore.getState().addMessage(greeting);
 				// Removed setLocalMessages - UI reads from Zustand store
 			} catch {
 				setAgentStatus('error');
 			}
 		};
 		init();
-	}, [chrome, addMessage]);
+		// Only depend on chrome - addMessage is accessed via getState()
+	}, [chrome]);
 
 	// ============================================================================
 	// MESSAGE SUBMISSION
@@ -571,10 +573,9 @@ export default function App({name = 'User', chrome = false}: AppProps) {
 	}, []);
 
 	// Augment common commands with additional Floyd-specific commands
-	// Memoized to prevent infinite re-render loop in MainLayout
 	const augmentedCommands: CommandItem[] = useMemo(
 		() => [
-			...commonCommands,
+			...commonCommands.map(cmd => ({...cmd})),
 			{
 				id: 'reset-session',
 				label: 'Reset Session',
@@ -621,7 +622,7 @@ export default function App({name = 'User', chrome = false}: AppProps) {
 					// This command entry is for documentation/help purposes
 				},
 			},
-		].map(cmd => ({...cmd, action: () => handleCommand(cmd.id)})),
+		],
 		[commonCommands, handleCommand, toggleMonitor]
 	);
 

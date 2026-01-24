@@ -1,3 +1,4 @@
+#!/usr/bin/env node
 /**
  * Floyd Wrapper CLI - Main Entry Point
  *

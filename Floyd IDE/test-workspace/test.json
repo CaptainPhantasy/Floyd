@@ -1,0 +1,36 @@
+{
+  "name": "floyd-crush-theme-test",
+  "version": "1.0.0",
+  "description": "Floyd CRUSH Theme - Dark Side of the Code 🌙",
+  "author": {
+    "name": "Douglas Talley",
+    "company": "Legacy AI"
+  },
+  "keywords": [
+    "floyd",
+    "crush",
+    "pink",
+    "purple",
+    "theme"
+  ],
+  "colors": {
+    "background": "#201F26",
+    "foreground": "#DFDBDD",
+    "primary": "#6B50FF",
+    "secondary": "#FF60FF",
+    "tertiary": "#68FFD6",
+    "success": "#12C78F",
+    "error": "#EB4268"
+  },
+  "features": {
+    "darkMode": true,
+    "syntaxHighlighting": true,
+    "pinkFloydReferences": "lots"
+  },
+  "albums": [
+    "The Dark Side of the Moon",
+    "Wish You Were Here",
+    "Animals",
+    "The Wall"
+  ]
+}

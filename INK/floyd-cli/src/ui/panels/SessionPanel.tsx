@@ -17,6 +17,7 @@ import React from 'react';
 import {Frame} from '../crush/Frame.js';
 import {WorkerBadge} from '../components/WorkerBadge.js';
 import {floydTheme, crushTheme, statusColors} from '../../theme/crush-theme.js';
+import {getDefaultToolStates} from '../../config/available-tools.js';
 
 export interface ToolToggle {
 	name: string;
@@ -117,6 +118,9 @@ function SessionPanelInner({
 	const safetyColor =
 		safetyMode === 'yolo' ? statusColors.error : statusColors.ready;
 	const safetyLabel = safetyMode === 'yolo' ? 'YOLO ON' : 'YOLO OFF';
+
+	// Use provided tools or default to comprehensive list
+	const displayTools = tools && tools.length > 0 ? tools : getDefaultToolStates();
 
 	return (
 		<Frame

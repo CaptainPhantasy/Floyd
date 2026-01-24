@@ -560,47 +560,79 @@ export function PromptLibraryOverlay({
 							paddingX={1}
 							flexGrow={1}
 						>
-							<Text bold color={crushTheme.accent.primary}>
-								Prompts ({filteredPrompts.length})
-							</Text>
+							<Box flexDirection="row" justifyContent="space-between">
+								<Text bold color={crushTheme.accent.primary}>
+									Prompts ({filteredPrompts.length})
+								</Text>
+								<Text dimColor color={floydTheme.colors.fgMuted}>
+									Numbered
+								</Text>
+							</Box>
 							<Box flexDirection="column" marginTop={1} flexGrow={1}>
 								{filteredPrompts.length === 0 ? (
 									<Text color={floydTheme.colors.fgMuted} dimColor>
 										No prompts found
 									</Text>
 								) : (
-									filteredPrompts.slice(0, maxHeight - 10).map((prompt, idx) => (
-										<Box
-											key={prompt.fullPath}
-											flexDirection="column"
-											paddingX={1}
-											paddingY={0}
-											borderStyle={
-												idx === selectedIndex ? 'round' : undefined
-											}
-											borderColor={
-												idx === selectedIndex
-													? crushTheme.accent.primary
-													: undefined
-											}
-										>
-											<Text
-												color={
+									filteredPrompts.slice(0, maxHeight - 10).map((prompt, idx) => {
+										const globalIndex = idx + 1;
+										return (
+											<Box
+												key={prompt.fullPath}
+												flexDirection="row"
+												paddingX={1}
+												paddingY={0}
+												borderStyle={
+													idx === selectedIndex ? 'round' : undefined
+												}
+												borderColor={
 													idx === selectedIndex
 														? crushTheme.accent.primary
-														: floydTheme.colors.fgBase
+														: undefined
 												}
-												bold={idx === selectedIndex}
+												justifyContent="space-between"
+												width="100%"
 											>
-												{prompt.title}
-											</Text>
-											{prompt.tags.length > 0 && (
-												<Text color={floydTheme.colors.fgSubtle} dimColor>
-													{prompt.tags.slice(0, 3).map(t => `#${t}`).join(' ')}
-												</Text>
-											)}
-										</Box>
-									))
+												{/* Prompt number and title */}
+												<Box flexGrow={1}>
+													<Text
+														color={
+															idx === selectedIndex
+																? crushTheme.accent.primary
+																: floydTheme.colors.fgMuted
+														}
+														dimColor={idx !== selectedIndex}
+													>
+														{globalIndex.toString().padStart(2, '0')}.
+													</Text>
+													<Text
+														color={
+															idx === selectedIndex
+																? crushTheme.accent.primary
+																: floydTheme.colors.fgBase
+														}
+														bold={idx === selectedIndex}
+													>
+														{' '}{prompt.title}
+													</Text>
+												</Box>
+
+												{/* Tags */}
+												{prompt.tags.length > 0 && (
+													<Text color={floydTheme.colors.fgSubtle} dimColor>
+														#{prompt.tags.length}
+													</Text>
+												)}
+
+												{/* Quick copy indicator */}
+												{idx === selectedIndex && (
+													<Text color={crushTheme.accent.secondary}>
+														[Enter to copy]
+													</Text>
+												)}
+											</Box>
+										);
+									})
 								)}
 							</Box>
 						</Box>

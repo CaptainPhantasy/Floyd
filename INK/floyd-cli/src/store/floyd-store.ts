@@ -20,6 +20,11 @@ export type Message = {
 	name?: string;
 };
 import type {AgentStatus} from '../ui/agent/types.js';
+import type {
+	DashboardMetrics,
+	ErrorMetrics,
+} from './dashboard-metrics.js';
+import {initialDashboardMetrics, COST_CONFIG} from './dashboard-metrics.js';
 
 // ============================================================================
 // UTILITY FUNCTIONS
@@ -313,6 +318,8 @@ interface OverlaySlice {
 	showCommandPalette: boolean;
 	/** Config/settings overlay visibility */
 	showConfig: boolean;
+	/** Session switcher overlay visibility */
+	showSessionSwitcher: boolean;
 	/** Set overlay visibility by name */
 	setOverlay: (name: keyof OverlayState, value: boolean) => void;
 	/** Toggle overlay by name */
@@ -334,18 +341,54 @@ type OverlayState = Pick<
 	| 'showAgentBuilder'
 	| 'showCommandPalette'
 	| 'showConfig'
+	| 'showSessionSwitcher'
 >;
+
+/**
+ * Dashboard metrics slice
+ */
+interface DashboardSlice {
+	/** Dashboard metrics data */
+	dashboardMetrics: DashboardMetrics;
+	/** Record token usage from Claude API */
+	recordTokenUsage: (inputTokens: number, outputTokens: number) => void;
+	/** Calculate and track API costs */
+	calculateCost: (inputTokens: number, outputTokens: number) => void;
+	/** Record tool execution metrics */
+	recordToolCall: (toolName: string, duration: number, success: boolean) => void;
+	/** Record error */
+	recordError: (error: {
+		message: string;
+		type: ErrorMetrics['errors'][0]['type'];
+		toolName?: string;
+	}) => void;
+	/** Resolve error */
+	resolveError: (errorId: string, resolutionTime?: number) => void;
+	/** Record task completion */
+	recordTaskCompletion: () => void;
+	/** Update activity time */
+	updateActivityTime: (isActive: boolean) => void;
+	/** Update streak */
+	updateStreak: () => void;
+	/** Record response time */
+	recordResponseTime: (duration: number) => void;
+	/** Set token budget */
+	setTokenBudget: (budget: number) => void;
+	/** Reset all dashboard metrics */
+	resetDashboardMetrics: () => void;
+}
 
 /**
  * Main Floyd store state combining all slices
  */
-type FloydStore = ConversationSlice &
+export type FloydStore = ConversationSlice &
 	AgentSlice &
 	ToolsSlice &
 	RateLimitSlice &
 	SessionSlice &
 	ConfigSlice &
-	OverlaySlice & {
+	OverlaySlice &
+	DashboardSlice & {
 		/** Reset entire store to initial state */
 		reset: () => void;
 		/** Get store version for migration */
@@ -434,6 +477,24 @@ const initialOverlayState: Omit<
 	showAgentBuilder: false,
 	showCommandPalette: false,
 	showConfig: false,
+	showSessionSwitcher: false,
+};
+
+const initialDashboardState: Omit<
+	DashboardSlice,
+	| 'recordTokenUsage'
+	| 'calculateCost'
+	| 'recordToolCall'
+	| 'recordError'
+	| 'resolveError'
+	| 'recordTaskCompletion'
+	| 'updateActivityTime'
+	| 'updateStreak'
+	| 'recordResponseTime'
+	| 'setTokenBudget'
+	| 'resetDashboardMetrics'
+> = {
+	dashboardMetrics: initialDashboardMetrics,
 };
 
 // ============================================================================
@@ -486,6 +547,11 @@ export const useFloydStore = create<FloydStore>()(
 			// ============================================================
 			...initialOverlayState,
 
+			// ============================================================
+			// DASHBOARD METRICS STATE
+			// ============================================================
+			...initialDashboardState,
+
 			setOverlay: (name, value) =>
 				set(state => {
 					const overlayName = name as keyof Extract<OverlaySlice, boolean>;
@@ -506,6 +572,7 @@ export const useFloydStore = create<FloydStore>()(
 					showAgentBuilder: false,
 					showCommandPalette: false,
 					showConfig: false,
+					showSessionSwitcher: false,
 				}),
 
 			hasOpenOverlay: () => {
@@ -516,7 +583,8 @@ export const useFloydStore = create<FloydStore>()(
 					state.showPromptLibrary ||
 					state.showAgentBuilder ||
 					state.showCommandPalette ||
-					state.showConfig
+					state.showConfig ||
+					state.showSessionSwitcher
 				);
 			},
 
@@ -810,6 +878,235 @@ export const useFloydStore = create<FloydStore>()(
 			},
 
 			// ============================================================
+			// DASHBOARD METRICS ACTIONS
+			// ============================================================
+			recordTokenUsage: (inputTokens, outputTokens) =>
+				set(produce(state => {
+					const metrics = state.dashboardMetrics.tokenUsage;
+					metrics.totalTokens += inputTokens + outputTokens;
+					metrics.inputTokens += inputTokens;
+					metrics.outputTokens += outputTokens;
+					metrics.requestCount = state.messages.length;
+
+					// Update average
+					metrics.avgTokensPerRequest =
+						metrics.requestCount > 0
+							? metrics.totalTokens / metrics.requestCount
+							: 0;
+
+					// Add to history
+					metrics.history.push({
+						timestamp: Date.now(),
+						tokens: inputTokens + outputTokens,
+						requestCount: 1,
+					});
+
+					// Keep last 100 history entries
+					if (metrics.history.length > 100) {
+						metrics.history = metrics.history.slice(-100);
+					}
+				})),
+
+			setTokenBudget: (budget) =>
+				set(produce(state => {
+					state.dashboardMetrics.tokenUsage.tokenBudget = budget;
+				})),
+
+			recordToolCall: (toolName, duration, success) =>
+				set(produce(state => {
+					const tools = state.dashboardMetrics.toolPerformance.tools;
+					if (!tools[toolName]) {
+						tools[toolName] = {
+							calls: 0,
+							successes: 0,
+							failures: 0,
+							totalDuration: 0,
+							avgDuration: 0,
+							successRate: 1,
+							lastUsed: null,
+						};
+					}
+
+					const tool = tools[toolName];
+					tool.calls += 1;
+					tool.totalDuration += duration;
+					tool.avgDuration = tool.totalDuration / tool.calls;
+					tool.lastUsed = Date.now();
+
+					if (success) {
+						tool.successes += 1;
+					} else {
+						tool.failures += 1;
+					}
+
+					tool.successRate = tool.successes / tool.calls;
+				})),
+
+			recordError: ({message, type, toolName}) =>
+				set(produce(state => {
+					const errors = state.dashboardMetrics.errors.errors;
+
+					// Check if similar error already exists
+					const existingError = errors.find(
+						e =>
+							e.message === message &&
+							e.type === type &&
+							(!toolName || e.toolName === toolName),
+					);
+
+					if (existingError) {
+						existingError.count++;
+					} else {
+						errors.push({
+							id: `error-${Date.now()}-${Math.random().toString(36).substring(2, 11)}`,
+							timestamp: Date.now(),
+							resolved: false,
+							count: 1,
+							message,
+							type,
+							toolName,
+						});
+					}
+
+					// Keep last 100 errors
+					if (errors.length > 100) {
+						state.dashboardMetrics.errors.errors = errors.slice(-100);
+					}
+				})),
+
+			resolveError: (errorId, resolutionTime) =>
+				set(produce(state => {
+					const error = state.dashboardMetrics.errors.errors.find(
+						e => e.id === errorId,
+					);
+					if (error) {
+						error.resolved = true;
+						error.resolutionTime = resolutionTime || Date.now() - error.timestamp;
+					}
+				})),
+
+			recordTaskCompletion: () =>
+				set(produce(state => {
+					const productivity = state.dashboardMetrics.productivity;
+					productivity.tasksCompleted++;
+					productivity.tasksToday++;
+					productivity.lastActivity = Date.now();
+				})),
+
+			updateActivityTime: (isActive) =>
+				set(produce(state => {
+					const productivity = state.dashboardMetrics.productivity;
+					productivity.sessionMinutes += 1/60; // Approximate per-minute update
+					if (isActive) {
+						productivity.activeMinutes += 1/60;
+					} else {
+						productivity.idleMinutes += 1/60;
+					}
+
+					// Calculate derived metrics
+					productivity.tasksPerHour =
+						productivity.sessionMinutes > 0
+							? (productivity.tasksCompleted / productivity.sessionMinutes) * 60
+							: 0;
+
+					productivity.activityScore =
+						productivity.activeMinutes > 0
+							? Math.min(100, Math.round((productivity.tasksCompleted / productivity.activeMinutes) * 60))
+							: 0;
+				})),
+
+			updateStreak: () =>
+				set(produce(state => {
+					const productivity = state.dashboardMetrics.productivity;
+					const now = Date.now();
+					const lastActivity = productivity.lastActivity;
+					const oneDay = 24 * 60 * 60 * 1000;
+
+					// Check if last activity was today
+					const lastActivityDate = new Date(lastActivity).toDateString();
+					const todayDate = new Date(now).toDateString();
+
+					if (lastActivityDate !== todayDate) {
+						// New day
+						if (lastActivityDate === new Date(now - oneDay).toDateString()) {
+							// Yesterday - increment streak
+							productivity.streak++;
+							productivity.bestStreak = Math.max(
+								productivity.streak,
+								productivity.bestStreak,
+							);
+						} else {
+							// Streak broken
+							productivity.streak = 1;
+						}
+
+						// Reset daily counters
+						productivity.tasksToday = 0;
+						productivity.sessionsToday = 0;
+
+						// Add to history
+						const yesterday = new Date(now - oneDay).toISOString().split('T')[0];
+						productivity.history.push({
+							date: yesterday,
+							tasks: productivity.tasksToday,
+							sessionMinutes: productivity.sessionMinutes,
+						});
+
+						// Keep last 30 days
+						if (productivity.history.length > 30) {
+							productivity.history = productivity.history.slice(-30);
+						}
+					}
+				})),
+
+			recordResponseTime: (duration) =>
+				set(produce(state => {
+					const metrics = state.dashboardMetrics.responseTime;
+					metrics.times.push(duration);
+
+					// Keep last 1000 measurements
+					if (metrics.times.length > 1000) {
+						metrics.times = metrics.times.slice(-1000);
+					}
+
+					// Update average and percentiles
+					if (metrics.times.length > 0) {
+						const sum = metrics.times.reduce((a, b) => a + b, 0);
+						metrics.averageTime = sum / metrics.times.length;
+
+						const sorted = [...metrics.times].sort((a, b) => a - b);
+						const len = metrics.times.length;
+
+						metrics.p50 = sorted[Math.floor(len * 0.5)];
+						metrics.p95 = sorted[Math.floor(len * 0.95)];
+						metrics.p99 = sorted[Math.floor(len * 0.99)];
+					}
+				})),
+
+			calculateCost: (inputTokens, outputTokens) =>
+				set(produce(state => {
+					const inputCost = (inputTokens / 1000) * COST_CONFIG.INPUT_COST_PER_1K;
+					const outputCost = (outputTokens / 1000) * COST_CONFIG.OUTPUT_COST_PER_1K;
+					const totalCost = inputCost + outputCost;
+
+					state.dashboardMetrics.costs.totalCost += totalCost;
+					state.dashboardMetrics.costs.inputCost += inputCost;
+					state.dashboardMetrics.costs.outputCost += outputCost;
+					state.dashboardMetrics.costs.costPerRequest =
+						state.messages.length > 0
+							? state.dashboardMetrics.costs.totalCost / state.messages.length
+							: 0;
+
+					// Update estimated cost in token usage
+					state.dashboardMetrics.tokenUsage.estimatedCost += totalCost;
+				})),
+
+			resetDashboardMetrics: () =>
+				set({
+					dashboardMetrics: initialDashboardMetrics,
+				}),
+
+			// ============================================================
 			// GLOBAL RESET
 			// ============================================================
 			reset: () =>
@@ -821,6 +1118,7 @@ export const useFloydStore = create<FloydStore>()(
 					session: initialSessionState,
 					...initialConfigState,
 					...initialOverlayState,
+					...initialDashboardState,
 				}),
 		}),
 		{
@@ -858,6 +1156,7 @@ export const useFloydStore = create<FloydStore>()(
 				session: state.session,
 				safetyMode: state.safetyMode,
 				version: state.version,
+				dashboardMetrics: state.dashboardMetrics,
 			}),
 		},
 	),
@@ -916,6 +1215,7 @@ export const selectOverlays = (state: FloydStore) => ({
 	showAgentBuilder: state.showAgentBuilder,
 	showCommandPalette: state.showCommandPalette,
 	showConfig: state.showConfig,
+	showSessionSwitcher: state.showSessionSwitcher,
 });
 
 /**
@@ -927,7 +1227,77 @@ export const selectHasOpenOverlay = (state: FloydStore) =>
 	state.showPromptLibrary ||
 	state.showAgentBuilder ||
 	state.showCommandPalette ||
-	state.showConfig;
+	state.showConfig ||
+	state.showSessionSwitcher;
+
+/**
+ * Get dashboard metrics
+ */
+export const selectDashboardMetrics = (state: FloydStore) => state.dashboardMetrics;
+
+/**
+ * Get token usage metrics
+ */
+export const selectTokenUsage = (state: FloydStore) => ({
+	totalTokens: state.dashboardMetrics.tokenUsage.totalTokens,
+	inputTokens: state.dashboardMetrics.tokenUsage.inputTokens,
+	outputTokens: state.dashboardMetrics.tokenUsage.outputTokens,
+	requestCount: state.dashboardMetrics.tokenUsage.requestCount,
+	avgTokensPerRequest: state.dashboardMetrics.tokenUsage.avgTokensPerRequest,
+	estimatedCost: state.dashboardMetrics.tokenUsage.estimatedCost,
+	tokenBudget: state.dashboardMetrics.tokenUsage.tokenBudget,
+	history: state.dashboardMetrics.tokenUsage.history,
+});
+
+/**
+ * Get tool performance metrics
+ */
+export const selectToolPerformance = (state: FloydStore) =>
+	state.dashboardMetrics.toolPerformance.tools;
+
+/**
+ * Get error metrics
+ */
+export const selectErrors = (state: FloydStore) =>
+	state.dashboardMetrics.errors.errors;
+
+/**
+ * Get productivity metrics
+ */
+export const selectProductivity = (state: FloydStore) => ({
+	tasksCompleted: state.dashboardMetrics.productivity.tasksCompleted,
+	sessionMinutes: state.dashboardMetrics.productivity.sessionMinutes,
+	activeMinutes: state.dashboardMetrics.productivity.activeMinutes,
+	idleMinutes: state.dashboardMetrics.productivity.idleMinutes,
+	tasksPerHour: state.dashboardMetrics.productivity.tasksPerHour,
+	activityScore: state.dashboardMetrics.productivity.activityScore,
+	streak: state.dashboardMetrics.productivity.streak,
+	bestStreak: state.dashboardMetrics.productivity.bestStreak,
+	sessionsToday: state.dashboardMetrics.productivity.sessionsToday,
+	tasksToday: state.dashboardMetrics.productivity.tasksToday,
+	lastActivity: state.dashboardMetrics.productivity.lastActivity,
+	history: state.dashboardMetrics.productivity.history,
+});
+
+/**
+ * Get response time metrics
+ */
+export const selectResponseTimes = (state: FloydStore) => ({
+	averageTime: state.dashboardMetrics.responseTime.averageTime,
+	p50: state.dashboardMetrics.responseTime.p50,
+	p95: state.dashboardMetrics.responseTime.p95,
+	p99: state.dashboardMetrics.responseTime.p99,
+});
+
+/**
+ * Get cost metrics
+ */
+export const selectCosts = (state: FloydStore) => ({
+	totalCost: state.dashboardMetrics.costs.totalCost,
+	inputCost: state.dashboardMetrics.costs.inputCost,
+	outputCost: state.dashboardMetrics.costs.outputCost,
+	costPerRequest: state.dashboardMetrics.costs.costPerRequest,
+});
 
 // ============================================================================
 // TYPE DECLARATIONS

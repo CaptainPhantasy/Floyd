@@ -11,5 +11,113 @@
   "express-middleware": [
     "express",
     "middleware"
+  ],
+  "ExcellentProcess.md": [
+    "prompts",
+    "vault"
+  ],
+  "DREAM_TEAM_REFACTOR_SUMMARY.md": [
+    "prompts",
+    "vault"
+  ],
+  "NOTION_UPDATE_CONTENT.md": [
+    "prompts",
+    "vault"
+  ],
+  "UNIVERSAL_HARDENED_PROMPT_META.md": [
+    "prompts",
+    "vault"
+  ],
+  "PG Inspector Prompt.md": [
+    "prompts",
+    "vault"
+  ],
+  "README.md": [
+    "prompts",
+    "vault"
+  ],
+  "UNAU Prompt For Grading.md": [
+    "prompts",
+    "vault"
+  ],
+  "UNAU.md": [
+    "prompts",
+    "vault"
+  ],
+  "architecture-agent.md": [
+    "prompts",
+    "vault"
+  ],
+  "critic-agent-refactored.md": [
+    "prompts",
+    "vault"
+  ],
+  "critic-agent.md": [
+    "prompts",
+    "vault"
+  ],
+  "hygiene-agent.md": [
+    "prompts",
+    "vault"
+  ],
+  "implementer-agent-refactored.md": [
+    "prompts",
+    "vault"
+  ],
+  "implementer-agent.md": [
+    "prompts",
+    "vault"
+  ],
+  "observability-agent.md": [
+    "prompts",
+    "vault"
+  ],
+  "overwatch-agent.md": [
+    "prompts",
+    "vault"
+  ],
+  "performance-agent.md": [
+    "prompts",
+    "vault"
+  ],
+  "phallus-agent.md": [
+    "prompts",
+    "vault"
+  ],
+  "phallus-hook-template.md": [
+    "prompts",
+    "vault"
+  ],
+  "security-agent.md": [
+    "prompts",
+    "vault"
+  ],
+  "strategist-agent.md": [
+    "prompts",
+    "vault"
+  ],
+  "testing-agent-refactored.md": [
+    "prompts",
+    "vault"
+  ],
+  "testing-agent.md": [
+    "prompts",
+    "vault"
+  ],
+  "unau-orchestrator.md": [
+    "prompts",
+    "vault"
+  ],
+  "prompt-2026-01-21T13-04-47-422Z-1.md": [
+    "prompts",
+    "vault"
+  ],
+  "prompt-2026-01-21T13-04-47-422Z-2.md": [
+    "prompts",
+    "vault"
+  ],
+  "prompt-2026-01-21T13-04-47-422Z-3.md": [
+    "prompts",
+    "vault"
   ]
 }

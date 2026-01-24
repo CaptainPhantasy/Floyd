@@ -19,9 +19,15 @@
     "install:desktop": "echo 'Desktop (Electron) is deprecated - use FloydDesktopWeb instead'",
     "install:web": "cd FloydDesktopWeb && npm ci",
     "install:chrome": "cd FloydChromeBuild/floydchrome && npm ci",
+    "build": "npm run build:core && npm run build:cli",
     "build:core": "cd packages/floyd-agent-core && npm run build",
+    "build:cli": "cd INK/floyd-cli && npm run build",
     "build:web": "cd FloydDesktopWeb && npm run build",
+    "build:chrome": "cd FloydChromeBuild/floydchrome && npm run build",
+    "rebuild": "npm run clean && npm run build",
+    "clean": "rm -rf packages/floyd-agent-core/dist INK/floyd-cli/dist FloydDesktopWeb/dist",
     "dev:web": "cd FloydDesktopWeb && npm run dev",
+    "start:cli": "cd INK/floyd-cli && npm run build && npm run start",
     "type-check": "cd packages/floyd-agent-core && npm run build && cd ../../INK/floyd-cli && npm run build && cd ../../FloydDesktopWeb && npm run build && cd ../FloydChromeBuild/floydchrome && npm run typecheck"
   },
   "devDependencies": {
