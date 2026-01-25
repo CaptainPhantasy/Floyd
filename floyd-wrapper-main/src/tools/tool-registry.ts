@@ -8,6 +8,7 @@ import { z } from 'zod';
 import type { ToolDefinition, ToolResult, ToolCategory, ToolReceipt, ReceiptType, Receipt } from '../types.js';
 import { logger } from '../utils/logger.js';
 import { ToolExecutionError } from '../utils/errors.js';
+import { getCheckpointManager, DANGEROUS_TOOLS, type Checkpoint } from '../rewind/index.js';
 
 // ============================================================================
 // Tool Registry Class
@@ -634,6 +635,110 @@ export class ToolRegistry {
     logger.debug(`Tool ${name} receipt generated: ${status} (${duration_ms}ms)`);
 
     return toolReceipt;
+  }
+
+  // ==========================================================================
+  // Auto-Checkpoint Execution (v1.3.0+)
+  // ==========================================================================
+
+  /**
+   * Extract affected file paths from tool input
+   * Used to determine which files to snapshot before dangerous operations
+   */
+  private extractAffectedPaths(input: unknown, _toolName: string): string[] {
+    const inputObj = input as Record<string, unknown>;
+    const paths: string[] = [];
+
+    // Common path field names
+    const pathFields = [
+      'file_path', 'path', 'filePath', 'target', 'destination',
+      'source', 'from', 'to', 'file', 'filename'
+    ];
+
+    for (const field of pathFields) {
+      if (inputObj[field] && typeof inputObj[field] === 'string') {
+        paths.push(inputObj[field] as string);
+      }
+    }
+
+    // Handle array of paths
+    if (Array.isArray(inputObj.paths)) {
+      paths.push(...inputObj.paths.filter((p): p is string => typeof p === 'string'));
+    }
+
+    if (Array.isArray(inputObj.files)) {
+      paths.push(...inputObj.files.filter((p): p is string => typeof p === 'string'));
+    }
+
+    return paths;
+  }
+
+  /**
+   * Check if a tool is considered dangerous (should trigger auto-checkpoint)
+   */
+  isDangerousTool(toolName: string): boolean {
+    return DANGEROUS_TOOLS.includes(toolName);
+  }
+
+  /**
+   * Execute a tool with automatic checkpoint creation for dangerous operations
+   * Creates a checkpoint before executing dangerous tools (delete, move, write, etc.)
+   *
+   * @param name - Tool name
+   * @param input - Tool input
+   * @param options - Execution options including session ID for checkpoint tracking
+   * @returns Tool result with optional checkpoint info
+   */
+  async executeWithAutoCheckpoint(
+    name: string,
+    input: unknown,
+    options: {
+      permissionGranted?: boolean;
+      sessionId?: string;
+      autoCheckpointEnabled?: boolean;
+    } = {}
+  ): Promise<ToolReceipt & { checkpoint?: Checkpoint }> {
+    const { autoCheckpointEnabled = true, sessionId } = options;
+
+    let checkpoint: Checkpoint | undefined;
+
+    // Create auto-checkpoint for dangerous tools
+    if (autoCheckpointEnabled && this.isDangerousTool(name)) {
+      const affectedPaths = this.extractAffectedPaths(input, name);
+
+      if (affectedPaths.length > 0) {
+        try {
+          const checkpointManager = getCheckpointManager();
+          const created = await checkpointManager.createAutoCheckpoint(
+            name,
+            affectedPaths,
+            sessionId
+          );
+
+          if (created) {
+            checkpoint = created;
+            logger.info(`Auto-checkpoint created before ${name}`, {
+              checkpointId: checkpoint.id,
+              fileCount: checkpoint.fileCount,
+            });
+          }
+        } catch (error) {
+          // Don't fail the tool execution if checkpoint creation fails
+          logger.warn(`Failed to create auto-checkpoint for ${name}`, { error });
+        }
+      }
+    }
+
+    // Execute with receipt
+    const receipt = await this.executeWithReceipt(name, input, {
+      permissionGranted: options.permissionGranted,
+    });
+
+    // Add checkpoint to result if created
+    return {
+      ...receipt,
+      checkpoint,
+    };
   }
 }
 

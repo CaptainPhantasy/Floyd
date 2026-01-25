@@ -81,3 +81,11 @@ scripts/verify-connection.ts
 # TypeScript build artifacts
 *.tsbuildinfo
 packages/floyd-agent-core/tsconfig.tsbuildinfo
+
+# Test outputs and receipts
+test-output.txt
+SMOKE_TEST_RECEIPT_*.txt
+*.receipt.txt
+
+# Local environment files
+.env.local

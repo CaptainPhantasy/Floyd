@@ -107,3 +107,63 @@ export {
   FloydTerminal,
   terminal,
 } from './ui/terminal.js';
+
+// ============================================================================
+// Interrupt Handling
+// ============================================================================
+
+export {
+  InterruptManager,
+  getInterruptManager,
+} from './interrupts/index.js';
+
+export type {
+  InterruptableState,
+  InterruptAction,
+  InterruptEvent,
+  InterruptManagerOptions,
+} from './interrupts/index.js';
+
+// ============================================================================
+// Checkpoint & Rewind System
+// ============================================================================
+
+export {
+  CheckpointManager,
+  getCheckpointManager,
+  resetCheckpointManager,
+  DANGEROUS_TOOLS,
+  FileSnapshotManager,
+  getDefaultSnapshotManager,
+  formatBytes,
+  calculateTotalSnapshotsSize,
+} from './rewind/index.js';
+
+export type {
+  Checkpoint,
+  CheckpointOptions,
+  CheckpointStorageOptions,
+  FileSnapshot,
+  SnapshotOptions,
+} from './rewind/index.js';
+
+// ============================================================================
+// Sandbox System
+// ============================================================================
+
+export {
+  SandboxManager,
+  getSandboxManager,
+  DryRunSandbox,
+  getDryRunSandbox,
+  resetSandbox,
+} from './sandbox/index.js';
+
+export type {
+  SandboxType,
+  SandboxState,
+  SandboxFileChange,
+  SandboxSession,
+  SandboxOptions,
+  CommitResult,
+} from './sandbox/index.js';

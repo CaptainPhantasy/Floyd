@@ -1,267 +1,243 @@
 /**
- * Configuration Management - Floyd Wrapper
+ * Configuration Manager - Floyd Wrapper
  *
- * Configuration loader with Zod validation supporting .env files and environment variable overrides.
+ * Manages application configuration with feature flags
  */
 
+import path from 'path';
 import fs from 'fs-extra';
-import * as path from 'path';
-import { z } from 'zod';
-import type { FloydConfig } from '../types.js';
-import { logger } from './logger.js';
-import { ConfigError } from './errors.js';
 
-// ============================================================================
-// Configuration Schema
-// ============================================================================
+export interface FloydConfig {
+  // GLM API Configuration
+  glmApiKey: string;
+  glmApiEndpoint: string;
+  glmModel: string;
+
+  // Model Behavior
+  maxTokens: number;
+  temperature: number;
+  maxTurns: number;
+
+  // Feature Flags
+  useHardenedPrompt: boolean;
+  enablePreservedThinking: boolean;
+  enableTurnLevelThinking: boolean;
+  useJsonPlanning: boolean;
+
+  // Logging & Monitoring
+  logLevel: LogLevel;
+  cacheEnabled: boolean;
+
+  // Permissions
+  permissionLevel: PermissionLevel;
+
+  // Execution Mode
+  mode: ExecutionMode;
+
+  // Project Context
+  cwd: string;
+  floydIgnorePatterns?: string[];
+  projectContext?: string;
+}
+
+export type LogLevel = 'debug' | 'info' | 'warn' | 'error';
+export type PermissionLevel = 'auto' | 'ask' | 'deny';
+export type ExecutionMode = 'ask' | 'yolo' | 'plan' | 'auto' | 'dialogue';
 
 /**
- * Zod schema for Floyd configuration
+ * Load configuration from environment variables and config files
  */
-const configSchema = z.object({
-  glmApiKey: z.string().min(1, 'GLM API key is required'),
-  glmApiEndpoint: z.string().url('GLM API endpoint must be a valid URL').default('https://api.z.ai/api/anthropic'),
-  glmModel: z.string().min(1).default('glm-4.7'),
-  maxTokens: z.number().int().positive().default(100000),
-  temperature: z.number().min(0).max(2).default(0.7),
-  maxTurns: z.number().int().positive().default(20),
-  logLevel: z.enum(['debug', 'info', 'warn', 'error']).default('info'),
-  cacheEnabled: z.boolean().default(true),
-  permissionLevel: z.enum(['auto', 'ask', 'deny']).default('ask'),
-});
+export function loadConfig(): FloydConfig {
+  return {
+    // GLM API Configuration
+    glmApiKey: process.env.FLOYD_GLM_API_KEY || '',
+    glmApiEndpoint: process.env.FLOYD_GLM_ENDPOINT || 'https://api.z.ai/api/coding/paas/v4',
+    glmModel: process.env.FLOYD_GLM_MODEL || 'glm-4.7',
 
-// ============================================================================
-// Configuration Loader
-// ============================================================================
+    // Model Behavior
+    maxTokens: parseInt(process.env.FLOYD_MAX_TOKENS || '100000'),
+    temperature: parseFloat(process.env.FLOYD_TEMPERATURE || '0.7'),
+    maxTurns: parseInt(process.env.FLOYD_MAX_TURNS || '20'),
 
-/**
- * Load configuration from environment variables
- *
- * Priority: env vars > .env file > defaults
- */
-export async function loadConfig(): Promise<FloydConfig> {
-  logger.debug('Loading configuration...');
+    // Feature Flags (NEW - Hardened Prompt System)
+    useHardenedPrompt: process.env.FLOYD_USE_HARDENED_PROMPT === 'true',
+    enablePreservedThinking: process.env.FLOYD_PRESERVED_THINKING !== 'false',
+    enableTurnLevelThinking: process.env.FLOYD_TURN_LEVEL_THINKING !== 'false',
+    useJsonPlanning: process.env.FLOYD_JSON_PLANNING !== 'false',
 
-  // Load from environment variables
-  const envVars: Record<string, string | undefined> = {
-    glmApiKey: process.env.FLOYD_GLM_API_KEY || process.env.GLM_API_KEY,
-    glmApiEndpoint: process.env.FLOYD_GLM_ENDPOINT || process.env.GLM_API_ENDPOINT,
-    glmModel: process.env.FLOYD_GLM_MODEL || process.env.GLM_MODEL,
-    maxTokens: process.env.FLOYD_MAX_TOKENS,
-    temperature: process.env.FLOYD_TEMPERATURE,
-    maxTurns: process.env.FLOYD_MAX_TURNS,
-    logLevel: process.env.FLOYD_LOG_LEVEL,
-    cacheEnabled: process.env.FLOYD_CACHE_ENABLED,
-    permissionLevel: process.env.FLOYD_PERMISSION_LEVEL,
+    // Logging & Monitoring
+    logLevel: (process.env.FLOYD_LOG_LEVEL as LogLevel) || 'info',
+    cacheEnabled: process.env.FLOYD_CACHE_ENABLED !== 'false',
+
+    // Permissions
+    permissionLevel: (process.env.FLOYD_PERMISSION_LEVEL as PermissionLevel) || 'ask',
+
+    // Execution Mode
+    mode: (process.env.FLOYD_MODE as ExecutionMode) || 'ask',
+
+    // Project Context
+    cwd: process.cwd(),
+    floydIgnorePatterns: [],
+    projectContext: loadProjectContext(),
   };
-
-  // Clean undefined values and parse to correct types
-  const parsed: Record<string, unknown> = {};
-
-  for (const [key, value] of Object.entries(envVars)) {
-    if (value === undefined || value === '') {
-      continue;
-    }
-
-    switch (key) {
-      case 'maxTokens':
-      case 'maxTurns':
-        parsed[key] = parseInt(value, 10);
-        break;
-      case 'temperature':
-        parsed[key] = parseFloat(value);
-        break;
-      case 'cacheEnabled':
-        parsed[key] = value.toLowerCase() === 'true' || value === '1';
-        break;
-      default:
-        parsed[key] = value;
-    }
-  }
-
-  // Validate with Zod
-  try {
-    const config = configSchema.parse(parsed) as FloydConfig;
-    logger.debug('Configuration loaded successfully');
-    logger.debug(`GLM API Endpoint: ${config.glmApiEndpoint}`);
-    logger.debug(`GLM Model: ${config.glmModel}`);
-    logger.debug(`Max Tokens: ${config.maxTokens}`);
-    logger.debug(`Temperature: ${config.temperature}`);
-    logger.debug(`Log Level: ${config.logLevel}`);
-    logger.debug(`Cache Enabled: ${config.cacheEnabled}`);
-    logger.debug(`Permission Level: ${config.permissionLevel}`);
-
-    // Add cwd to config
-    config.cwd = process.cwd();
-
-    return config;
-  } catch (error) {
-    if (error instanceof z.ZodError) {
-      const errorMessages = error.errors.map((e) => `- ${e.path.join('.')}: ${e.message}`).join('\n');
-      throw new ConfigError(`Invalid configuration:\n${errorMessages}`, { errors: error.errors });
-    }
-
-    throw new ConfigError(`Failed to load configuration: ${error instanceof Error ? error.message : String(error)}`);
-  }
 }
 
 /**
- * Load project context from configuration files
- *
- * Searches for project configuration in:
- * 1. FLOYD.md
- * 2. AGENTS.md
- * 3. .floyd/config.md
+ * Load project context from FLOYD.md if it exists
  */
-export async function loadProjectContext(projectRoot: string): Promise<string | null> {
-  logger.debug(`Loading project context from ${projectRoot}...`);
+export function loadProjectContext(projectRoot?: string): string | undefined {
+  const root = projectRoot || process.cwd();
+  const floydMdPath = path.join(root, 'FLOYD.md');
 
-  const configPaths = [
-    path.join(projectRoot, 'FLOYD.md'),
-    path.join(projectRoot, 'AGENTS.md'),
-    path.join(projectRoot, '.floyd', 'config.md'),
-  ];
-
-  for (const configPath of configPaths) {
-    if (await fs.pathExists(configPath)) {
-      logger.debug(`Found project context at ${configPath}`);
-      const content = await fs.readFile(configPath, 'utf-8');
-      return content;
-    }
-  }
-
-  logger.debug('No project context found');
-  return null;
-}
-
-/**
- * Load ignore patterns from .floydignore
- */
-export async function loadFloydIgnore(projectRoot: string): Promise<string[]> {
-  const ignorePath = path.join(projectRoot, '.floydignore');
-  
-  if (await fs.pathExists(ignorePath)) {
+  if (fs.existsSync(floydMdPath)) {
     try {
-      const content = await fs.readFile(ignorePath, 'utf-8');
-      return content
-        .split('\n')
-        .map(line => line.trim())
-        .filter(line => line && !line.startsWith('#')); // Remove empty lines and comments
+      return fs.readFileSync(floydMdPath, 'utf-8');
     } catch (error) {
-      logger.warn(`Failed to read .floydignore: ${error}`);
+      console.warn(`Failed to read FLOYD.md: ${error}`);
     }
   }
-  
+
+  return undefined;
+}
+
+/**
+ * Load .floydignore patterns from the project
+ */
+export function loadFloydIgnore(projectRoot?: string): string[] {
+  const root = projectRoot || process.cwd();
+  const ignoreFile = path.join(root, '.floydignore');
+
+  if (fs.existsSync(ignoreFile)) {
+    try {
+      const content = fs.readFileSync(ignoreFile, 'utf-8');
+      return content.split('\n').filter(line => line.trim() && !line.startsWith('#'));
+    } catch (error) {
+      console.warn(`Failed to read .floydignore: ${error}`);
+    }
+  }
+
   return [];
 }
 
 /**
- * Get cache directory path
+ * Get cache path for FLOYD data
  */
-export function getCachePath(tier: 'reasoning' | 'project' | 'vault'): string {
-  return path.join(process.cwd(), '.floyd', 'cache', tier);
+export function getCachePath(): string {
+  return path.join(process.cwd(), '.floyd', 'cache');
 }
 
 /**
  * Ensure cache directories exist
  */
-export async function ensureCacheDirectories(): Promise<void> {
-  const cacheDir = path.join(process.cwd(), '.floyd', 'cache');
-
-  if (!(await fs.pathExists(cacheDir))) {
-    logger.debug('Creating cache directories...');
-    await fs.ensureDir(cacheDir);
-  }
-
-  const tiers: Array<'reasoning' | 'project' | 'vault'> = ['reasoning', 'project', 'vault'];
-
-  for (const tier of tiers) {
-    const tierPath = getCachePath(tier);
-    await fs.ensureDir(tierPath);
-    logger.debug(`Ensured cache directory exists: ${tierPath}`);
-  }
-}
-
-// ============================================================================
-// Configuration Helpers
-// ============================================================================
-
-/**
- * Validate configuration object
- */
-export function validateConfig(config: unknown): FloydConfig {
-  try {
-    return configSchema.parse(config) as FloydConfig;
-  } catch (error) {
-    if (error instanceof z.ZodError) {
-      const errorMessages = error.errors.map((e) => `- ${e.path.join('.')}: ${e.message}`).join('\n');
-      throw new ConfigError(`Invalid configuration:\n${errorMessages}`, { errors: error.errors });
-    }
-
-    throw new ConfigError(`Failed to validate configuration: ${error instanceof Error ? error.message : String(error)}`);
-  }
+export function ensureCacheDirectories(): void {
+  const cachePath = getCachePath();
+  fs.ensureDirSync(cachePath);
 }
 
 /**
- * Get default configuration values
- * Note: This excludes required fields like glmApiKey
+ * Get default configuration
  */
-export function getDefaultConfig(): Partial<z.infer<typeof configSchema>> {
+export function getDefaultConfig(): Partial<FloydConfig> {
   return {
-    glmApiEndpoint: 'https://api.z.ai/api/anthropic',
+    glmApiEndpoint: 'https://api.z.ai/api/coding/paas/v4',
     glmModel: 'glm-4.7',
     maxTokens: 100000,
     temperature: 0.7,
     maxTurns: 20,
+    useHardenedPrompt: false,
+    enablePreservedThinking: true,
+    enableTurnLevelThinking: true,
+    useJsonPlanning: true,
     logLevel: 'info',
     cacheEnabled: true,
     permissionLevel: 'ask',
+    mode: 'ask',
   };
 }
 
 /**
- * Merge configuration values (doesn't validate)
+ * Merge configs with defaults
  */
-export function mergeConfig(...configs: Partial<z.infer<typeof configSchema>>[]): Partial<z.infer<typeof configSchema>> {
-  const merged: Partial<z.infer<typeof configSchema>> = {};
-
-  for (const config of configs) {
-    Object.assign(merged, config);
-  }
-
-  return merged;
+export function mergeConfig(base: Partial<FloydConfig>, override: Partial<FloydConfig>): Partial<FloydConfig> {
+  return { ...base, ...override };
 }
 
-// ============================================================================
-// Environment Variable Helpers
-// ============================================================================
-
 /**
- * Get environment variable as boolean
+ * Get boolean from environment variable
  */
-export function getEnvBool(key: string, defaultValue: boolean = false): boolean {
+export function getEnvBool(key: string, defaultValue: boolean): boolean {
   const value = process.env[key];
-  if (value === undefined || value === '') {
-    return defaultValue;
-  }
+  if (value === undefined) return defaultValue;
   return value.toLowerCase() === 'true' || value === '1';
 }
 
 /**
- * Get environment variable as number
+ * Get number from environment variable
  */
 export function getEnvNumber(key: string, defaultValue: number): number {
   const value = process.env[key];
-  if (value === undefined || value === '') {
-    return defaultValue;
-  }
-  const parsed = parseInt(value, 10);
+  if (value === undefined) return defaultValue;
+  const parsed = parseFloat(value);
   return isNaN(parsed) ? defaultValue : parsed;
 }
 
 /**
- * Get environment variable as string
+ * Get string from environment variable
  */
-export function getEnvString(key: string, defaultValue: string = ''): string {
+export function getEnvString(key: string, defaultValue: string): string {
   return process.env[key] || defaultValue;
+}
+
+/**
+ * Get configuration summary for logging
+ */
+export function getConfigSummary(config: FloydConfig): string {
+  return `
+Floyd Wrapper Configuration:
+  GLM Model: ${config.glmModel}
+  Endpoint: ${config.glmApiEndpoint}
+  Max Tokens: ${config.maxTokens}
+  Max Turns: ${config.maxTurns}
+  Temperature: ${config.temperature}
+
+Feature Flags:
+  Hardened Prompt: ${config.useHardenedPrompt ? 'ENABLED' : 'DISABLED'}
+  Preserved Thinking: ${config.enablePreservedThinking ? 'ENABLED' : 'DISABLED'}
+  Turn-Level Thinking: ${config.enableTurnLevelThinking ? 'ENABLED' : 'DISABLED'}
+  JSON Planning: ${config.useJsonPlanning ? 'ENABLED' : 'DISABLED'}
+
+Execution:
+  Mode: ${config.mode.toUpperCase()}
+  Permission Level: ${config.permissionLevel}
+  Log Level: ${config.logLevel}
+  Cache: ${config.cacheEnabled ? 'ENABLED' : 'DISABLED'}
+  `;
+}
+
+/**
+ * Validate configuration
+ */
+export function validateConfig(config: FloydConfig): { valid: boolean; errors: string[] } {
+  const errors: string[] = [];
+
+  if (!config.glmApiKey) {
+    errors.push('FLOYD_GLM_API_KEY is required');
+  }
+
+  if (config.maxTokens < 1) {
+    errors.push('FLOYD_MAX_TOKENS must be positive');
+  }
+
+  if (config.temperature < 0 || config.temperature > 2) {
+    errors.push('FLOYD_TEMPERATURE must be between 0 and 2');
+  }
+
+  if (config.maxTurns < 1 || config.maxTurns > 100) {
+    errors.push('FLOYD_MAX_TURNS must be between 1 and 100');
+  }
+
+  return {
+    valid: errors.length === 0,
+    errors,
+  };
 }

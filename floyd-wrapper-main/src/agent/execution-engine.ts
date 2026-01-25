@@ -12,6 +12,7 @@ import { toolRegistry, registerCoreTools } from '../tools/index.js';
 import { permissionManager } from '../permissions/permission-manager.js';
 import { logger } from '../utils/logger.js';
 import { buildSystemPrompt } from '../prompts/system/index.js';
+import { buildHardenedSystemPrompt } from '../prompts/hardened/index.js';
 import type { SessionManager } from '../persistence/session-manager.js';
 
 // ============================================================================
@@ -91,9 +92,25 @@ export class FloydAgentEngine {
       });
     } else {
       // New session or no persistent history, start fresh
-      const systemPrompt = buildSystemPrompt({
-        workingDirectory: config.cwd,
-        projectContext: config.projectContext,
+      // Use hardened prompt system if feature flag is enabled
+      const systemPrompt = config.useHardenedPrompt
+        ? buildHardenedSystemPrompt({
+            workingDirectory: config.cwd,
+            projectContext: config.projectContext,
+            enablePreservedThinking: config.enablePreservedThinking,
+            enableTurnLevelThinking: config.enableTurnLevelThinking,
+            maxTurns: config.maxTurns,
+            useJsonPlanning: config.useJsonPlanning,
+          })
+        : buildSystemPrompt({
+            workingDirectory: config.cwd,
+            projectContext: config.projectContext,
+          });
+      
+      logger.info('System prompt loaded', {
+        hardened: config.useHardenedPrompt,
+        preservedThinking: config.enablePreservedThinking,
+        turnLevelThinking: config.enableTurnLevelThinking,
       });
 
       this.history = {

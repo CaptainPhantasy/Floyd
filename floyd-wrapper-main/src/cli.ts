@@ -22,6 +22,7 @@ import { StreamingDisplay } from './ui/rendering.js';
 import { renderMarkdown } from './ui/formatters.js';
 import { getMessageQueue } from './ui/message-queue.js';
 import { getMonitoringModule } from './ui/monitoring-module.js';
+import { getInterruptManager, type InterruptEvent } from './interrupts/index.js';
 
 // Load environment variables from multiple possible locations
 const envPaths = [
@@ -193,6 +194,12 @@ export class FloydCLI {
         slashCommands.register(cmd);
       }
 
+      // Register rewind & sandbox commands
+      const { rewindCommands } = await import('./commands/rewind-commands.js');
+      for (const cmd of rewindCommands) {
+        slashCommands.register(cmd);
+      }
+
       // Load custom commands from .floyd/commands/
       const customCount = await slashCommands.loadCustomCommands(process.cwd());
       if (customCount > 0) {
@@ -300,16 +307,23 @@ export class FloydCLI {
         });
       }
 
+      // Get interrupt manager for state tracking
+      const interruptMgr = getInterruptManager();
+
       // Create agent engine with callbacks
       this.engine = new FloydAgentEngine(this.config, {
         onToken: (token: string) => {
+          // Update state to streaming when receiving tokens
+          interruptMgr.setState('streaming');
           // Pass token to streaming display - it handles styling logic internally
-          // Note: Ideally StreamingDisplay should handle <think> parsing, 
-          // but for now we'll just stream it. 
+          // Note: Ideally StreamingDisplay should handle <think> parsing,
+          // but for now we'll just stream it.
           // FUTURE: We should detect <think> here if we want to change color *before* printing.
           this.streamingDisplay.appendToken(token);
         },
         onToolStart: (tool: string, input: Record<string, unknown>) => {
+          // Update state to tool executing
+          interruptMgr.setState('tool_executing');
           // Finish streaming display before showing tool execution
           if (this.streamingDisplay.isActive()) {
             this.streamingDisplay.finish();
@@ -321,16 +335,22 @@ export class FloydCLI {
         },
         onToolComplete: (tool: string, result: unknown) => {
           logger.debug('Tool completed', { tool, result });
+          // Return to thinking state (waiting for next LLM response)
+          interruptMgr.setState('thinking');
           // Clear tool from monitoring module
           const monitoring = getMonitoringModule();
           monitoring.clearTool();
         },
         onThinkingStart: () => {
+          // Update state to thinking
+          interruptMgr.setState('thinking');
           // Start Pink Floyd thinking phrase in monitoring module
           const monitoring = getMonitoringModule();
           monitoring.startThinking();
         },
         onThinkingComplete: () => {
+          // Return to idle state
+          interruptMgr.setState('idle');
           // Stop thinking in monitoring module
           const monitoring = getMonitoringModule();
           monitoring.stopThinking();
@@ -358,16 +378,78 @@ export class FloydCLI {
    * Setup signal handlers for graceful shutdown
    */
   private setupSignalHandlers(): void {
-    // Handle SIGINT (Ctrl+C)
+    // Initialize the interrupt manager for state-aware interrupt handling
+    const interruptManager = getInterruptManager({
+      consecutiveWindow: 2000,    // 2 seconds for consecutive detection
+      forceExitThreshold: 3,      // 3 rapid Ctrl+C = force exit
+      checkpointOnInterrupt: true, // Enable checkpoint on tool abort
+    });
+
+    interruptManager.initialize();
+
+    // Handle interrupt events based on current state
+    interruptManager.on('interrupt', (event: InterruptEvent) => {
+      switch (event.action) {
+        case 'force_exit':
+          console.log('\n\n⚠️  Force exit requested. Shutting down immediately...');
+          this.cleanup();
+          process.exit(0);
+          break;
+
+        case 'confirm_exit':
+          console.log('\n\n👋 Press Ctrl+C again to exit, or type a message to continue.');
+          this.rl?.prompt();
+          break;
+
+        case 'cancel_turn':
+          console.log('\n\n⏹️  Operation cancelled.');
+          // Finish any streaming display
+          if (this.streamingDisplay.isActive()) {
+            this.streamingDisplay.finish();
+            console.log(chalk.hex(CRUSH_THEME.colors.warning)('\n[Interrupted by user]'));
+          }
+          // Reset state to idle
+          interruptManager.setState('idle');
+          this.rl?.prompt();
+          break;
+
+        case 'abort_tool':
+          console.log('\n\n🛑 Tool execution aborted.');
+          // The AbortController signal will propagate to the running tool
+          // Finish streaming display
+          if (this.streamingDisplay.isActive()) {
+            this.streamingDisplay.finish();
+          }
+          console.log(chalk.hex(CRUSH_THEME.colors.warning)('[Tool aborted - session preserved]'));
+          interruptManager.setState('idle');
+          this.rl?.prompt();
+          break;
+
+        case 'clear_prompt':
+          // Just clear and show new prompt
+          console.log('');
+          this.rl?.prompt();
+          break;
+
+        case 'ignore':
+        default:
+          // Do nothing
+          break;
+      }
+
+      // Reset consecutive counter after handling
+      interruptManager.resetConsecutive();
+    });
+
+    // Store cleanup reference
     this.sigintHandler = () => {
-      console.log('\n\nReceived interrupt signal. Shutting down...');
-      this.shutdown();
+      interruptManager.cleanup();
     };
-    process.on('SIGINT', this.sigintHandler);
 
     // Use signal-exit for cleanup on all exit paths
     // Store the dispose function returned by onExit
     this.onExitCleanup = onExit(() => {
+      interruptManager.cleanup();
       this.cleanup();
     });
   }
@@ -662,17 +744,17 @@ export class FloydCLI {
 
         // Basic history loading (Note: Node's readline interface history API is limited
         // in older versions, but we can try to inject it if supported or just manually handle)
-        // Actually, standard Node `readline` doesn't have a simple public API to load history 
+        // Actually, standard Node `readline` doesn't have a simple public API to load history
         // array directly without creating a new instance with history option, but `createInterface`
-        // doesn't support passing an array in types easily. 
+        // doesn't support passing an array in types easily.
         // However, we can push to the internal history array if we are careful.
 
         // Safe approach: just let new session accumulate history, or verify if we can set it.
-        // Since we already created `rl` in initialize(), we might need to recreate it OR 
+        // Since we already created `rl` in initialize(), we might need to recreate it OR
         // just manual append to file for NOW and maybe in future use a better CLI lib.
 
-        // Wait, we CAN pass history to createInterface if we reconstruct it. 
-        // But let's just use the file for persistent storage across sessions. 
+        // Wait, we CAN pass history to createInterface if we reconstruct it.
+        // But let's just use the file for persistent storage across sessions.
         // For current session up-arrow, readline handles it in-memory.
         // If we want up-arrow to work for previous sessions, we need to load it.
 
