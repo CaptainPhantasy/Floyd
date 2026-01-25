@@ -2,7 +2,17 @@
  * Available Tools Registry
  *
  * Central source of truth for all available tools in Floyd CLI.
- * Used by HelpOverlay and SessionPanel to display tool states.
+ * Expanded to full 50-tool parity with floyd-wrapper.
+ *
+ * Tool Categories:
+ * - Core File Operations (7 tools)
+ * - Git Workflow (9 tools)
+ * - Search & Exploration (2 tools)
+ * - SUPERCACHE 3-Tier Memory (12 tools)
+ * - System Operations (3 tools)
+ * - Browser Automation (9 tools)
+ * - Patch Operations (5 tools)
+ * - Special Operations (3 tools)
  *
  * @module config/available-tools
  */
@@ -24,133 +34,496 @@ export interface ToolDefinition {
 	defaultEnabled: boolean;
 
 	/** Tool category for organization */
-	category: 'file' | 'code' | 'search' | 'build' | 'git' | 'cache' | 'browser' | 'terminal';
+	category: 'file' | 'code' | 'search' | 'build' | 'git' | 'cache' | 'browser' | 'terminal' | 'patch' | 'special';
+
+	/** Permission level: none=auto-approve, ask=prompt user, dangerous=warn+confirm */
+	permission?: 'none' | 'ask' | 'dangerous';
 }
 
 /**
- * Complete list of all available tools
+ * Complete list of all available tools (50 tools for floyd-wrapper parity)
  */
 export const AVAILABLE_TOOLS: ToolDefinition[] = [
-	// File operations
+	// =========================================================================
+	// CORE FILE OPERATIONS (7 tools) - #1-7
+	// =========================================================================
 	{
 		name: 'read_file',
 		displayName: 'Read File',
-		description: 'Read file contents from disk',
-		icon: '📄',
+		description: 'Read file contents from disk (uses file_path parameter)',
+		icon: '[F]',
 		defaultEnabled: true,
 		category: 'file',
+		permission: 'none',
 	},
 	{
 		name: 'write',
 		displayName: 'Write File',
-		description: 'Write or create files',
-		icon: '✍️',
+		description: 'Write or create files (full content replacement)',
+		icon: '[W]',
 		defaultEnabled: true,
 		category: 'file',
+		permission: 'ask',
 	},
 	{
 		name: 'edit_file',
 		displayName: 'Edit File',
-		description: 'Edit specific file sections',
-		icon: '✏️',
+		description: 'Edit specific file sections with search/replace',
+		icon: '[E]',
 		defaultEnabled: true,
 		category: 'file',
+		permission: 'ask',
 	},
 	{
 		name: 'search_replace',
 		displayName: 'Search & Replace',
-		description: 'Search and replace text in files',
-		icon: '🔄',
+		description: 'Search and replace text across files',
+		icon: '[R]',
 		defaultEnabled: true,
 		category: 'file',
+		permission: 'ask',
+	},
+	{
+		name: 'list_directory',
+		displayName: 'List Directory',
+		description: 'List files and directories in a path',
+		icon: '[D]',
+		defaultEnabled: true,
+		category: 'file',
+		permission: 'none',
+	},
+	{
+		name: 'move_file',
+		displayName: 'Move File',
+		description: 'Move or rename files and directories',
+		icon: '[M]',
+		defaultEnabled: true,
+		category: 'file',
+		permission: 'ask',
+	},
+	{
+		name: 'delete_file',
+		displayName: 'Delete File',
+		description: 'Delete files (dangerous - use with caution)',
+		icon: '[X]',
+		defaultEnabled: true,
+		category: 'file',
+		permission: 'dangerous',
 	},
 
-	// Code search and exploration
+	// =========================================================================
+	// GIT WORKFLOW (9 tools) - #8-16
+	// =========================================================================
+	{
+		name: 'git_status',
+		displayName: 'Git Status',
+		description: 'Show working tree status (USE FIRST before git ops)',
+		icon: '[S]',
+		defaultEnabled: true,
+		category: 'git',
+		permission: 'none',
+	},
+	{
+		name: 'git_add',
+		displayName: 'Git Add',
+		description: 'Stage files for commit',
+		icon: '[+]',
+		defaultEnabled: true,
+		category: 'git',
+		permission: 'ask',
+	},
+	{
+		name: 'git_commit',
+		displayName: 'Git Commit',
+		description: 'Commit staged changes with message',
+		icon: '[C]',
+		defaultEnabled: true,
+		category: 'git',
+		permission: 'ask',
+	},
+	{
+		name: 'git_diff',
+		displayName: 'Git Diff',
+		description: 'Show differences between commits/files',
+		icon: '[D]',
+		defaultEnabled: true,
+		category: 'git',
+		permission: 'none',
+	},
+	{
+		name: 'git_log',
+		displayName: 'Git Log',
+		description: 'Show commit history',
+		icon: '[L]',
+		defaultEnabled: true,
+		category: 'git',
+		permission: 'none',
+	},
+	{
+		name: 'git_branch',
+		displayName: 'Git Branch',
+		description: 'List, create, or delete branches',
+		icon: '[B]',
+		defaultEnabled: true,
+		category: 'git',
+		permission: 'ask',
+	},
+	{
+		name: 'git_checkout',
+		displayName: 'Git Checkout',
+		description: 'Switch branches or restore files',
+		icon: '[K]',
+		defaultEnabled: true,
+		category: 'git',
+		permission: 'ask',
+	},
+	{
+		name: 'git_stash',
+		displayName: 'Git Stash',
+		description: 'Stash and restore uncommitted changes',
+		icon: '[T]',
+		defaultEnabled: true,
+		category: 'git',
+		permission: 'ask',
+	},
+	{
+		name: 'git_merge',
+		displayName: 'Git Merge',
+		description: 'Merge branches together',
+		icon: '[G]',
+		defaultEnabled: true,
+		category: 'git',
+		permission: 'dangerous',
+	},
+
+	// =========================================================================
+	// SEARCH & EXPLORATION (2 tools) - #17-18
+	// =========================================================================
 	{
 		name: 'grep',
 		displayName: 'Grep',
-		description: 'Search file contents with patterns',
-		icon: '🔍',
+		description: 'Exact pattern matching with regex support',
+		icon: '[S]',
 		defaultEnabled: true,
 		category: 'search',
+		permission: 'none',
 	},
 	{
 		name: 'codebase_search',
 		displayName: 'Codebase Search',
-		description: 'Search entire codebase',
-		icon: '🌐',
+		description: 'Semantic search across entire codebase',
+		icon: '[Q]',
 		defaultEnabled: true,
 		category: 'search',
+		permission: 'none',
 	},
 
-	// Build and test
+	// =========================================================================
+	// SUPERCACHE - 3-TIER INTELLIGENT MEMORY (12 tools) - #19-30
+	// =========================================================================
+	{
+		name: 'cache_store',
+		displayName: 'Cache Store',
+		description: 'Store data in cache (project/reasoning/vault tier)',
+		icon: '[>]',
+		defaultEnabled: true,
+		category: 'cache',
+		permission: 'none',
+	},
+	{
+		name: 'cache_retrieve',
+		displayName: 'Cache Retrieve',
+		description: 'Retrieve data from cache by key',
+		icon: '[<]',
+		defaultEnabled: true,
+		category: 'cache',
+		permission: 'none',
+	},
+	{
+		name: 'cache_delete',
+		displayName: 'Cache Delete',
+		description: 'Delete specific cache entry',
+		icon: '[X]',
+		defaultEnabled: true,
+		category: 'cache',
+		permission: 'ask',
+	},
+	{
+		name: 'cache_clear',
+		displayName: 'Cache Clear',
+		description: 'Clear all entries in a cache tier',
+		icon: '[C]',
+		defaultEnabled: true,
+		category: 'cache',
+		permission: 'dangerous',
+	},
+	{
+		name: 'cache_list',
+		displayName: 'Cache List',
+		description: 'List all keys in a cache tier',
+		icon: '[L]',
+		defaultEnabled: true,
+		category: 'cache',
+		permission: 'none',
+	},
+	{
+		name: 'cache_search',
+		displayName: 'Cache Search',
+		description: 'Search cache by pattern or semantic query',
+		icon: '[?]',
+		defaultEnabled: true,
+		category: 'cache',
+		permission: 'none',
+	},
+	{
+		name: 'cache_stats',
+		displayName: 'Cache Stats',
+		description: 'Get cache statistics (hits, misses, size)',
+		icon: '[#]',
+		defaultEnabled: true,
+		category: 'cache',
+		permission: 'none',
+	},
+	{
+		name: 'cache_prune',
+		displayName: 'Cache Prune',
+		description: 'Remove expired or old cache entries',
+		icon: '[P]',
+		defaultEnabled: true,
+		category: 'cache',
+		permission: 'ask',
+	},
+	{
+		name: 'cache_store_pattern',
+		displayName: 'Store Pattern',
+		description: 'Store a reusable code/solution pattern',
+		icon: '[*]',
+		defaultEnabled: true,
+		category: 'cache',
+		permission: 'none',
+	},
+	{
+		name: 'cache_store_reasoning',
+		displayName: 'Store Reasoning',
+		description: 'Persist reasoning chain for future sessions',
+		icon: '[R]',
+		defaultEnabled: true,
+		category: 'cache',
+		permission: 'none',
+	},
+	{
+		name: 'cache_load_reasoning',
+		displayName: 'Load Reasoning',
+		description: 'Load previous reasoning chain',
+		icon: '[^]',
+		defaultEnabled: true,
+		category: 'cache',
+		permission: 'none',
+	},
+	{
+		name: 'cache_archive_reasoning',
+		displayName: 'Archive Reasoning',
+		description: 'Archive reasoning to vault tier',
+		icon: '[A]',
+		defaultEnabled: true,
+		category: 'cache',
+		permission: 'ask',
+	},
+
+	// =========================================================================
+	// SYSTEM OPERATIONS (3 tools) - #31-33
+	// =========================================================================
 	{
 		name: 'run',
 		displayName: 'Run Command',
-		description: 'Execute terminal commands',
-		icon: '▶️',
+		description: 'Execute shell commands (uses command parameter)',
+		icon: '[>]',
 		defaultEnabled: true,
 		category: 'build',
+		permission: 'ask',
 	},
-
-	// Git operations
 	{
-		name: 'git',
-		displayName: 'Git',
-		description: 'Git operations: status, diff, log, commit, branches',
-		icon: '📦',
+		name: 'ask_user',
+		displayName: 'Ask User',
+		description: 'Prompt user for input or confirmation',
+		icon: '[?]',
 		defaultEnabled: true,
-		category: 'git',
+		category: 'terminal',
+		permission: 'none',
+	},
+	{
+		name: 'fetch',
+		displayName: 'Fetch URL',
+		description: 'HTTP request to fetch remote content',
+		icon: '[U]',
+		defaultEnabled: true,
+		category: 'terminal',
+		permission: 'ask',
 	},
 
-	// Browser operations
+	// =========================================================================
+	// BROWSER AUTOMATION (9 tools) - #34-42
+	// =========================================================================
+	{
+		name: 'browser_status',
+		displayName: 'Browser Status',
+		description: 'Check browser connection (MUST USE FIRST)',
+		icon: '[.]',
+		defaultEnabled: false,
+		category: 'browser',
+		permission: 'none',
+	},
 	{
 		name: 'browser_navigate',
 		displayName: 'Browser Navigate',
-		description: 'Navigate and interact with web pages',
-		icon: '🌍',
+		description: 'Navigate to a URL in the browser',
+		icon: '[N]',
 		defaultEnabled: false,
 		category: 'browser',
+		permission: 'ask',
+	},
+	{
+		name: 'browser_read_page',
+		displayName: 'Browser Read Page',
+		description: 'Read current page content and DOM',
+		icon: '[R]',
+		defaultEnabled: false,
+		category: 'browser',
+		permission: 'none',
+	},
+	{
+		name: 'browser_screenshot',
+		displayName: 'Browser Screenshot',
+		description: 'Take a screenshot of current page',
+		icon: '[S]',
+		defaultEnabled: false,
+		category: 'browser',
+		permission: 'none',
+	},
+	{
+		name: 'browser_click',
+		displayName: 'Browser Click',
+		description: 'Click an element on the page',
+		icon: '[C]',
+		defaultEnabled: false,
+		category: 'browser',
+		permission: 'ask',
+	},
+	{
+		name: 'browser_type',
+		displayName: 'Browser Type',
+		description: 'Type text into an input field',
+		icon: '[T]',
+		defaultEnabled: false,
+		category: 'browser',
+		permission: 'ask',
+	},
+	{
+		name: 'browser_find',
+		displayName: 'Browser Find',
+		description: 'Find elements by CSS selector or XPath',
+		icon: '[F]',
+		defaultEnabled: false,
+		category: 'browser',
+		permission: 'none',
+	},
+	{
+		name: 'browser_get_tabs',
+		displayName: 'Browser Get Tabs',
+		description: 'List all open browser tabs',
+		icon: '[G]',
+		defaultEnabled: false,
+		category: 'browser',
+		permission: 'none',
+	},
+	{
+		name: 'browser_create_tab',
+		displayName: 'Browser Create Tab',
+		description: 'Open a new browser tab',
+		icon: '[+]',
+		defaultEnabled: false,
+		category: 'browser',
+		permission: 'ask',
 	},
 
-	// Cache (via MCP server)
+	// =========================================================================
+	// PATCH OPERATIONS (5 tools) - #43-47
+	// =========================================================================
 	{
-		name: 'cache',
-		displayName: 'Cache',
-		description: 'SUPERCACHE - 3-tier caching system',
-		icon: '💾',
+		name: 'apply_unified_diff',
+		displayName: 'Apply Unified Diff',
+		description: 'Apply unified diffs (SAFEST for multi-file changes)',
+		icon: '[P]',
 		defaultEnabled: true,
-		category: 'cache',
+		category: 'patch',
+		permission: 'ask',
+	},
+	{
+		name: 'edit_range',
+		displayName: 'Edit Range',
+		description: 'Edit a specific line range in a file',
+		icon: '[E]',
+		defaultEnabled: true,
+		category: 'patch',
+		permission: 'ask',
+	},
+	{
+		name: 'insert_at',
+		displayName: 'Insert At',
+		description: 'Insert content at a specific line',
+		icon: '[I]',
+		defaultEnabled: true,
+		category: 'patch',
+		permission: 'ask',
+	},
+	{
+		name: 'delete_range',
+		displayName: 'Delete Range',
+		description: 'Delete a range of lines from a file',
+		icon: '[X]',
+		defaultEnabled: true,
+		category: 'patch',
+		permission: 'dangerous',
+	},
+	{
+		name: 'assess_patch_risk',
+		displayName: 'Assess Patch Risk',
+		description: 'Analyze risk before applying patch',
+		icon: '[!]',
+		defaultEnabled: true,
+		category: 'patch',
+		permission: 'none',
 	},
 
-	// Patch server (via MCP)
+	// =========================================================================
+	// SPECIAL OPERATIONS (3 tools) - #48-50
+	// =========================================================================
 	{
-		name: 'patch',
-		displayName: 'Patch',
-		description: 'Apply unified diffs, edit ranges, insert/delete content',
-		icon: '🩹',
+		name: 'verify',
+		displayName: 'Verify',
+		description: 'Explicit verification tool - confirm changes work',
+		icon: '[OK]',
 		defaultEnabled: true,
-		category: 'code',
+		category: 'special',
+		permission: 'none',
 	},
-
-	// Runner server (via MCP)
 	{
-		name: 'runner',
-		displayName: 'Runner',
-		description: 'Detect projects, run tests, format, lint, build',
-		icon: '🏃',
+		name: 'safe_refactor',
+		displayName: 'Safe Refactor',
+		description: 'Refactor with automatic rollback on failure',
+		icon: '[*]',
 		defaultEnabled: true,
-		category: 'build',
+		category: 'special',
+		permission: 'ask',
 	},
-
-	// Explorer server (via MCP)
 	{
-		name: 'explorer',
-		displayName: 'Explorer',
-		description: 'Codebase exploration: project map, symbol listing',
-		icon: '🗺️',
+		name: 'impact_simulate',
+		displayName: 'Impact Simulate',
+		description: 'Simulate impact of changes before applying',
+		icon: '[~]',
 		defaultEnabled: true,
-		category: 'search',
+		category: 'special',
+		permission: 'none',
 	},
 ];
 
@@ -199,4 +572,50 @@ export function getDefaultToolStates(): Array<{name: string; enabled: boolean; i
 export function getToolDisplayName(name: string): string {
 	const tool = getTool(name);
 	return tool?.displayName || name;
+}
+
+/**
+ * Get tools count by category
+ */
+export function getToolCountByCategory(): Record<string, number> {
+	const counts: Record<string, number> = {};
+	for (const tool of AVAILABLE_TOOLS) {
+		counts[tool.category] = (counts[tool.category] || 0) + 1;
+	}
+	return counts;
+}
+
+/**
+ * Get total tool count
+ */
+export function getTotalToolCount(): number {
+	return AVAILABLE_TOOLS.length;
+}
+
+/**
+ * Get tool statistics
+ */
+export function getToolStats(): {
+	total: number;
+	enabled: number;
+	disabled: number;
+	byCategory: Record<string, number>;
+	byPermission: Record<string, number>;
+} {
+	const byCategory: Record<string, number> = {};
+	const byPermission: Record<string, number> = {};
+
+	for (const tool of AVAILABLE_TOOLS) {
+		byCategory[tool.category] = (byCategory[tool.category] || 0) + 1;
+		const perm = tool.permission || 'ask';
+		byPermission[perm] = (byPermission[perm] || 0) + 1;
+	}
+
+	return {
+		total: AVAILABLE_TOOLS.length,
+		enabled: AVAILABLE_TOOLS.filter(t => t.defaultEnabled).length,
+		disabled: AVAILABLE_TOOLS.filter(t => !t.defaultEnabled).length,
+		byCategory,
+		byPermission,
+	};
 }

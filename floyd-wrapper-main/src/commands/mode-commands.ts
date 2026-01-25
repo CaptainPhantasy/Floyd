@@ -25,8 +25,10 @@ export const modeCommand: SlashCommand = {
             ctx.terminal.blank();
             ctx.terminal.info('Available Modes:');
             ctx.terminal.info('  ask      - Default mode. Asks for permission before executing tools.');
-            ctx.terminal.info('  yolo     - Autonomous mode. Executes "safe" tools without permission.');
-            ctx.terminal.info('  plan     - Planning mode. analyses but does not execute changes.');
+            ctx.terminal.info('  yolo     - Auto-approves SAFE/MODERATE tools. DANGEROUS tools need approval.');
+            ctx.terminal.info('            SAFE: read operations. MODERATE: fetch, git branch, stage.');
+            ctx.terminal.info('            DANGEROUS: write, run, delete, git commit (DENIED in piped mode)');
+            ctx.terminal.info('  plan     - Planning mode. Analyzes but does not execute changes.');
             ctx.terminal.info('  auto     - Agent decides appropriate mode based on request.');
             ctx.terminal.info('  dialogue - Quick chat mode. One line at a time, no code blocks.');
             return;
@@ -41,6 +43,11 @@ export const modeCommand: SlashCommand = {
         // Set the mode
         process.env.FLOYD_MODE = newMode;
 
+        // Update system prompt in conversation history to reflect new mode
+        if (ctx.engine && typeof ctx.engine.updateSystemPrompt === 'function') {
+            ctx.engine.updateSystemPrompt();
+        }
+
         ctx.terminal.success(`Switched to ${newMode.toUpperCase()} mode.`);
 
         switch (newMode) {
@@ -48,7 +55,10 @@ export const modeCommand: SlashCommand = {
                 ctx.terminal.muted('Floyd will ask for permission before executing tools.');
                 break;
             case 'yolo':
-                ctx.terminal.warning('⚠️  Floyd will execute safe tools AUTOMATICALLY.');
+                ctx.terminal.warning('⚠️  YOLO MODE: Auto-approves SAFE tools only.');
+                ctx.terminal.muted('SAFE: read-only tools + moderate operations (fetch, branch, stage)');
+                ctx.terminal.muted('DANGEROUS: write, run, delete, git_commit STILL require approval');
+                ctx.terminal.muted('NOTE: In piped/non-TTY mode, dangerous tools are DENIED (cannot prompt)');
                 break;
             case 'plan':
                 ctx.terminal.info('Floyd will create plans but NOT edit files.');

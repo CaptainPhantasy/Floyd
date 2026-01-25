@@ -70,8 +70,8 @@ function AgentNameStep({agentName, onChange, onSubmit, onCancel}: AgentNameStepP
 			process.exit(0);
 			return;
 		}
-		// Ctrl+C - Close this overlay
-		if (key.ctrl && input === 'c') {
+		// Esc or Ctrl+C - Close this overlay
+		if (key.escape || (key.ctrl && input === 'c')) {
 			onCancel();
 			return;
 		}
@@ -150,8 +150,8 @@ function CapabilitiesStep({
 			process.exit(0);
 			return;
 		}
-		// Ctrl+C - Close this overlay
-		if (key.ctrl && input === 'c') {
+		// Esc or Ctrl+C - Close this overlay
+		if (key.escape || (key.ctrl && input === 'c')) {
 			onCancel();
 			return;
 		}
@@ -256,8 +256,8 @@ function SystemPromptStep({prompt, onChange, onSubmit, onCancel}: SystemPromptSt
 			process.exit(0);
 			return;
 		}
-		// Ctrl+C - Close this overlay
-		if (key.ctrl && input === 'c') {
+		// Esc or Ctrl+C - Close this overlay
+		if (key.escape || (key.ctrl && input === 'c')) {
 			onCancel();
 			return;
 		}

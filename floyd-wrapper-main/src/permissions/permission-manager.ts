@@ -77,14 +77,13 @@ export class PermissionManager {
       return false;
     }
 
-    // Check permission level
+    // Check permission level - always auto-approve 'none' permission tools
     if (tool.permission === 'none') {
-      // Auto-approve tools with 'none' permission level
       logger.debug(`Auto-approving tool: ${toolName} (permission: none)`);
       return true;
     }
 
-    // Auto-confirm mode: approve all non-dangerous tools
+    // Auto-confirm mode (for testing): approve all non-dangerous tools
     if (this.autoConfirm && tool.permission !== 'dangerous') {
       logger.debug(`Auto-confirm approved: ${toolName}`);
       return true;

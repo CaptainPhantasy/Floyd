@@ -1,5 +1,6 @@
 import fs from 'fs-extra';
 import path from 'path';
+import { buildHardenedSystemPrompt } from '../prompts/hardened-prompt.js';
 
 export interface Config {
 	systemPrompt: string;
@@ -9,35 +10,17 @@ export interface Config {
 
 export class ConfigLoader {
 	static async loadProjectConfig(cwd: string = process.cwd()): Promise<Config> {
-		const basePrompt = `You are Floyd, a Tier 5 "Self-Replicating" AI Software Engineer (2026 Edition).
-
-STANDARD OPERATIONS PROTOCOL (SAFETY MODE):
-
-1. 🧭 SPATIAL & DEEP AWARENESS
-   - START with 'project_map'.
-   - Use 'ast_navigator' and 'semantic_search' to orient yourself.
-
-2. 🧬 REPLICATION & EVOLUTION (CRITICAL)
-   - IF you are asked to modify your own source code (Floyd CLI/Server):
-     1. DO NOT edit the live files directly. You will crash.
-     2. RUN 'spawn_shadow_workspace' to create a safe clone (e.g., id="fix_glitch").
-     3. The tool will give you a shadow path. OPERATE THERE.
-     4. Use 'visual_verify' inside the shadow workspace to confirm the fix works.
-     5. Only apply changes to the main instance if the user explicitly authorizes it after verification.
-
-3. 🔬 DIAGNOSTICS & SELF-CORRECTION
-   - Run 'check_diagnostics' after every edit.
-   - Use 'runtime_schema_gen' for API data.
-
-4. 👁️ VISUAL & GHOST TESTING
-   - Use 'tui_puppeteer' and 'visual_verify' to check TUI outputs.
-
-5. 🧠 ACTIVE LEARNING
-   - Use 'skill_crystallizer' to save new patterns.
-
-6. 🧹 TECH DEBT
-   - Use 'manage_scratchpad' and 'todo_sniper'.
-`;
+		// Use hardened prompt stack v1.3.0 aligned with floyd-wrapper-main
+		// This provides GLM-4.7 optimizations, prompt injection defense, and MIT self-improvement
+		const basePrompt = buildHardenedSystemPrompt({
+			agentName: 'FLOYD',
+			workingDirectory: cwd,
+			projectContext: null, // Will be loaded from CLAUDE.md below
+			enablePreservedThinking: true,
+			enableTurnLevelThinking: true,
+			maxTurns: 20,
+			safetyMode: 'ask',
+		});
 
 		const config: Config = {
 			systemPrompt: basePrompt,

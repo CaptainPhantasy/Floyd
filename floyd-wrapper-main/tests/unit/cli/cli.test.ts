@@ -6,9 +6,9 @@
  */
 
 import test from 'ava';
-import { FloydCLI } from '../../../src/cli.ts';
-import { FloydTerminal } from '../../../src/ui/terminal.ts';
-import { StreamingDisplay } from '../../../src/ui/rendering.ts';
+import { FloydCLI } from '../../../dist/cli.js';
+import { FloydTerminal } from '../../../dist/ui/terminal.js';
+import { StreamingDisplay } from '../../../dist/ui/rendering.js';
 
 // ============================================================================
 // Test Setup

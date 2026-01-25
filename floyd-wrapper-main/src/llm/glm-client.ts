@@ -1,7 +1,14 @@
 /**
+ * ⚠️ DO NOT MODIFY WITHOUT PERMISSION - VERIFIED WORKING CONFIGURATION
  * GLM Client - Floyd Wrapper
  *
  * GLM-4.7 API client with streaming support and SSE parsing.
+ *
+ * PRIMARY: GLM-4.7 Coding Plan API (https://api.z.ai/api/coding/paas/v4)
+ * FORMAT: OpenAI-compatible (NOT Anthropic format)
+ *
+ * BREAKING CHANGE: Modifying streaming logic or tool call parsing will break tool calling
+ * VERIFIED WORKING: 2026-01-25 - SSE parsing and tool calling tested
  */
 
 import type { FloydConfig, FloydMessage, StreamEvent } from '../types.js';
@@ -59,7 +66,12 @@ export interface GLMStreamOptions {
 // ============================================================================
 
 /**
- * GLM-4.7 API client with streaming support
+ * ⚠️ DO NOT MODIFY - GLM-4.7 API client with streaming support
+ *
+ * CRITICAL: This client uses OpenAI-compatible format for GLM Coding Plan API
+ * Endpoint: https://api.z.ai/api/coding/paas/v4
+ *
+ * Modifying constructor, streamChat, or processSSEEvent will break tool calling
  */
 export class GLMClient {
   private apiKey: string;

@@ -320,6 +320,10 @@ interface OverlaySlice {
 	showConfig: boolean;
 	/** Session switcher overlay visibility */
 	showSessionSwitcher: boolean;
+	/** File picker overlay visibility */
+	showFilePicker: boolean;
+	/** Diff preview overlay visibility */
+	showDiffPreview: boolean;
 	/** Set overlay visibility by name */
 	setOverlay: (name: keyof OverlayState, value: boolean) => void;
 	/** Toggle overlay by name */
@@ -342,6 +346,8 @@ type OverlayState = Pick<
 	| 'showCommandPalette'
 	| 'showConfig'
 	| 'showSessionSwitcher'
+	| 'showFilePicker'
+	| 'showDiffPreview'
 >;
 
 /**
@@ -478,6 +484,8 @@ const initialOverlayState: Omit<
 	showCommandPalette: false,
 	showConfig: false,
 	showSessionSwitcher: false,
+	showFilePicker: false,
+	showDiffPreview: false,
 };
 
 const initialDashboardState: Omit<
@@ -573,6 +581,8 @@ export const useFloydStore = create<FloydStore>()(
 					showCommandPalette: false,
 					showConfig: false,
 					showSessionSwitcher: false,
+					showFilePicker: false,
+					showDiffPreview: false,
 				}),
 
 			hasOpenOverlay: () => {
@@ -584,7 +594,9 @@ export const useFloydStore = create<FloydStore>()(
 					state.showAgentBuilder ||
 					state.showCommandPalette ||
 					state.showConfig ||
-					state.showSessionSwitcher
+					state.showSessionSwitcher ||
+					state.showFilePicker ||
+					state.showDiffPreview
 				);
 			},
 
@@ -1228,7 +1240,9 @@ export const selectHasOpenOverlay = (state: FloydStore) =>
 	state.showAgentBuilder ||
 	state.showCommandPalette ||
 	state.showConfig ||
-	state.showSessionSwitcher;
+	state.showSessionSwitcher ||
+	state.showFilePicker ||
+	state.showDiffPreview;
 
 /**
  * Get dashboard metrics

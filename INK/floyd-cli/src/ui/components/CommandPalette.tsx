@@ -146,7 +146,7 @@ export function CommandPalette({
 	onOpen,
 	onCommandSelected,
 	placeholder = 'Type a command or search...',
-	maxVisible = 8,
+	maxVisible = 50,
 	fuzzy = true,
 }: CommandPaletteProps) {
 	const [query, setQuery] = useState('');
@@ -292,7 +292,7 @@ export function CommandPalette({
 						value={query}
 						onChange={setQuery}
 						placeholder={placeholder}
-						focus={!isOpen}
+						focus={true}
 					/>
 				</Box>
 
@@ -475,87 +475,90 @@ export function CommandPaletteTrigger({
 
 /**
  * Quick command definitions for common Floyd actions
+ * NOTE: Actions are placeholders - app.tsx MUST override these with real handlers
+ * via createCommandsWithHandlers() or augmentedCommands pattern
  */
 export const commonCommands: CommandItem[] = [
 	{
 		id: 'new-task',
 		label: 'New Task',
 		description: 'Create a new task/conversation',
-		icon: '📝',
+		icon: '[+]',
 		shortcut: '^N',
-		action: () => {
-			// Implementation would be provided by the app
-		},
+		// Placeholder - will be overridden by app.tsx
+		action: () => { /* Override in app.tsx */ },
 	},
 	{
 		id: 'open-file',
 		label: 'Open File',
 		description: 'Open a file in the editor',
-		icon: '📄',
+		icon: '[F]',
 		shortcut: '^O',
-		action: () => {
-			// Implementation would be provided by the app
-		},
+		insertText: '/open ',
+		action: () => { /* Override in app.tsx */ },
 	},
 	{
 		id: 'search-files',
 		label: 'Search Files',
 		description: 'Search across all files in the project',
-		icon: '🔍',
+		icon: '[S]',
 		shortcut: '^F',
-		action: () => {
-			// Implementation would be provided by the app
-		},
+		insertText: '/search ',
+		action: () => { /* Override in app.tsx */ },
 	},
 	{
 		id: 'run-command',
 		label: 'Run Command',
 		description: 'Execute a shell command',
-		icon: '⚡',
+		icon: '[!]',
 		shortcut: '^R',
-		action: () => {
-			// Implementation would be provided by the app
-		},
+		insertText: '/run ',
+		action: () => { /* Override in app.tsx */ },
 	},
 	{
 		id: 'view-history',
 		label: 'View History',
 		description: 'View conversation history',
-		icon: '📜',
-		action: () => {
-			// Implementation would be provided by the app
-		},
+		icon: '[H]',
+		action: () => { /* Override in app.tsx */ },
 	},
 	{
 		id: 'settings',
 		label: 'Settings',
 		description: 'Open Floyd settings',
-		icon: '⚙️',
+		icon: '[C]',
 		shortcut: '^,',
-		action: () => {
-			// Implementation would be provided by the app
-		},
+		action: () => { /* Override in app.tsx */ },
 	},
 	{
 		id: 'help',
 		label: 'Help',
 		description: 'Show help and documentation',
-		icon: '❓',
+		icon: '[?]',
 		shortcut: 'F1',
-		action: () => {
-			// Implementation would be provided by the app
-		},
+		action: () => { /* Override in app.tsx */ },
 	},
 	{
 		id: 'exit',
 		label: 'Exit',
 		description: 'Exit Floyd CLI',
-		icon: '👋',
+		icon: '[X]',
 		shortcut: '^Q',
-		action: () => {
-			// Implementation would be provided by the app
-		},
+		action: () => { /* Override in app.tsx */ },
 	},
 ];
+
+/**
+ * Create commands with proper handlers from app.tsx
+ * This is the recommended way to wire up command actions
+ */
+export function createCommandsWithHandlers(
+	handlers: Record<string, () => void | Promise<void>>
+): CommandItem[] {
+	return commonCommands.map(cmd => ({
+		...cmd,
+		action: handlers[cmd.id] || cmd.action,
+	}));
+}
 
 export default CommandPalette;

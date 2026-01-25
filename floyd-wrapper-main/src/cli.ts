@@ -58,6 +58,7 @@ const cli = meow(
     --tui         Launch full TUI mode (Ink-based UI)
     --bridge      Start mobile bridge server
     --resume      Resume specific session (id or name)
+    --mode        Set initial execution mode (ask, yolo, plan, auto, dialogue)
     --version     Show version number
 
   Examples
@@ -65,6 +66,7 @@ const cli = meow(
     $ floyd --tui        # Launch full TUI mode
     $ floyd --bridge     # Start mobile bridge server
     $ floyd --debug
+    $ floyd --mode yolo  # Start in YOLO mode
     $ floyd-tui          # Alternative way to launch TUI
 `,
   {
@@ -83,6 +85,9 @@ const cli = meow(
         default: false,
       },
       resume: {
+        type: 'string',
+      },
+      mode: {
         type: 'string',
       },
     },
@@ -147,9 +152,22 @@ export class FloydCLI {
         logger.setLevel('warn'); // Only show warnings and errors by default
       }
 
+      // Set execution mode from CLI flag if provided
+      if (cli.flags.mode) {
+        const validModes = ['ask', 'yolo', 'plan', 'auto', 'dialogue'];
+        const mode = cli.flags.mode.toLowerCase();
+        if (validModes.includes(mode)) {
+          process.env.FLOYD_MODE = mode;
+          logger.info('Execution mode set from flag', { mode });
+        } else {
+          this.terminal.warning(`Invalid mode: ${mode}. Using default: ask`);
+        }
+      }
+
       logger.info('Initializing Floyd CLI...', {
         version: cli.pkg.version,
         debug: cli.flags.debug,
+        mode: process.env.FLOYD_MODE || 'ask',
       });
 
       // Initialize Session Manager
@@ -305,6 +323,11 @@ export class FloydCLI {
             this.shutdown();
           }
         });
+
+        // Handle Shift+Tab for mode switching (only in TTY mode)
+        if (process.stdin.isTTY) {
+          this.setupModeSwitching();
+        }
       }
 
       // Get interrupt manager for state tracking
@@ -357,10 +380,38 @@ export class FloydCLI {
         },
       }, this.sessionManager);
 
-      // Import permission manager and set to auto-approve mode
-      // NOTE: Interactive permission prompts conflict with readline, so we auto-approve for now
+      // Import permission manager and set up proper permission prompting
       const { permissionManager } = await import('./permissions/permission-manager.js');
-      permissionManager.setAutoConfirm(true);
+
+      // Set up permission prompt function that respects execution modes
+      permissionManager.setPromptFunction(async (prompt: string, permissionLevel: 'moderate' | 'dangerous') => {
+        // CRITICAL: In piped/non-TTY mode, we cannot prompt interactively
+        // Check TTY status first before attempting any readline operations
+        if (!process.stdin.isTTY) {
+          logger.warn('Permission denied: Cannot prompt in non-interactive mode (piped input).');
+          logger.info('For automation, use: --mode yolo (auto-approves safe tools) or --mode plan (read-only)');
+          return false;
+        }
+
+        // Pause readline to show prompt
+        if (this.rl) {
+          this.rl.pause();
+        }
+
+        // Show permission prompt
+        console.log(prompt);
+
+        // Create temporary readline for permission input
+        const response = await this.promptForPermission(permissionLevel);
+
+        // Resume main readline
+        if (this.rl) {
+          this.rl.resume();
+          this.rl.prompt();
+        }
+
+        return response;
+      });
 
       // Handle Ctrl+C gracefully (skip in test mode)
       if (!this.testMode) {
@@ -475,6 +526,107 @@ export class FloydCLI {
   private showCursor(): void {
     // ANSI escape code to show cursor
     process.stdout.write('\x1B[?25h');
+  }
+
+  /**
+   * Prompt user for permission (yes/no)
+   *
+   * CRITICAL: In piped/non-TTY mode, stdin is already consumed and cannot be used
+   * for interactive prompts. This function detects that condition and denies
+   * permission rather than crashing with ERR_USE_AFTER_CLOSE.
+   */
+  private async promptForPermission(permissionLevel: 'moderate' | 'dangerous'): Promise<boolean> {
+    // In non-interactive mode (piped input), we cannot create a readline interface
+    // because stdin is either already consumed or will close immediately.
+    // Auto-deny to prevent ERR_USE_AFTER_CLOSE crash.
+    if (!process.stdin.isTTY) {
+      logger.warn('Permission denied: Cannot prompt in non-interactive mode (piped input).');
+      logger.info('For automation, use: --mode yolo (auto-approves safe tools) or --mode plan (read-only)');
+      return false;
+    }
+
+    return new Promise<boolean>((resolve) => {
+      const tempRl = readline.createInterface({
+        input: process.stdin,
+        output: process.stdout,
+      });
+
+      const promptText = permissionLevel === 'dangerous'
+        ? '⚠️  Approve DANGEROUS operation? (yes/no): '
+        : 'Approve this operation? (yes/no): ';
+
+      tempRl.question(promptText, (answer) => {
+        tempRl.close();
+        const normalized = answer.trim().toLowerCase();
+        resolve(normalized === 'y' || normalized === 'yes');
+      });
+    });
+  }
+
+  /**
+   * Setup Shift+Tab mode switching
+   */
+  private setupModeSwitching(): void {
+    // Modes in order: ask -> yolo -> plan -> auto -> dialogue -> ask
+    const modes: Array<'ask' | 'yolo' | 'plan' | 'auto' | 'dialogue'> = ['ask', 'yolo', 'plan', 'auto', 'dialogue'];
+
+    // Get the input stream from readline
+    const input = this.rl ? (this.rl as any).input : null;
+
+    if (input && input.isTTY) {
+      // Add our keypress listener WITHOUT removing readline's listener
+      // This allows normal typing to continue working
+      input.on('keypress', (_str: string, key: any) => {
+        // Detect Shift+Tab: key.name === 'tab' && key.shift
+        if (key && key.name === 'tab' && key.shift) {
+          // Get current mode
+          const currentMode = (process.env.FLOYD_MODE as 'ask' | 'yolo' | 'plan' | 'auto' | 'dialogue') || 'ask';
+          const currentIndex = modes.indexOf(currentMode);
+
+          // Cycle to next mode
+          const nextMode = modes[(currentIndex + 1) % modes.length];
+          process.env.FLOYD_MODE = nextMode;
+
+          // Update system prompt in conversation history to reflect new mode
+          if (this.engine && typeof (this.engine as any).updateSystemPrompt === 'function') {
+            (this.engine as any).updateSystemPrompt();
+          }
+
+          // Clear current line and show mode change notification
+          readline.clearLine(process.stdout, 0);
+          readline.moveCursor(process.stdout, 0, -1);
+          console.log('');
+
+          this.terminal.info(`Mode switched to: ${nextMode.toUpperCase()}`);
+
+          switch (nextMode) {
+            case 'ask':
+              this.terminal.muted('Floyd will ask for permission before executing tools.');
+              break;
+            case 'yolo':
+              this.terminal.warning('⚠️  YOLO MODE: Auto-approves SAFE tools only.');
+              this.terminal.muted('SAFE: read-only tools + moderate operations (fetch, branch, stage)');
+              this.terminal.muted('DANGEROUS: write, run, delete, git_commit STILL require approval');
+              this.terminal.muted('NOTE: In piped/non-TTY mode, dangerous tools are DENIED (cannot prompt)');
+              break;
+            case 'plan':
+              this.terminal.info('Floyd will create plans but NOT edit files.');
+              break;
+            case 'auto':
+              this.terminal.info('Floyd will decide the best mode for each request.');
+              break;
+            case 'dialogue':
+              this.terminal.info('💬 Quick chat mode. Floyd responds one line at a time.');
+              break;
+          }
+
+          console.log('');
+
+          // Re-show prompt
+          this.rl?.prompt();
+        }
+      });
+    }
   }
 
   /**

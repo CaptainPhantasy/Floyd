@@ -1,8 +1,11 @@
 /**
+ * ⚠️ DO NOT MODIFY WITHOUT PERMISSION - VERIFIED WORKING CONFIGURATION
  * Constants - Floyd Wrapper
  *
  * Application-wide constants including version numbers, default configuration,
  * CRUSH branding, and ASCII logo.
+ *
+ * PRIMARY: GLM-4.7 Coding Plan API (https://api.z.ai/api/coding/paas/v4)
  */
 
 import chalk from 'chalk';
@@ -20,10 +23,15 @@ export const FLOYD_FULL_NAME = 'File-Logged Orchestrator Yielding Deliverables' 
 // ============================================================================
 
 /**
- * Default Floyd Wrapper configuration
+ * ⚠️ DO NOT MODIFY - Default Floyd Wrapper configuration
+ *
+ * CRITICAL: GLM-4.7 Coding Plan endpoint uses OpenAI-compatible format
+ * Endpoint: https://api.z.ai/api/coding/paas/v4
+ *
+ * BREAKING CHANGE: Modifying endpoint will break tool calling
  */
 export const DEFAULT_CONFIG = {
-  glmApiEndpoint: 'https://api.z.ai/api/anthropic',
+  glmApiEndpoint: 'https://api.z.ai/api/coding/paas/v4',
   glmModel: 'glm-4.7',
   maxTokens: 100000,
   temperature: 0.7,

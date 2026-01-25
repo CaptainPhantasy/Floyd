@@ -5,9 +5,9 @@
  */
 
 import test from 'ava';
-import { PermissionManager } from '../../../src/permissions/permission-manager.ts';
-import { toolRegistry } from '../../../src/tools/tool-registry.ts';
-import { registerCoreTools } from '../../../src/tools/index.ts';
+import { PermissionManager } from '../../../dist/permissions/permission-manager.js';
+import { toolRegistry } from '../../../dist/tools/tool-registry.js';
+import { registerCoreTools } from '../../../dist/tools/index.js';
 
 // ============================================================================
 // Test Setup
@@ -218,7 +218,7 @@ test('unit: permission_manager - handles browser tools', async (t) => {
   t.true(result, 'Should approve browser tools in auto-confirm mode');
 });
 
-test('unit: permission_manager - handles build tools', async (t) => {
+test('unit: permission_manager - handles dangerous tools (delete_file)', async (t) => {
   // FIXED: Uses mock prompt function instead of interactive stdin
   const pm = new PermissionManager();
   pm.setAutoConfirm(false);
@@ -226,12 +226,12 @@ test('unit: permission_manager - handles build tools', async (t) => {
   // Set mock prompt to approve the request
   pm.setPromptFunction(async () => true);
 
-  // build has 'dangerous' permission level
-  const result = await pm.requestPermission('build', {
-    projectPath: '/tmp/test',
+  // delete_file has 'dangerous' permission level
+  const result = await pm.requestPermission('delete_file', {
+    filePath: '/tmp/test.txt',
   });
 
-  t.true(result, 'Should approve dangerous build tools when prompt returns true');
+  t.true(result, 'Should approve dangerous tools when prompt returns true');
 });
 
 test('unit: permission_manager - multiple permission requests maintain state', async (t) => {

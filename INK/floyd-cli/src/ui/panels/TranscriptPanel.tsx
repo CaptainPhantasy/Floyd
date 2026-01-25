@@ -125,7 +125,7 @@ function TranscriptPanelInner({
 							{/* Message header */}
 							<Box flexDirection="row" gap={1} marginBottom={1}>
 								<Text color={getMessageColor(msg.role)} bold>
-									{msg.role === 'user' ? '❯' : '✦'} {getLabel(msg.role)}
+									{msg.role === 'user' ? '>' : '*'} {getLabel(msg.role)}
 								</Text>
 								<Text color={floydTheme.colors.fgSubtle} dimColor>
 									{formatTimestamp(msg.timestamp)}

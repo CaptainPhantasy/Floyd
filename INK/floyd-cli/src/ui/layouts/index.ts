@@ -50,3 +50,12 @@ export {
 	EnhancedMainLayout,
 	type EnhancedMainLayoutProps,
 } from './EnhancedMainLayout.js';
+
+// ============================================================================
+// CONVERSATIONAL LAYOUT (Claude-style single-column chat)
+// ============================================================================
+
+export {
+	ConversationalLayout,
+	type ConversationalLayoutProps,
+} from './ConversationalLayout.js';

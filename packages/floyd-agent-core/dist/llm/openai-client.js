@@ -31,7 +31,11 @@ export class OpenAICompatibleClient {
         return this.baseURL;
     }
     async *chat(messages, tools, callbacks) {
+        console.log('[OpenAIClient] chat() method called');
+        console.log('[OpenAIClient] Messages:', JSON.stringify(messages, null, 2).slice(0, 500));
+        console.log('[OpenAIClient] Tools count:', tools.length);
         try {
+            console.log('[OpenAIClient] Starting chat with', messages.length, 'messages and', tools.length, 'tools');
             // Convert tools to OpenAI format
             const openaiTools = tools.map((tool) => ({
                 type: 'function',
@@ -46,6 +50,7 @@ export class OpenAICompatibleClient {
                 role: msg.role,
                 content: msg.content,
             }));
+            console.log('[OpenAIClient] Sending request to', this.baseURL, 'with model', this.model);
             const stream = await this.client.chat.completions.create({
                 model: this.model,
                 messages: openaiMessages,
@@ -132,6 +137,8 @@ export class OpenAICompatibleClient {
             }
         }
         catch (error) {
+            // Log actual error for debugging
+            console.error('[OpenAIClient] API Error:', error);
             const humanized = humanizeError(error instanceof Error ? error : String(error));
             const userMessage = formatHumanizedError(humanized, false);
             const errorChunk = {

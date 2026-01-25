@@ -185,23 +185,67 @@ export class AgentEngine {
   }
 
   /**
+   * ⚠️ DO NOT MODIFY - Tool role conversion (CRITICAL for multi-turn conversations)
    * Convert internal history to LLM messages format
+   *
+   * BREAKING CHANGE: Modifying this will break multi-turn tool conversations
+   * VERIFIED WORKING: 2026-01-25 - 4-turn conversation with tools tested
    */
   private convertHistoryToLLMMessages(): LLMMessage[] {
     return this.history.map((msg) => {
-      // Handle complex content (tool_use, tool_result)
+      // Handle tool result messages (OpenAI format)
+      if (msg.role === 'tool' || (Array.isArray(msg.content) && msg.content.some((block: any) => block.type === 'tool_result'))) {
+        // Extract tool results
+        if (Array.isArray(msg.content)) {
+          const toolResult = msg.content.find((block: any) => block.type === 'tool_result');
+          if (toolResult) {
+            return {
+              role: 'tool' as any,
+              tool_call_id: toolResult.tool_use_id,
+              content: toolResult.content,
+            };
+          }
+        }
+        // Fallback for string-based tool results
+        return {
+          role: 'tool' as any,
+          tool_call_id: (msg as any).tool_use_id || 'unknown',
+          content: String(msg.content),
+        };
+      }
+
+      // Handle assistant messages with tool calls
+      if (msg.role === 'assistant' && Array.isArray(msg.content)) {
+        const hasToolUse = msg.content.some((block: any) => block.type === 'tool_use');
+        if (hasToolUse) {
+          // For OpenAI format, we need to extract tool_calls separately
+          const textBlock = msg.content.find((block: any) => block.type === 'text');
+          const toolUseBlocks = msg.content.filter((block: any) => block.type === 'tool_use');
+
+          return {
+            role: 'assistant',
+            content: textBlock?.text || '',
+            tool_calls: toolUseBlocks.map((block: any) => ({
+              id: block.id,
+              type: 'function' as const,
+              function: {
+                name: block.name,
+                arguments: JSON.stringify(block.input),
+              },
+            })),
+          } as any;
+        }
+      }
+
+      // Handle simple text messages
       let content: string;
       if (typeof msg.content === 'string') {
         content = msg.content;
       } else if (Array.isArray(msg.content)) {
-        // Extract text from content blocks
+        // Extract text from content blocks (for messages without tool calls)
         content = msg.content
-          .filter((block: any) => block.type === 'text' || block.type === 'tool_result')
-          .map((block: any) => {
-            if (block.type === 'text') return block.text;
-            if (block.type === 'tool_result') return `[Tool Result for ${block.tool_use_id}]: ${block.content}`;
-            return '';
-          })
+          .filter((block: any) => block.type === 'text')
+          .map((block: any) => block.text)
           .join('\n');
       } else {
         content = String(msg.content);
@@ -221,6 +265,8 @@ export class AgentEngine {
    * It yields chunks of the response as they arrive.
    */
   async *sendMessage(content: string, callbacks?: AgentCallbacks): AsyncGenerator<string, void, unknown> {
+    console.log('[AgentEngine] sendMessage called with:', content.slice(0, 50));
+
     // Add user message to history
     this.history.push({ role: 'user', content });
 
@@ -235,9 +281,11 @@ export class AgentEngine {
 
     while (!currentTurnDone && turns < this.maxTurns) {
       turns++;
+      console.log('[AgentEngine] Turn', turns, 'of', this.maxTurns);
 
       // Get available tools from MCP
       const mcpTools = await this.mcpManager.listTools();
+      console.log('[AgentEngine] Got', mcpTools.length, 'tools from MCP');
 
       // Transform MCP tools to LLM format
       const tools: LLMTool[] = mcpTools.map(tool => ({
@@ -251,6 +299,7 @@ export class AgentEngine {
 
       // Convert history to LLM messages
       const messages = this.convertHistoryToLLMMessages();
+      console.log('[AgentEngine] Converted to', messages.length, 'LLM messages');
 
       let assistantContent = '';
       let toolCalls: ToolCall[] = [];
@@ -258,6 +307,7 @@ export class AgentEngine {
 
       // Stream from LLM client
       try {
+        console.log('[AgentEngine] Calling llmClient.chat...');
         for await (const chunk of this.llmClient.chat(messages, tools)) {
           // Handle text tokens
           if (chunk.token) {

@@ -56,7 +56,7 @@ function readApiConfig(): ApiConfig {
 		return {
 			apiKey: '',
 			endpoint: 'https://api.z.ai/api/anthropic',
-			model: 'claude-sonnet-4-20250514',
+			model: 'glm-4.7',
 		};
 	}
 
@@ -66,7 +66,7 @@ function readApiConfig(): ApiConfig {
 	const config: ApiConfig = {
 		apiKey: '',
 		endpoint: 'https://api.z.ai/api/anthropic',
-		model: 'claude-sonnet-4-20250514',
+		model: 'glm-4.7',
 	};
 
 	for (const line of lines) {

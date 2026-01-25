@@ -7,7 +7,7 @@
 import { promises as fs } from 'fs';
 import { join } from 'path';
 
-export type CacheTier = 'reasoning' | 'project' | 'vault';
+export type CacheTier = 'reasoning' | 'project' | 'vault' | 'legacy';
 
 export interface CacheEntry {
 	key: string;
@@ -95,6 +95,7 @@ const TTL_CONFIG: Record<CacheTier, number> = {
 	reasoning: 5 * 60 * 1000, // 5 minutes
 	project: 24 * 60 * 60 * 1000, // 24 hours
 	vault: 7 * 24 * 60 * 60 * 1000, // 7 days
+	legacy: 10 * 365 * 24 * 60 * 60 * 1000, // 10 years (effectively forever)
 };
 
 // Size limits per tier (max number of entries)
@@ -102,6 +103,7 @@ const SIZE_LIMITS: Record<CacheTier, number> = {
 	reasoning: 100, // 100 entries
 	project: 500, // 500 entries
 	vault: 1000, // 1000 entries
+	legacy: 10000, // 10000 entries (large capacity for permanent storage)
 };
 
 // Compression threshold (bytes)
@@ -118,7 +120,7 @@ export interface CacheConfig {
 
 export class CacheManager {
 	private cacheRoot: string;
-	private tiers: CacheTier[] = ['reasoning', 'project', 'vault'];
+	private tiers: CacheTier[] = ['reasoning', 'project', 'vault', 'legacy'];
 	private maxSize: Record<CacheTier, number>;
 	private compressThreshold: number;
 
@@ -128,6 +130,7 @@ export class CacheManager {
 			reasoning: config?.maxSize?.reasoning || SIZE_LIMITS.reasoning,
 			project: config?.maxSize?.project || SIZE_LIMITS.project,
 			vault: config?.maxSize?.vault || SIZE_LIMITS.vault,
+			legacy: config?.maxSize?.legacy || SIZE_LIMITS.legacy,
 		};
 		this.compressThreshold = config?.compressThreshold || COMPRESS_THRESHOLD;
 	}

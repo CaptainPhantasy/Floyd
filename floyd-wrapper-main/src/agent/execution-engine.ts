@@ -57,6 +57,7 @@ export class FloydAgentEngine {
   private callbacks: EngineCallbacks;
   private sessionManager?: SessionManager;
   private executionLock: Promise<unknown> = Promise.resolve(); // Mutex for concurrent execution prevention
+  private config: FloydConfig; // Store config to rebuild system prompt later
 
   constructor(
     config: FloydConfig,
@@ -66,6 +67,7 @@ export class FloydAgentEngine {
     // Register all core tools
     registerCoreTools();
 
+    this.config = config; // Store config
     this.sessionManager = sessionManager;
     this.glmClient = new GLMClient(config);
     this.streamHandler = new StreamHandler();
@@ -330,7 +332,17 @@ export class FloydAgentEngine {
           // Mode-based Permission Logic
           let permissionGranted = false;
 
-          if (mode === 'plan') {
+          if (mode === 'yolo') {
+            // YOLO mode: Auto-approve safe tools (permission: none or moderate)
+            // but still require permission for dangerous tools (delete_file, git_commit, etc.)
+            if (permissionLevel === 'dangerous') {
+              logger.info(`YOLO mode: Dangerous tool ${toolName} requires explicit permission`);
+              permissionGranted = await permissionManager.requestPermission(toolName, input);
+            } else {
+              permissionGranted = true;
+              logger.info(`YOLO mode: Auto-approving safe tool: ${toolName}`);
+            }
+          } else if (mode === 'plan') {
             // PLAN mode: Only allow read-only tools (permission: 'none')
             if (permissionLevel === 'none') {
               permissionGranted = true;
@@ -339,21 +351,8 @@ export class FloydAgentEngine {
               // We don't ask, we just block
               permissionGranted = false;
             }
-          } else if (mode === 'yolo') {
-            // YOLO mode: Auto-approve 'none' and 'moderate' permissions
-            if (permissionLevel === 'none' || permissionLevel === 'moderate') {
-              permissionGranted = true;
-              logger.info(`Auto-approving tool in YOLO mode: ${toolName}`);
-            } else {
-              // Still ask for dangerous tools
-              permissionGranted = await permissionManager.requestPermission(toolName, input);
-            }
           } else {
-            // ASK / AUTO mode: Default behavior, ask unless it's 'none'
-            // (Assuming permissionManager handles 'none' auto-approval internally, checking...)
-            // Actually permissionManager always asks currently.
-            // Let's optimize: We can auto-approve 'none' here too if we want,
-            // but for safety let's rely on permissionManager.
+            // ASK / AUTO / DIALOGUE mode: Default behavior, ask unless it's 'none'
             permissionGranted = await permissionManager.requestPermission(toolName, input);
           }
 
@@ -552,6 +551,47 @@ export class FloydAgentEngine {
       default:
         // Fallback for unknown types
         return { type: 'string' };
+    }
+  }
+
+  /**
+   * Update the system prompt in conversation history
+   *
+   * Rebuilds the system prompt with current mode and updates the
+   * first message in history. Call this when mode changes.
+   */
+  updateSystemPrompt(): void {
+    // Rebuild system prompt with current mode
+    const newSystemPrompt = this.config.useHardenedPrompt
+      ? buildHardenedSystemPrompt({
+          workingDirectory: this.config.cwd,
+          projectContext: this.config.projectContext,
+          enablePreservedThinking: this.config.enablePreservedThinking,
+          enableTurnLevelThinking: this.config.enableTurnLevelThinking,
+          maxTurns: this.config.maxTurns,
+          useJsonPlanning: this.config.useJsonPlanning,
+        })
+      : buildSystemPrompt({
+          workingDirectory: this.config.cwd,
+          projectContext: this.config.projectContext,
+        });
+
+    // Update the first message in history if it's a system message
+    if (this.history.messages.length > 0 && this.history.messages[0].role === 'system') {
+      this.history.messages[0].content = newSystemPrompt;
+      this.history.messages[0].timestamp = Date.now();
+      logger.info('System prompt updated', {
+        mode: process.env.FLOYD_MODE || 'ask',
+      });
+    } else {
+      logger.warn('No system message found in history to update');
+    }
+
+    // Persist updated system prompt if we have a session manager
+    if (this.sessionManager) {
+      // Note: Session manager doesn't have a direct "update system message" method,
+      // so we just log here. The updated prompt will be used for current session.
+      logger.debug('System prompt updated in memory for current session');
     }
   }
 

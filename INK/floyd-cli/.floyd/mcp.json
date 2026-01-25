@@ -3,11 +3,11 @@
   "servers": [
     {
       "name": "filesystem",
-      "enabled": false,
+      "enabled": true,
       "transport": {
         "type": "stdio",
         "command": "npx",
-        "args": ["-y", "@modelcontextprotocol/server-filesystem", "/tmp/allowed"],
+        "args": ["-y", "@modelcontextprotocol/server-filesystem", "."],
         "env": {}
       }
     },
@@ -49,7 +49,8 @@
     },
     {
       "name": "browser",
-      "enabled": true,
+      "enabled": false,
+      "description": "Disabled until FloydChrome extension is running on port 3005",
       "transport": {
         "type": "stdio",
         "command": "node",

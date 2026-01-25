@@ -6,7 +6,7 @@
  */
 
 import test from 'ava';
-import { FloydTerminal } from '../../../src/ui/terminal.ts';
+import { FloydTerminal } from '../../../dist/ui/terminal.js';
 
 // ============================================================================
 // Test Setup

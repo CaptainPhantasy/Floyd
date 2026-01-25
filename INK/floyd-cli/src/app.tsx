@@ -4,33 +4,35 @@
  * Please do not modify without explicit instruction and regression testing.
  * Ref: geminireport.md
  */
-import {useState, useEffect, useRef, useCallback, useMemo} from 'react';
-import {Box, Text, useInput, useApp} from 'ink';
-import {AgentEngine, MCPClientManager, PermissionManager} from 'floyd-agent-core';
-import {SessionManager} from './store/session-store.js';
-import {ConfigLoader} from './utils/config.js';
-import {BUILTIN_SERVERS} from './config/builtin-servers.js';
-import {StreamProcessor} from './streaming/stream-engine.js';
-import {StreamTagParser} from './streaming/tag-parser.js';
-import {getRandomWhimsicalPhrase} from './utils/whimsical-phrases.js';
-import {floydTheme, floydRoles} from './theme/crush-theme.js';
+import { useState, useEffect, useRef, useCallback, useMemo } from 'react';
+import { Box, Text, useInput, useApp } from 'ink';
+import { AgentEngine, MCPClientManager, PermissionManager } from 'floyd-agent-core';
+import { SessionManager } from './store/session-store.js';
+import { ConfigLoader } from './utils/config.js';
+import { BUILTIN_SERVERS } from './config/builtin-servers.js';
+import { StreamProcessor } from './streaming/stream-engine.js';
+import { StreamTagParser } from './streaming/tag-parser.js';
+import { getRandomWhimsicalPhrase } from './utils/whimsical-phrases.js';
+import { floydTheme, floydRoles } from './theme/crush-theme.js';
 import {
 	MainLayout,
 	MonitorLayout,
+	ConversationalLayout,
 	type ChatMessage,
 	type MonitorData,
 } from './ui/layouts/index.js';
-import {useFloydStore, type ConversationMessage} from './store/floyd-store.js';
-import {ErrorBoundary} from './ui/components/ErrorBoundary.js';
+import { useFloydStore, type ConversationMessage } from './store/floyd-store.js';
+import { ErrorBoundary } from './ui/components/ErrorBoundary.js';
 import {
 	commonCommands,
+	createCommandsWithHandlers,
 	type CommandItem,
 } from './ui/components/CommandPalette.js';
-import {runDockCommand, parseDockArgs} from './commands/dock.js';
-import type {ThinkingStatus} from './ui/agent/ThinkingStream.js';
-import type {Task} from './ui/agent/TaskChecklist.js';
-import type {ToolExecution} from './ui/monitor/ToolTimeline.js';
-import type {StreamEvent} from './ui/monitor/EventStream.js';
+import { runDockCommand, parseDockArgs } from './commands/dock.js';
+import type { ThinkingStatus } from './ui/agent/ThinkingStream.js';
+import type { Task } from './ui/agent/TaskChecklist.js';
+import type { ToolExecution } from './ui/monitor/ToolTimeline.js';
+import type { StreamEvent } from './ui/monitor/EventStream.js';
 import {
 	TokenUsageDashboard,
 	ToolPerformanceDashboard,
@@ -57,27 +59,27 @@ import {
 	selectCosts,
 } from './store/floyd-store.js';
 import dotenv from 'dotenv';
-import {resolve} from 'node:path';
+import { resolve } from 'node:path';
 
 // Load environment variables from multiple possible locations
 const envPaths = [
-  '.env.local', // Project-specific local env (git-ignored)
-  '.env', // Project env
-  `${process.env.HOME}/.floyd/.env.local`, // Global user env
+	'.env.local', // Project-specific local env (git-ignored)
+	'.env', // Project env
+	`${process.env.HOME}/.floyd/.env.local`, // Global user env
 ];
 
 for (const envPath of envPaths) {
-  try {
-    const result = dotenv.config({path: envPath});
-    if (result.error) {
-      // Silently ignore ENOENT (file not found) errors
-      // Log other errors
-    } else if (Object.keys(result.parsed ?? {}).length > 0) {
-      // Environment loaded successfully
-    }
-  } catch {
-    // Ignore errors, try next path
-  }
+	try {
+		const result = dotenv.config({ path: envPath });
+		if (result.error) {
+			// Silently ignore ENOENT (file not found) errors
+			// Log other errors
+		} else if (Object.keys(result.parsed ?? {}).length > 0) {
+			// Environment loaded successfully
+		}
+	} catch {
+		// Ignore errors, try next path
+	}
 }
 
 type Message = {
@@ -131,6 +133,19 @@ function MonitorOverlay() {
 	const responseTimeData = useFloydStore(selectResponseTimes);
 	const costData = useFloydStore(selectCosts);
 
+	// Handle keyboard input for closing the overlay
+	useInput((input, key) => {
+		// Ctrl+Q - Quit the entire CLI immediately
+		if (key.ctrl && (input === 'q' || input === 'Q')) {
+			process.exit(0);
+		}
+		// Esc or Ctrl+M to close monitor and return to main view
+		if (key.escape || (key.ctrl && input === 'm')) {
+			useFloydStore.getState().setOverlay('showMonitor', false);
+			return;
+		}
+	});
+
 	return (
 		<Box flexDirection="column" padding={1}>
 			<Box
@@ -157,9 +172,9 @@ function MonitorOverlay() {
 
 				<Box flexDirection="column" gap={1}>
 					<MemoryDashboard
-						projectCache={{name: 'Project', entries: 0, sizeBytes: 0, hits: 0, misses: 0, lastAccess: Date.now()}}
-						reasoningCache={{name: 'Reasoning', entries: 0, sizeBytes: 0, hits: 0, misses: 0, lastAccess: Date.now()}}
-						vaultCache={{name: 'Vault', entries: 0, sizeBytes: 0, hits: 0, misses: 0, lastAccess: Date.now()}}
+						projectCache={{ name: 'Project', entries: 0, sizeBytes: 0, hits: 0, misses: 0, lastAccess: Date.now() }}
+						reasoningCache={{ name: 'Reasoning', entries: 0, sizeBytes: 0, hits: 0, misses: 0, lastAccess: Date.now() }}
+						vaultCache={{ name: 'Vault', entries: 0, sizeBytes: 0, hits: 0, misses: 0, lastAccess: Date.now() }}
 						totalMemoryMB={0}
 					/>
 					<ResponseTimeDashboard data={responseTimeData} />
@@ -242,7 +257,7 @@ function MonitorOverlay() {
  * Integrates the MainLayout with AgentEngine, SessionManager, and Zustand store.
  * Provides streaming responses, command palette support, and full UI functionality.
  */
-export default function App({name = 'User', chrome = false}: AppProps) {
+export default function App({ name = 'User', chrome = false }: AppProps) {
 	// Local state
 	const [isThinking, setIsThinking] = useState(false);
 	const [agentStatus, setAgentStatus] = useState<ThinkingStatus>('idle');
@@ -300,7 +315,7 @@ export default function App({name = 'User', chrome = false}: AppProps) {
 		useFloydStore.getState().toggleOverlay('showMonitor');
 	}, []);
 
-	const {exit} = useApp();
+	const { exit } = useApp();
 
 	// ============================================================================
 	// INITIALIZATION
@@ -326,28 +341,30 @@ export default function App({name = 'User', chrome = false}: AppProps) {
 				// Connect to MCP servers defined in .floyd/mcp.json
 				await mcpManager.connectExternalServers(process.cwd());
 
-				const apiKey = process.env['GLM_API_KEY'] || 'dummy-key';
-				const apiEndpoint = process.env['GLM_ENDPOINT'] || 'https://api.z.ai/api/anthropic';
-				const apiModel = process.env['GLM_MODEL'] || 'claude-sonnet-4-20250514';
+				// Support both FLOYD_GLM_* and GLM_* env var formats
+				const apiKey = process.env['FLOYD_GLM_API_KEY'] || process.env['GLM_API_KEY'] || 'dummy-key';
+				// Fixed endpoint: Use api.z.ai/api/anthropic (Anthropic-compatible format)
+				const apiEndpoint = process.env['FLOYD_GLM_ENDPOINT'] || process.env['GLM_ENDPOINT'] || 'https://api.z.ai/api/anthropic';
+				const apiModel = process.env['FLOYD_GLM_MODEL'] || process.env['GLM_MODEL'] || 'claude-sonnet-4-20250514';
 
-				if (process.env['GLM_API_KEY'] === undefined) {
+				if (!process.env['FLOYD_GLM_API_KEY'] && !process.env['GLM_API_KEY']) {
 					// We warn but continue with dummy for UI testing if requested
 					// or we could block.
 				}
 
-			engineRef.current = new AgentEngine(
-				{
-					apiKey,
-					baseURL: apiEndpoint,
-					model: apiModel,
-					enableThinkingMode: true,
-					temperature: 0.2,
-				},
-				mcpManager,
-				sessionManager,
-				permissionManager,
-				config,
-			);
+				engineRef.current = new AgentEngine(
+					{
+						apiKey,
+						baseURL: apiEndpoint,
+						model: apiModel,
+						enableThinkingMode: true,
+						temperature: 0.2,
+					},
+					mcpManager,
+					sessionManager,
+					permissionManager,
+					config,
+				);
 				await engineRef.current.initSession(process.cwd());
 
 				setAgentStatus('idle');
@@ -358,11 +375,12 @@ export default function App({name = 'User', chrome = false}: AppProps) {
 					.initSession('floyd-cli', 'Floyd CLI', process.cwd());
 
 				// Initial greeting - add to both local state and store
+				// Aligned with hardened prompt stack v1.3.0 identity
 				const greeting: ConversationMessage = {
 					id: `init-${Date.now()}`,
 					role: 'assistant',
 					content:
-						'Hello! I am Floyd (GLM-4 Powered). How can I help you today?',
+						'👋 Hello! I\'m FLOYD, your GOD TIER LEVEL 5 autonomous software engineering agent. I\'m ready to help you build, refactor, or ship code. What are we working on today?',
 					timestamp: Date.now(),
 				};
 				// Use getState() directly to avoid including addMessage in dependencies
@@ -394,7 +412,7 @@ export default function App({name = 'User', chrome = false}: AppProps) {
 						const dockMsg: ConversationMessage = {
 							id: `dock-${Date.now()}`,
 							role: 'system',
-							content: `⚓ ${result.message}`,
+							content: `[D] ${result.message}`,
 							timestamp: Date.now(),
 						};
 						addMessage(dockMsg);
@@ -403,18 +421,18 @@ export default function App({name = 'User', chrome = false}: AppProps) {
 						const errorMsg: ConversationMessage = {
 							id: `dock-error-${Date.now()}`,
 							role: 'system',
-							content: `⚠️  ${result.message}`,
+							content: `[!] ${result.message}`,
 							timestamp: Date.now(),
 						};
 						addMessage(errorMsg);
 					}
 				} catch (error) {
-					const errorMsg: ConversationMessage = {
-						id: `dock-error-${Date.now()}`,
-						role: 'system',
-						content: `⚠️  Dock error: ${error instanceof Error ? error.message : String(error)}`,
-						timestamp: Date.now(),
-					};
+				const errorMsg: ConversationMessage = {
+					id: `dock-error-${Date.now()}`,
+					role: 'system',
+					content: `[!] Dock error: ${error instanceof Error ? error.message : String(error)}`,
+					timestamp: Date.now(),
+				};
 					addMessage(errorMsg);
 				}
 				return;
@@ -423,7 +441,7 @@ export default function App({name = 'User', chrome = false}: AppProps) {
 			if (!engineRef.current) return;
 
 			// Add user message
-			const userMsg: Message = {role: 'user', content: value};
+			const userMsg: Message = { role: 'user', content: value };
 			const userMsgStore: ConversationMessage = {
 				id: `user-${Date.now()}`,
 				role: 'user',
@@ -548,11 +566,34 @@ export default function App({name = 'User', chrome = false}: AppProps) {
 					timestamp: Date.now(),
 				});
 			} catch (error: unknown) {
-				const errorMessage = error instanceof Error ? error.message : String(error);
+				// Extract detailed error information
+				let errorMessage = 'An unexpected error occurred';
+				let errorDetails = '';
+
+				if (error instanceof Error) {
+					errorMessage = error.message;
+					if (error.stack) {
+						// Get first few lines of stack for debugging
+						errorDetails = error.stack.split('\n').slice(0, 3).join('\n');
+					}
+					// Check for common API errors
+					if (errorMessage.includes('fetch') || errorMessage.includes('network')) {
+						errorDetails = 'Network error - check your internet connection and API endpoint';
+					} else if (errorMessage.includes('401') || errorMessage.includes('Unauthorized')) {
+						errorDetails = 'API authentication failed - check your API key';
+					} else if (errorMessage.includes('429')) {
+						errorDetails = 'Rate limit exceeded - please wait and try again';
+					} else if (errorMessage.includes('500') || errorMessage.includes('502') || errorMessage.includes('503')) {
+						errorDetails = 'API server error - the service may be temporarily unavailable';
+					}
+				} else {
+					errorMessage = String(error);
+				}
+
 				const errorMsg: ConversationMessage = {
 					id: `error-${Date.now()}`,
 					role: 'assistant',
-					content: `Error: ${errorMessage}`,
+					content: `[!] Error: ${errorMessage}${errorDetails ? `\n\n${errorDetails}` : ''}`,
 					timestamp: Date.now(),
 				};
 				addMessage(errorMsg);
@@ -649,7 +690,7 @@ export default function App({name = 'User', chrome = false}: AppProps) {
 					addMessage({
 						id: `system-${Date.now()}`,
 						role: 'system',
-						content: `✅ Transcript exported to ${transcriptPath}`,
+						content: `[OK] Transcript exported to ${transcriptPath}`,
 						timestamp: Date.now(),
 					});
 					break;
@@ -667,9 +708,107 @@ export default function App({name = 'User', chrome = false}: AppProps) {
 				case 'dock':
 					// Dock command - handled separately via input parsing
 					break;
+				// ============================================================
+				// QUICK ACTIONS (1-4 keys after assistant response)
+				// ============================================================
+				case 'apply':
+					// Apply the last suggested code change
+					if (allMessages.length > 0) {
+						const lastAssistant = [...allMessages].reverse().find(m => m.role === 'assistant');
+						if (lastAssistant && typeof lastAssistant.content === 'string') {
+							// Send apply request to agent
+							handleSubmit(`Please apply the changes you just suggested. Execute the code modifications.`);
+						} else {
+							addMessage({
+								id: `system-${Date.now()}`,
+								role: 'system',
+								content: '[!] No recent response to apply.',
+								timestamp: Date.now(),
+							});
+						}
+					}
+					break;
+				case 'explain':
+					// Request explanation of last response
+					if (allMessages.length > 0) {
+						const lastAssistant = [...allMessages].reverse().find(m => m.role === 'assistant');
+						if (lastAssistant && typeof lastAssistant.content === 'string') {
+							handleSubmit(`Please explain in more detail what you just said. Break it down step by step.`);
+						} else {
+							addMessage({
+								id: `system-${Date.now()}`,
+								role: 'system',
+								content: '[!] No recent response to explain.',
+								timestamp: Date.now(),
+							});
+						}
+					}
+					break;
+				case 'diff':
+					// Show diff preview of proposed changes
+					if (allMessages.length > 0) {
+						const lastAssistant = [...allMessages].reverse().find(m => m.role === 'assistant');
+						if (lastAssistant && typeof lastAssistant.content === 'string') {
+							// Check if content contains code blocks that could be diffed
+							const hasCodeBlocks = lastAssistant.content.includes('```');
+							if (hasCodeBlocks) {
+								useFloydStore.getState().setOverlay('showDiffPreview', true);
+								addMessage({
+									id: `system-${Date.now()}`,
+									role: 'system',
+									content: '[D] Opening diff preview... (Showing proposed changes)',
+									timestamp: Date.now(),
+								});
+							} else {
+								handleSubmit(`Please show me a diff of the changes you're proposing. Use unified diff format.`);
+							}
+						} else {
+							addMessage({
+								id: `system-${Date.now()}`,
+								role: 'system',
+								content: '[!] No recent response with changes to diff.',
+								timestamp: Date.now(),
+							});
+						}
+					}
+					break;
+				case 'undo':
+					// Undo the last action or revert conversation
+					if (allMessages.length > 1) {
+						// Find the last user message and remove everything after it
+						const messages = useFloydStore.getState().messages;
+						const lastUserIdx = messages.map(m => m.role).lastIndexOf('user');
+						if (lastUserIdx > 0) {
+							// Remove last user message and any responses
+							const messagesToKeep = messages.slice(0, lastUserIdx);
+							useFloydStore.getState().clearMessages();
+							messagesToKeep.forEach(msg => useFloydStore.getState().addMessage(msg));
+							addMessage({
+								id: `system-${Date.now()}`,
+								role: 'system',
+								content: '[<-] Reverted to previous state. Last exchange removed.',
+								timestamp: Date.now(),
+							});
+						} else {
+							addMessage({
+								id: `system-${Date.now()}`,
+								role: 'system',
+								content: '[!] Cannot undo further - at conversation start.',
+								timestamp: Date.now(),
+							});
+						}
+					} else {
+						addMessage({
+							id: `system-${Date.now()}`,
+							role: 'system',
+							content: '[!] Nothing to undo.',
+							timestamp: Date.now(),
+						});
+					}
+					break;
 			}
 		},
-		[exit, toggleHelp, allMessages, addMessage],
+		[exit, toggleHelp, allMessages, addMessage, handleSubmit],
 	);
 
 	// Handle safety mode changes from MainLayout
@@ -677,58 +816,109 @@ export default function App({name = 'User', chrome = false}: AppProps) {
 		useFloydStore.getState().setSafetyMode(mode);
 	}, []);
 
-	// Augment common commands with additional Floyd-specific commands
+	// Create command handlers map for all common commands
+	const commandHandlers = useMemo(() => ({
+		'new-task': () => handleCommand('new-task'),
+		'open-file': () => {
+			// Prompt user to specify file path
+			addMessage({
+				id: `system-${Date.now()}`,
+				role: 'system',
+				content: '[F] Type a file path to open (e.g., /open src/index.ts)...',
+				timestamp: Date.now(),
+			});
+		},
+		'search-files': () => {
+			// Prompt for search query
+			addMessage({
+				id: `system-${Date.now()}`,
+				role: 'system',
+				content: '[S] Type your search query to search files...',
+				timestamp: Date.now(),
+			});
+		},
+		'run-command': () => {
+			addMessage({
+				id: `system-${Date.now()}`,
+				role: 'system',
+				content: '[!] Type a command to run (e.g., npm test)...',
+				timestamp: Date.now(),
+			});
+		},
+		'view-history': () => {
+			// Show session history switcher
+			useFloydStore.getState().setOverlay('showSessionSwitcher', true);
+		},
+		'settings': () => {
+			// Show config overlay
+			useFloydStore.getState().setOverlay('showConfig', true);
+		},
+		'help': () => handleCommand('help'),
+		'exit': () => handleCommand('exit'),
+	}), [handleCommand, addMessage]);
+
+	// Create commands with proper handlers using the new pattern
+	const baseCommands = useMemo(
+		() => createCommandsWithHandlers(commandHandlers),
+		[commandHandlers]
+	);
+
+	// Augment with additional Floyd-specific commands
 	const augmentedCommands: CommandItem[] = useMemo(
 		() => [
-			...commonCommands.map(cmd => ({...cmd})),
+			...baseCommands,
 			{
 				id: 'reset-session',
 				label: 'Reset Session',
 				description: 'Clear current conversation and reset agent state',
-				icon: '🧹',
+				icon: '[R]',
 				action: () => handleCommand('reset-session'),
 			},
 			{
 				id: 'toggle-safety',
 				label: 'Toggle Safety Mode',
 				description: 'Cycle between YOLO, ASK, and PLAN modes',
-				icon: '🛡️',
+				icon: '[S]',
 				action: () => handleCommand('toggle-safety'),
 			},
 			{
 				id: 'export-transcript',
 				label: 'Export Transcript',
 				description: 'Save conversation history to a markdown file',
-				icon: '💾',
+				icon: '[E]',
 				action: () => handleCommand('export-transcript'),
 			},
 			{
 				id: 'toggle-monitor',
 				label: 'Toggle Monitor',
 				description: 'Show/hide system performance dashboard',
-				icon: '◐',
+				icon: '[M]',
 				action: () => toggleMonitor(),
 			},
 			{
 				id: 'toggle-agent-viz',
 				label: 'Toggle Agent Viz',
 				description: 'Show/hide task checklist and tool timeline',
-				icon: '◉',
+				icon: '[A]',
 				action: () => setShowAgentViz(v => !v),
 			},
 			{
 				id: 'dock',
 				label: 'Dock Command',
 				description: 'Execute command in TMUX monitor pane (e.g., :dock btop)',
-				icon: '⚓',
-				action: async () => {
-					// Dock commands are handled via text input parsing
-					// User types ":dock <command>" in the input field
-					// This command entry is for documentation/help purposes
+				icon: '[D]',
+				insertText: ':dock ',
+				action: () => {
+					addMessage({
+						id: `system-${Date.now()}`,
+						role: 'system',
+						content: '[D] Type :dock <command> to run in TMUX pane (e.g., :dock btop)',
+						timestamp: Date.now(),
+					});
 				},
 			},
 		],
-		[commonCommands, handleCommand, toggleMonitor]
+		[baseCommands, handleCommand, toggleMonitor, addMessage]
 	);
 
 	// ============================================================================
@@ -740,12 +930,8 @@ export default function App({name = 'User', chrome = false}: AppProps) {
 	}
 
 	// ============================================================================
-	// MAIN LAYOUT
+	// CONVERSATIONAL LAYOUT (Claude-style chat flow)
 	// ============================================================================
-
-	// Determine if we should show visualization panels
-	const hasActivity =
-		tasks.length > 0 || toolExecutions.length > 0 || events.length > 0;
 
 	return (
 		<ErrorBoundary
@@ -753,33 +939,20 @@ export default function App({name = 'User', chrome = false}: AppProps) {
 				// Log error to file in production
 			}}
 		>
-			<MainLayout
+			<ConversationalLayout
 				userName={name}
-				cwd={process.cwd()}
-				connectionStatus="connected"
-				mode="chat"
 				messages={allMessages}
-				agentStatus={agentStatus}
-				tasks={tasks}
-				toolExecutions={toolExecutions}
-				events={events}
-				isThinking={isThinking}
-				whimsicalPhrase={currentWhimsicalPhrase}
 				streamingContent={streamingContent}
-				commands={augmentedCommands}
+				isThinking={isThinking}
+				agentStatus={agentStatus}
+				whimsicalPhrase={currentWhimsicalPhrase}
+				toolExecutions={toolExecutions}
 				onSubmit={handleSubmit}
 				onCommand={handleCommand}
 				onExit={exit}
+				commands={augmentedCommands}
 				safetyMode={safetyMode}
 				onSafetyModeChange={handleSafetyModeChange}
-				showHelp={showHelp}
-				showMonitor={showMonitor}
-				onCloseMonitor={() => setShowMonitor(false)}
-				showAgentViz={showAgentViz || (hasActivity && tasks.length > 0)}
-				showToolTimeline={
-					showAgentViz || (hasActivity && toolExecutions.length > 0)
-				}
-				showEventStream={showAgentViz || (hasActivity && events.length > 0)}
 			/>
 		</ErrorBoundary>
 	);

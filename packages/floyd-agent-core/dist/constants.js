@@ -49,7 +49,22 @@ export function inferProviderFromEndpoint(endpoint) {
  */
 export function isOpenAICompatible(endpoint) {
     // OpenAI and DeepSeek use OpenAI-compatible format
-    // Anthropic and Z.ai use Anthropic format
-    return !endpoint.includes('api.anthropic.com') && !endpoint.includes('api.z.ai');
+    // Anthropic direct API uses Anthropic format
+    // Z.ai has TWO endpoints:
+    //   - /api/anthropic uses Anthropic format
+    //   - /api/coding/paas/v4 (GLM) uses OpenAI format
+    if (endpoint.includes('api.z.ai/api/coding')) {
+        // GLM coding endpoint uses OpenAI format
+        return true;
+    }
+    if (endpoint.includes('api.anthropic.com')) {
+        return false;
+    }
+    if (endpoint.includes('api.z.ai')) {
+        // Z.ai Anthropic-compatible endpoint
+        return false;
+    }
+    // Default to OpenAI for other endpoints
+    return true;
 }
 //# sourceMappingURL=constants.js.map

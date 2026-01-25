@@ -566,7 +566,7 @@ interface InputAreaProps {
 	hint?: string;
 	onVoiceInput?: () => void;
 	isRecording?: boolean;
-	isTranscribing?: boolean; 
+	isTranscribing?: boolean;
 	isWideScreen?: boolean;
 	isNarrowScreen?: boolean;
 }
@@ -579,7 +579,7 @@ function InputArea({
 	hint,
 	onVoiceInput,
 	isRecording,
-	isTranscribing = false, 
+	isTranscribing = false,
 	isWideScreen = false,
 	isNarrowScreen = false,
 }: InputAreaProps) {
@@ -594,7 +594,7 @@ function InputArea({
 				width="100%"
 				height={5}
 			>
-				<Text color={roleColors.inputPrompt}>❯ </Text>
+				<Text color={roleColors.inputPrompt}>{'>'} </Text>
 				<TextInput
 					value={value}
 					onChange={onChange}
@@ -821,7 +821,7 @@ export function MainLayout({
 
 	const handleVoiceInput = useCallback(async () => {
 		if (isThinking) return;
-		
+
 		if (isRecording) {
 			await stopRecording();
 		} else {
@@ -1464,7 +1464,7 @@ export function CompactMainLayout({
 				borderColor={floydTheme.colors.border}
 				paddingX={1}
 			>
-				<Text>❯ </Text>
+				<Text>{'>'} </Text>
 				<TextInput
 					value={input}
 					onChange={(newValue) => {

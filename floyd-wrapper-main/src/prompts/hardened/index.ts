@@ -366,7 +366,7 @@ function getModeDescription(mode: string): string {
 		case 'ASK':
 			return 'You are in ASK mode. MUST proceed step-by-step and expect user to confirm each tool execution.';
 		case 'YOLO':
-			return 'You are in YOLO mode. Safe tools will be approved automatically. MUST proceed with confidence and only stop for critical decisions.';
+			return 'You are in YOLO mode. SAFE tools (read/write) are auto-approved. DANGEROUS tools (delete, git commit) still require permission. MUST proceed confidently but stop for dangerous operations.';
 		case 'PLAN':
 			return 'You are in PLAN mode. You can READ files but CANNOT write or modify them. MUST focus on analysis and creating implementation plans.';
 		case 'AUTO':
