@@ -75,8 +75,8 @@ scripts/verify-connection.ts
 .floyd/floyd.db
 .floyd/history
 
-# Mobile project (WIP)
-mobile/
+# Mobile project (part of Floyd Suite - KEEP IN GIT)
+# mobile/ - REMOVED from gitignore to track in version control
 
 # TypeScript build artifacts
 *.tsbuildinfo
