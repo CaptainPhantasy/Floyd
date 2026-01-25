@@ -210,48 +210,94 @@ export class FloydCLI {
 
       // Setup readline interface first (skip in test mode)
       if (!this.testMode) {
-        // Create completer for slash commands
-        const completer = async (line: string) => {
-          const { slashCommands } = await import('./commands/slash-commands.js');
-          const commands = slashCommands.list();
-          const commandNames = commands.map(cmd => `/${cmd.name}`);
+        // CRITICAL: Detect piped mode for proper readline configuration
+        // In piped mode, stdin starts paused and won't emit 'line' events without this
+        const isPiped = !process.stdin.isTTY;
+        if (isPiped) {
+          process.stdin.resume();
+        }
 
-          // Add aliases
-          const allNames = [...commandNames];
-          for (const cmd of commands) {
-            if (cmd.aliases) {
-              allNames.push(...cmd.aliases.map(a => `/${a}`));
+        // Create completer for slash commands (skip in piped mode to avoid interference)
+        let completer: ((line: string) => Promise<[string[], string]>) | undefined;
+        if (!isPiped) {
+          completer = async (line: string) => {
+            const { slashCommands } = await import('./commands/slash-commands.js');
+            const commands = slashCommands.list();
+            const commandNames = commands.map(cmd => `/${cmd.name}`);
+
+            // Add aliases
+            const allNames = [...commandNames];
+            for (const cmd of commands) {
+              if (cmd.aliases) {
+                allNames.push(...cmd.aliases.map(a => `/${a}`));
+              }
             }
-          }
 
-          // Only complete if line starts with /
-          if (!line.startsWith('/')) {
-            return [[], line];
-          }
+            // Only complete if line starts with /
+            if (!line.startsWith('/')) {
+              return [[], line];
+            }
 
-          const hits = allNames.filter(cmd => cmd.startsWith(line));
+            const hits = allNames.filter(cmd => cmd.startsWith(line));
 
-          // Show all commands if just "/" is typed
-          if (line === '/') {
-            return [allNames, line];
-          }
+            // Show all commands if just "/" is typed
+            if (line === '/') {
+              return [allNames, line];
+            }
 
-          return [hits, line];
-        };
+            return [hits, line];
+          };
+        }
 
         this.rl = readline.createInterface({
           input: process.stdin,
           output: process.stdout,
           prompt: '> ', // Simple prompt only - NO frame in prompt
-          completer,
-          // Enable visible cursor
-          terminal: true,
+          ...(completer ? { completer } : {}),
+          // CRITICAL: Set terminal based on TTY detection
+          // In piped mode, terminal should be false for proper line handling
+          terminal: !isPiped,
         });
 
         // Show a visible block cursor using ANSI escape codes
         // This makes the cursor more visible in the terminal
         const cursorVisible = '\x1B[?25h'; // Show cursor
         process.stdout.write(cursorVisible);
+
+        // CRITICAL: Attach event handlers IMMEDIATELY after creating readline
+        // In piped mode, data starts flowing immediately and we must be ready to receive it
+        // Do NOT wait for start() to attach handlers
+        this.rl.on('line', async (line: string) => {
+          // Save to history file
+          if (line.trim()) {
+            await this.appendToHistory(line.trim());
+          }
+
+          // Use message queue to prevent race conditions
+          this.messageQueue.enqueue(line, async (msg) => {
+            await this.processInput(msg);
+          });
+
+          // Only prompt again if stdin is a TTY (interactive mode)
+          // When stdin is piped, readline will close automatically after input ends
+          if (this.isRunning && process.stdin.isTTY) {
+            this.rl?.prompt();
+            this.showCursor(); // Ensure cursor is visible after each prompt
+          }
+        });
+
+        this.rl.on('close', async () => {
+          // CRITICAL: For piped input, close fires AFTER line event
+          // But we need to wait for async processing to complete
+          if (process.stdin.isTTY) {
+            // TTY mode: shutdown immediately
+            this.shutdown();
+          } else {
+            // Piped mode: wait for message queue to flush before shutdown
+            await this.messageQueue.waitForQueue();
+            this.shutdown();
+          }
+        });
       }
 
       // Create agent engine with callbacks
@@ -585,42 +631,11 @@ export class FloydCLI {
 
       // Main input loop
       // Only prompt if stdin is a TTY (interactive mode)
+      // Note: Event handlers are already attached in initialize()
       if (process.stdin.isTTY) {
         this.rl.prompt();
         this.showCursor(); // Ensure cursor is visible
       }
-
-      this.rl.on('line', async (line: string) => {
-        // Save to history file
-        if (line.trim()) {
-          await this.appendToHistory(line.trim());
-        }
-
-        // Use message queue to prevent race conditions
-        this.messageQueue.enqueue(line, async (msg) => {
-          await this.processInput(msg);
-        });
-
-        // Only prompt again if stdin is a TTY (interactive mode)
-        // When stdin is piped, readline will close automatically after input ends
-        if (this.isRunning && process.stdin.isTTY) {
-          this.rl?.prompt();
-          this.showCursor(); // Ensure cursor is visible after each prompt
-        }
-      });
-
-      this.rl.on('close', () => {
-        // Only shutdown if we're in interactive mode (TTY)
-        // When stdin is piped, the close event is expected and we should just exit cleanly
-        if (process.stdin.isTTY) {
-          this.shutdown();
-        } else {
-          // For piped input, just exit without calling shutdown
-          // (shutdown tries to close readline which is already closed)
-          this.isRunning = false;
-          process.exit(0);
-        }
-      });
 
       logger.info('Floyd CLI started');
     } catch (error) {
@@ -712,10 +727,8 @@ export class FloydCLI {
     this.rl?.close();
     this.terminal.success('Goodbye!');
 
-    // Only exit process if not in test mode
-    if (!this.testMode) {
-      process.exit(0);
-    }
+    // CRITICAL: Don't call process.exit() here - let async processing complete naturally
+    // The process will exit when all async work completes and event loop is empty
   }
 
   /**

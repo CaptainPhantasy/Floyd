@@ -5,6 +5,46 @@ All notable changes to the Floyd Wrapper project will be documented in this file
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [0.1.1] - 2026-01-25
+
+### Fixed
+
+#### Piped Input Processing (CRITICAL)
+- **Readline Event Handler Timing** - Moved event handler attachment from `start()` to `initialize()` to prevent race condition with piped input
+  - Event handlers now attach immediately after `readline.createInterface()`
+  - Prevents input stream data from being lost before handlers are ready
+- **Piped Mode stdin Resume** - Added `process.stdin.resume()` before readline creation for non-TTY input
+  - In piped mode, stdin starts paused and won't emit 'line' events without explicit resume
+- **Terminal Mode Detection** - Set `terminal: false` for piped input, `terminal: true` for TTY
+  - Prevents TTY-specific escape sequence handling in piped mode
+- **Message Queue Synchronization** - Added `waitForQueue()` method to close handler
+  - Ensures async processing completes before process exits in piped mode
+- **Removed process.exit() Calls** - Removed premature `process.exit(0)` from both close handler and `shutdown()` method
+  - Process now exits naturally when event loop empties
+
+#### Configuration Documentation
+- **Updated .env.example** - Corrected endpoint from `/api/anthropic` to `/api/coding/paas/v4`
+  - Added critical warning about endpoint distinction
+  - Documented that `/api/anthropic` returns empty responses for GLM-4.7 Coding Plan
+- **Global Configuration Fix** - Updated `~/.floyd/.env.local` with correct endpoint and model
+  - Changed from: `GLM_API_ENDPOINT=https://api.z.ai/api/anthropic` + `claude-sonnet-4-20250514`
+  - Changed to: `GLM_API_ENDPOINT=https://api.z.ai/api/coding/paas/v4` + `glm-4.7`
+
+### Technical Notes
+
+**Endpoint Distinction:**
+- `https://api.z.ai/api/coding/paas/v4` → GLM-4.7 Coding Plan (Floyd CLI)
+- `https://api.z.ai/api/anthropic` → Claude-compatible API (different wrapper)
+
+**Root Cause Analysis:**
+- Piped input appeared to "hang" because readline events fired before handlers were attached
+- The "thinking only" symptom was caused by wrong API endpoint returning empty SSE stream
+- Both issues masked each other, making diagnosis difficult
+
+**Verification:**
+- 5/5 smoke tests passed from different directories
+- All test cases: math, code generation, factual questions completed successfully
+
 ## [0.1.0] - 2025-01-22
 
 ### Added - SHIP RELEASE

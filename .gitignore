@@ -70,3 +70,14 @@ FloydChromeBuild/floydchrome/dist/
 INK/floyd-cli/.env
 scripts/verify-ipc-flow.ts
 scripts/verify-connection.ts
+
+# Floyd runtime state
+.floyd/floyd.db
+.floyd/history
+
+# Mobile project (WIP)
+mobile/
+
+# TypeScript build artifacts
+*.tsbuildinfo
+packages/floyd-agent-core/tsconfig.tsbuildinfo

@@ -11,6 +11,7 @@ export class MessageQueue {
   isEmpty(): boolean;
   getLength(): number;
   clear(): void;
+  waitForQueue(): Promise<void>;
 }
 
 export function getMessageQueue(): MessageQueue;

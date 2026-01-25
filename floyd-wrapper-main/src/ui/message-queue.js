@@ -79,6 +79,17 @@ export class MessageQueue {
 		this.queue = [];
 		this.isProcessing = false;
 	}
+
+	/**
+	 * Wait for queue to finish processing all messages
+	 * @returns {Promise<void>}
+	 */
+	async waitForQueue() {
+		while (!this.isEmpty() || this.isProcessing) {
+			// Wait 10ms before checking again
+			await new Promise(resolve => setTimeout(resolve, 10));
+		}
+	}
 }
 
 // Singleton instance
