@@ -20,18 +20,26 @@ import { gitStageTool } from './git/stage.js';
 import { gitUnstageTool } from './git/unstage.js';
 import { gitBranchTool } from './git/branch.js';
 import { isProtectedBranchTool } from './git/is-protected.js';
+import { gitMergeTool } from './git/merge.js';
 
 // Cache tools
 import { cacheStoreTool, cacheRetrieveTool, cacheDeleteTool, cacheClearTool, cacheListTool, cacheSearchTool, cacheStatsTool, cachePruneTool, cacheStorePatternTool, cacheStoreReasoningTool, cacheLoadReasoningTool, cacheArchiveReasoningTool } from './cache/index.js';
 
 // File tools
 import { readFileTool, writeTool, editFileTool, searchReplaceTool } from './file/index.js';
+import { listDirectoryTool } from './file/list-directory.js';
+import { deleteFileTool } from './file/delete-file.js';
+import { moveFileTool } from './file/move-file.js';
 
 // Search tools
 import { grepTool, codebaseSearchTool } from './search/index.js';
 
 // System tools
 import { runTool, askUserTool } from './system/index.js';
+import { fetchTool } from './system/fetch.js';
+
+// Special tools
+import { verifyTool, safeRefactorTool, impactSimulateTool } from './special/index.js';
 
 // Browser tools
 import { browserStatusTool, browserNavigateTool, browserReadPageTool, browserScreenshotTool, browserClickTool, browserTypeTool, browserFindTool, browserGetTabsTool, browserCreateTabTool } from './browser/index.js';
@@ -137,6 +145,26 @@ export function registerCoreTools(): void {
 	toolRegistry.register(insertAtTool);
 	toolRegistry.register(deleteRangeTool);
 	toolRegistry.register(assessPatchRiskTool);
+
+	// ========================================================================
+	// NEW TOOLS #43-50 (Phase 3 Completion)
+	// ========================================================================
+
+	// File tools (3 new tools: #43-45)
+	toolRegistry.register(listDirectoryTool);
+	toolRegistry.register(deleteFileTool);
+	toolRegistry.register(moveFileTool);
+
+	// Git tools (1 new tool: #46)
+	toolRegistry.register(gitMergeTool);
+
+	// System tools (1 new tool: #47)
+	toolRegistry.register(fetchTool);
+
+	// Special tools (3 new tools: #48-50)
+	toolRegistry.register(verifyTool);
+	toolRegistry.register(safeRefactorTool);
+	toolRegistry.register(impactSimulateTool);
 }
 
 // ============================================================================

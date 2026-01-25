@@ -85,6 +85,70 @@ export interface ToolResult<T = unknown> {
   };
 }
 
+/**
+ * Error codes for standardized error handling (v1.2.0+)
+ */
+export type ErrorCode =
+  | 'INVALID_INPUT'       // Schema validation failed
+  | 'AUTH'                // Authentication/authorization failed
+  | 'RATE_LIMIT'          // API rate limit exceeded
+  | 'NOT_FOUND'           // Resource doesn't exist
+  | 'FILE_NOT_FOUND'      // File doesn't exist
+  | 'TIMEOUT'             // Operation exceeded timeout
+  | 'DEPENDENCY_FAIL'     // Required service unavailable
+  | 'INVARIANT_BROKEN'    // Critical assumption violated (triggers stop)
+  | 'PERMISSION_DENIED'   // Tool access denied by policy
+  | 'PERMISSION_REQUIRED' // Permission needs approval
+  | 'VALIDATION_ERROR'    // Input failed Zod validation
+  | 'TOOL_NOT_FOUND'      // Tool not registered
+  | 'TOOL_EXECUTION_FAILED' // Tool threw uncaught error
+  | 'VERIFICATION_FAILED' // Post-execution check failed
+  | 'CONFLICT'            // Resource conflict (git merge, file locked)
+  | 'NETWORK_ERROR'       // Network operation failed
+  | 'PARSE_ERROR';        // Failed to parse response
+
+/**
+ * Receipt type for audit trail (v1.2.0+)
+ */
+export type ReceiptType = 'file_read' | 'file_write' | 'command' | 'network' | 'git' | 'cache' | 'browser' | 'search';
+
+/**
+ * Individual receipt for audit trail (v1.2.0+)
+ */
+export interface Receipt {
+  /** Type of operation */
+  type: ReceiptType;
+  /** Source/target of operation */
+  source: string;
+  /** Unix timestamp when operation occurred */
+  timestamp: number;
+  /** Content hash for file operations (optional) */
+  hash?: string;
+  /** Duration of operation in milliseconds */
+  duration_ms?: number;
+}
+
+/**
+ * Extended result with receipts for audit trail (v1.2.0+)
+ * Backwards compatible - extends ToolResult
+ */
+export interface ToolReceipt<T = unknown> extends ToolResult<T> {
+  /** Structured status for receipt */
+  status: 'success' | 'error' | 'partial';
+  /** Warning messages (non-fatal issues) */
+  warnings: string[];
+  /** Audit trail receipts */
+  receipts: Receipt[];
+  /** Suggested next actions */
+  next_actions?: string[];
+  /** Execution duration in milliseconds */
+  duration_ms: number;
+  /** Unix timestamp when execution started */
+  started_at: number;
+  /** Unix timestamp when execution completed */
+  completed_at: number;
+}
+
 // ============================================================================
 // Streaming Types
 // ============================================================================
@@ -175,6 +239,14 @@ export interface FloydConfig {
   projectContext?: string;
   /** Current working directory */
   cwd: string;
+  /** Use hardened prompt system (v1.1.0+) */
+  useHardenedPrompt?: boolean;
+  /** Enable preserved thinking across turns */
+  enablePreservedThinking?: boolean;
+  /** Enable turn-level thinking control */
+  enableTurnLevelThinking?: boolean;
+  /** Use JSON planning mode */
+  useJsonPlanning?: boolean;
 }
 
 // ============================================================================

@@ -5,7 +5,7 @@
  */
 
 import { z } from 'zod';
-import type { ToolDefinition, ToolResult, ToolCategory } from '../types.js';
+import type { ToolDefinition, ToolResult, ToolCategory, ToolReceipt, ReceiptType, Receipt } from '../types.js';
 import { logger } from '../utils/logger.js';
 import { ToolExecutionError } from '../utils/errors.js';
 
@@ -512,6 +512,128 @@ export class ToolRegistry {
         permission: tool.permission,
       })),
     };
+  }
+
+  // ==========================================================================
+  // Receipt-based Execution (v1.2.0+)
+  // ==========================================================================
+
+  /**
+   * Map tool category to receipt type
+   */
+  private categoryToReceiptType(category: ToolCategory, toolName: string): ReceiptType {
+    // Check for specific tool patterns
+    if (toolName.includes('read')) return 'file_read';
+    if (toolName.includes('write') || toolName.includes('edit')) return 'file_write';
+
+    // Map by category
+    const categoryMap: Record<ToolCategory, ReceiptType> = {
+      'file': 'file_read',
+      'search': 'search',
+      'build': 'command',
+      'git': 'git',
+      'browser': 'browser',
+      'cache': 'cache',
+      'patch': 'file_write',
+      'special': 'command',
+    };
+
+    return categoryMap[category] || 'command';
+  }
+
+  /**
+   * Extract source from tool input for receipts
+   */
+  private extractSourceFromInput(input: unknown, toolName: string): string {
+    const inputObj = input as Record<string, unknown>;
+
+    // Try common path fields
+    if (inputObj.file_path) return String(inputObj.file_path);
+    if (inputObj.path) return String(inputObj.path);
+    if (inputObj.filePath) return String(inputObj.filePath);
+    if (inputObj.command) return String(inputObj.command);
+    if (inputObj.query) return String(inputObj.query).substring(0, 50);
+    if (inputObj.pattern) return String(inputObj.pattern).substring(0, 50);
+    if (inputObj.url) return String(inputObj.url);
+
+    return toolName;
+  }
+
+  /**
+   * Execute a tool with full receipt/audit trail (v1.2.0+)
+   * Non-breaking: Wraps execute() and adds receipt metadata
+   */
+  async executeWithReceipt(
+    name: string,
+    input: unknown,
+    options: { permissionGranted?: boolean } = {}
+  ): Promise<ToolReceipt> {
+    const startedAt = Date.now();
+
+    // Execute using existing method
+    const result = await this.execute(name, input, options);
+
+    const completedAt = Date.now();
+    const duration_ms = completedAt - startedAt;
+
+    // Get tool for category info
+    const tool = this.tools.get(name);
+    const category: ToolCategory = tool?.category || 'special';
+
+    // Build receipt
+    const receiptType = this.categoryToReceiptType(category, name);
+    const source = this.extractSourceFromInput(input, name);
+
+    const receipt: Receipt = {
+      type: receiptType,
+      source: source,
+      timestamp: startedAt,
+      duration_ms: duration_ms,
+    };
+
+    // Build warnings array
+    const warnings: string[] = [];
+    if (duration_ms > 5000) {
+      warnings.push(`Slow execution: ${duration_ms}ms`);
+    }
+
+    // Determine status
+    let status: 'success' | 'error' | 'partial' = 'success';
+    if (!result.success) {
+      status = 'error';
+    } else if (warnings.length > 0) {
+      status = 'partial';
+    }
+
+    // Build next_actions suggestions
+    const next_actions: string[] = [];
+    if (result.success) {
+      if (receiptType === 'file_write') {
+        next_actions.push('verify_file_exists');
+      }
+      if (receiptType === 'command') {
+        next_actions.push('check_exit_code');
+      }
+    } else {
+      next_actions.push('check_error_details');
+      next_actions.push('retry_with_corrections');
+    }
+
+    // Return enhanced receipt
+    const toolReceipt: ToolReceipt = {
+      ...result,
+      status,
+      warnings,
+      receipts: [receipt],
+      next_actions,
+      duration_ms,
+      started_at: startedAt,
+      completed_at: completedAt,
+    };
+
+    logger.debug(`Tool ${name} receipt generated: ${status} (${duration_ms}ms)`);
+
+    return toolReceipt;
   }
 }
 
