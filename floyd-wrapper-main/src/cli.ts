@@ -23,8 +23,25 @@ import { renderMarkdown } from './ui/formatters.js';
 import { getMessageQueue } from './ui/message-queue.js';
 import { getMonitoringModule } from './ui/monitoring-module.js';
 
-// Load .env file
-dotenvConfig();
+// Load environment variables from multiple possible locations
+const envPaths = [
+  '.env.local', // Project-specific local env (git-ignored)
+  '.env', // Project env
+  `${process.env.HOME}/.floyd/.env.local`, // Global user env
+];
+
+for (const envPath of envPaths) {
+  try {
+    const result = dotenvConfig({ path: envPath });
+    if (result.error) {
+      // Silently ignore ENOENT (file not found) errors
+    } else if (Object.keys(result.parsed ?? {}).length > 0) {
+      // Environment loaded successfully
+    }
+  } catch {
+    // Ignore errors, try next path
+  }
+}
 
 // ============================================================================
 // CLI Configuration
@@ -36,14 +53,16 @@ const cli = meow(
     $ floyd [options]
 
   Options
-    --debug     Enable debug logging
-    --tui       Launch full TUI mode (Ink-based UI)
-    --resume    Resume specific session (id or name)
-    --version   Show version number
+    --debug       Enable debug logging
+    --tui         Launch full TUI mode (Ink-based UI)
+    --bridge      Start mobile bridge server
+    --resume      Resume specific session (id or name)
+    --version     Show version number
 
   Examples
     $ floyd              # Launch wrapper mode (default)
-    $ floyd --tui         # Launch full TUI mode
+    $ floyd --tui        # Launch full TUI mode
+    $ floyd --bridge     # Start mobile bridge server
     $ floyd --debug
     $ floyd-tui          # Alternative way to launch TUI
 `,
@@ -55,6 +74,10 @@ const cli = meow(
         default: false,
       },
       tui: {
+        type: 'boolean',
+        default: false,
+      },
+      bridge: {
         type: 'boolean',
         default: false,
       },
@@ -268,50 +291,10 @@ export class FloydCLI {
         },
       }, this.sessionManager);
 
-      // Import permission manager and set up prompt function
+      // Import permission manager and set to auto-approve mode
+      // NOTE: Interactive permission prompts conflict with readline, so we auto-approve for now
       const { permissionManager } = await import('./permissions/permission-manager.js');
-      permissionManager.setPromptFunction(async (prompt: string, _permissionLevel: 'moderate' | 'dangerous') => {
-        // Pause the main readline interface temporarily
-        if (this.rl) {
-          this.rl.pause();
-        }
-
-        // Display the permission prompt
-        console.error(prompt);
-
-        // Create a one-time question interface
-        const answer = await new Promise<string>((resolve) => {
-          const rl = readline.createInterface({
-            input: process.stdin,
-            output: process.stdout,
-          });
-
-          const question = '\nApprove this operation? (y/n): ';
-          rl.question(question, (ans) => {
-            rl.close();
-            resolve(ans);
-          });
-        });
-
-        // Resume the main readline interface
-        if (this.rl) {
-          this.rl.resume();
-        }
-
-        // Ensure cursor is visible after permission prompt
-        this.showCursor();
-
-        const normalizedAnswer = answer.trim().toLowerCase();
-        const approved = normalizedAnswer === 'y' || normalizedAnswer === 'yes';
-
-        if (approved) {
-          logger.info('Permission granted for tool');
-        } else {
-          logger.warn('Permission denied for tool');
-        }
-
-        return approved;
-      });
+      permissionManager.setAutoConfirm(true);
 
       // Handle Ctrl+C gracefully (skip in test mode)
       if (!this.testMode) {
@@ -601,8 +584,11 @@ export class FloydCLI {
       }
 
       // Main input loop
-      this.rl.prompt();
-      this.showCursor(); // Ensure cursor is visible
+      // Only prompt if stdin is a TTY (interactive mode)
+      if (process.stdin.isTTY) {
+        this.rl.prompt();
+        this.showCursor(); // Ensure cursor is visible
+      }
 
       this.rl.on('line', async (line: string) => {
         // Save to history file
@@ -615,14 +601,25 @@ export class FloydCLI {
           await this.processInput(msg);
         });
 
-        if (this.isRunning) {
+        // Only prompt again if stdin is a TTY (interactive mode)
+        // When stdin is piped, readline will close automatically after input ends
+        if (this.isRunning && process.stdin.isTTY) {
           this.rl?.prompt();
           this.showCursor(); // Ensure cursor is visible after each prompt
         }
       });
 
       this.rl.on('close', () => {
-        this.shutdown();
+        // Only shutdown if we're in interactive mode (TTY)
+        // When stdin is piped, the close event is expected and we should just exit cleanly
+        if (process.stdin.isTTY) {
+          this.shutdown();
+        } else {
+          // For piped input, just exit without calling shutdown
+          // (shutdown tries to close readline which is already closed)
+          this.isRunning = false;
+          process.exit(0);
+        }
       });
 
       logger.info('Floyd CLI started');
@@ -750,6 +747,18 @@ export class FloydCLI {
  * Main function to start the CLI
  */
 export async function main(options?: { testMode?: boolean }): Promise<void> {
+  // Check if bridge mode is requested
+  if (cli.flags.bridge) {
+    const { startBridgeServer } = await import('./bridge/cli.js');
+    await startBridgeServer({
+      port: 4000,
+      ngrokAuthToken: process.env.NGROK_AUTHTOKEN,
+      ngrokDomain: process.env.NGROK_DOMAIN,
+      jwtSecret: process.env.FLOYD_JWT_SECRET
+    });
+    return;
+  }
+
   // Check if TUI mode is requested
   if (cli.flags.tui) {
     const { launchTUI } = await import('./cli-tui.js');

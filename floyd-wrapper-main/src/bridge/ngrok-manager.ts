@@ -58,15 +58,23 @@ export class NgrokManager {
       // Set authtoken if provided
       if (this.config.authtoken) {
         await ngrok.authtoken(this.config.authtoken);
+        console.log('[NGROK] Authtoken set from configuration');
       }
 
       // Create forward tunnel
       // Reference: https://ngrok.com/docs/getting-started/javascript
-      this.listener = await ngrok.forward({
+      // Don't use authtoken_from_env if we've already set the token programmatically
+      const forwardOptions: any = {
         addr: this.config.port,
-        authtoken_from_env: true,
         ...(this.config.domain && { domain: this.config.domain })
-      });
+      };
+
+      // Only use authtoken_from_env if we haven't set it programmatically
+      if (!this.config.authtoken) {
+        forwardOptions.authtoken_from_env = true;
+      }
+
+      this.listener = await ngrok.forward(forwardOptions);
 
       // Get the public URL
       this.url = this.listener.url();

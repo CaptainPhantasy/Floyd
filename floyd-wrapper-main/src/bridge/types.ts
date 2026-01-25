@@ -29,6 +29,17 @@ export interface TokenPayload {
 }
 
 /**
+ * Session (from SessionManager)
+ */
+export interface Session {
+  id: string;
+  name: string;
+  createdAt: number;
+  updatedAt: number;
+  metadata: Record<string, unknown>;
+}
+
+/**
  * Bridge Server Configuration
  */
 export interface BridgeConfig {

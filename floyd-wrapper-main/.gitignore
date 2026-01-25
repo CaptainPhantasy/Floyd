@@ -61,3 +61,14 @@ Thumbs.db
 .loop/
 PRE_FLIGHT_COMPLETE.md
 *_PRE_FLIGHT*.md
+HANDOFF.md
+HANDOFF*.md
+*_HANDOFF*.md
+mobilecontract*.md
+MOBILE_*.md
+
+# Test scripts (may reference secrets)
+test-*.cjs
+test-*.js
+test-*.ts
+*.test.cjs

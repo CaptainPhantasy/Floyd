@@ -31,6 +31,7 @@
     "type-check": "cd packages/floyd-agent-core && npm run build && cd ../../INK/floyd-cli && npm run build && cd ../../FloydDesktopWeb && npm run build && cd ../FloydChromeBuild/floydchrome && npm run typecheck"
   },
   "devDependencies": {
+    "@types/jsonwebtoken": "^9.0.10",
     "electron": "^40.0.0",
     "typescript": "^5.8.3"
   },

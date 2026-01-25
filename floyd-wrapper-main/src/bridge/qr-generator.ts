@@ -92,8 +92,6 @@ export class QRGenerator {
       JSON.stringify(handshakeData),
       {
         errorCorrectionLevel: this.config.errorCorrectionLevel,
-        type: 'image/png',
-        quality: 0.92,
         margin: this.config.margin,
         scale: 8,
         width: this.config.width

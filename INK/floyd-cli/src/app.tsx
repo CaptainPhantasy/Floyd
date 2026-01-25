@@ -120,6 +120,119 @@ function toChatMessage(msg: Message | ConversationMessage): ChatMessage {
 // ═══════════════════════════════════════════════════════════════════════════════
 
 // ============================================================================
+// MONITOR OVERLAY COMPONENT
+// ============================================================================
+
+function MonitorOverlay() {
+	const tokenData = useFloydStore(selectTokenUsage);
+	const toolData = useFloydStore(selectToolPerformance);
+	const errorData = useFloydStore(selectErrors);
+	const productivityData = useFloydStore(selectProductivity);
+	const responseTimeData = useFloydStore(selectResponseTimes);
+	const costData = useFloydStore(selectCosts);
+
+	return (
+		<Box flexDirection="column" padding={1}>
+			<Box
+				flexDirection="row"
+				justifyContent="space-between"
+				paddingX={1}
+				paddingY={0}
+				borderStyle="double"
+				borderColor={floydTheme.colors.borderFocus}
+			>
+				<Text bold color={floydRoles.headerTitle}>
+					FLOYD MONITOR
+				</Text>
+				<Text dimColor>Press Esc to return</Text>
+			</Box>
+
+			<Box flexDirection="row" gap={1}>
+				<Box flexDirection="column" gap={1}>
+					<TokenUsageDashboard data={tokenData} />
+					<ToolPerformanceDashboard tools={toolData} />
+					<ProductivityDashboard data={productivityData} />
+					<ErrorAnalysisDashboard errors={errorData} />
+				</Box>
+
+				<Box flexDirection="column" gap={1}>
+					<MemoryDashboard
+						projectCache={{name: 'Project', entries: 0, sizeBytes: 0, hits: 0, misses: 0, lastAccess: Date.now()}}
+						reasoningCache={{name: 'Reasoning', entries: 0, sizeBytes: 0, hits: 0, misses: 0, lastAccess: Date.now()}}
+						vaultCache={{name: 'Vault', entries: 0, sizeBytes: 0, hits: 0, misses: 0, lastAccess: Date.now()}}
+						totalMemoryMB={0}
+					/>
+					<ResponseTimeDashboard data={responseTimeData} />
+					<CostAnalysisDashboard data={costData} />
+					<CodeQualityDashboard
+						data={{
+							testCoverage: 0,
+							lintErrors: 0,
+							typeErrors: 0,
+							score: 100,
+						}}
+					/>
+				</Box>
+			</Box>
+
+			<Box flexDirection="row" gap={1}>
+				<AgentActivityDashboard
+					data={{
+						activeAgents: 0,
+						totalTasks: 0,
+						completedTasks: 0,
+						averageTime: 0,
+					}}
+				/>
+				<WorkflowDashboard
+					data={{
+						commonWorkflows: [],
+					}}
+				/>
+				<FileActivityDashboard
+					data={{
+						filesRead: 0,
+						filesWritten: 0,
+						filesModified: 0,
+						totalFiles: 0,
+					}}
+				/>
+			</Box>
+
+			<Box flexDirection="row" gap={1}>
+				<GitActivityDashboard
+					data={{
+						commits: 0,
+						branches: 1,
+						merges: 0,
+						lastCommit: 'No commits yet',
+					}}
+				/>
+				<BrowserSessionDashboard
+					data={{
+						pagesVisited: 0,
+						screenshots: 0,
+						interactions: 0,
+						activeTime: 0,
+					}}
+				/>
+				<ResourceDashboard
+					data={{
+						diskUsage: 0,
+						networkIO: 0,
+						tempFiles: 0,
+						openFiles: 0,
+					}}
+				/>
+				<SessionHistoryDashboard
+					data={[]}
+				/>
+			</Box>
+		</Box>
+	);
+}
+
+// ============================================================================
 // APP COMPONENT WITH MAIN LAYOUT INTEGRATION
 // ============================================================================
 
@@ -186,14 +299,6 @@ export default function App({name = 'User', chrome = false}: AppProps) {
 	const toggleMonitor = useCallback(() => {
 		useFloydStore.getState().toggleOverlay('showMonitor');
 	}, []);
-
-	// Dashboard hooks (must be at top level for Rules of Hooks)
-	const tokenData = useFloydStore(selectTokenUsage);
-	const toolData = useFloydStore(selectToolPerformance);
-	const errorData = useFloydStore(selectErrors);
-	const productivityData = useFloydStore(selectProductivity);
-	const responseTimeData = useFloydStore(selectResponseTimes);
-	const costData = useFloydStore(selectCosts);
 
 	const {exit} = useApp();
 
@@ -631,105 +736,7 @@ export default function App({name = 'User', chrome = false}: AppProps) {
 	// ============================================================================
 
 	if (showMonitor) {
-		return (
-			<Box flexDirection="column" padding={1}>
-				<Box
-					flexDirection="row"
-					justifyContent="space-between"
-					paddingX={1}
-					paddingY={0}
-					borderStyle="double"
-					borderColor={floydTheme.colors.borderFocus}
-				>
-					<Text bold color={floydRoles.headerTitle}>
-						FLOYD MONITOR
-					</Text>
-					<Text dimColor>Press Esc to return</Text>
-				</Box>
-
-				<Box flexDirection="row" gap={1}>
-					<Box flexDirection="column" gap={1}>
-						<TokenUsageDashboard data={tokenData} />
-						<ToolPerformanceDashboard tools={toolData} />
-						<ProductivityDashboard data={productivityData} />
-						<ErrorAnalysisDashboard errors={errorData} />
-					</Box>
-
-					<Box flexDirection="column" gap={1}>
-						<MemoryDashboard
-							projectCache={{name: 'Project', entries: 0, sizeBytes: 0, hits: 0, misses: 0, lastAccess: Date.now()}}
-							reasoningCache={{name: 'Reasoning', entries: 0, sizeBytes: 0, hits: 0, misses: 0, lastAccess: Date.now()}}
-							vaultCache={{name: 'Vault', entries: 0, sizeBytes: 0, hits: 0, misses: 0, lastAccess: Date.now()}}
-							totalMemoryMB={0}
-						/>
-						<ResponseTimeDashboard data={responseTimeData} />
-						<CostAnalysisDashboard data={costData} />
-						<CodeQualityDashboard
-							data={{
-								testCoverage: 0,
-								lintErrors: 0,
-								typeErrors: 0,
-								score: 100,
-							}}
-						/>
-					</Box>
-				</Box>
-
-				<Box flexDirection="row" gap={1}>
-					<AgentActivityDashboard
-						data={{
-							activeAgents: 0,
-							totalTasks: 0,
-							completedTasks: 0,
-							averageTime: 0,
-						}}
-					/>
-					<WorkflowDashboard
-						data={{
-							commonWorkflows: [],
-						}}
-					/>
-					<FileActivityDashboard
-						data={{
-							filesRead: 0,
-							filesWritten: 0,
-							filesModified: 0,
-							totalFiles: 0,
-						}}
-					/>
-				</Box>
-
-				<Box flexDirection="row" gap={1}>
-					<GitActivityDashboard
-						data={{
-							commits: 0,
-							branches: 1,
-							merges: 0,
-							lastCommit: 'No commits yet',
-						}}
-					/>
-					<BrowserSessionDashboard
-						data={{
-							pagesVisited: 0,
-							screenshots: 0,
-							interactions: 0,
-							activeTime: 0,
-						}}
-					/>
-					<ResourceDashboard
-						data={{
-							diskUsage: 0,
-							networkIO: 0,
-							tempFiles: 0,
-							openFiles: 0,
-						}}
-					/>
-					<SessionHistoryDashboard
-						data={[]}
-					/>
-				</Box>
-			</Box>
-		);
+		return <MonitorOverlay />;
 	}
 
 	// ============================================================================

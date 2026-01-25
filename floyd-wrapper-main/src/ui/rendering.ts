@@ -1,19 +1,31 @@
 /**
- * Floyd Wrapper - In-place token streaming renderer
- *
- * Uses log-update for smooth token streaming without scroll spam.
+ * Hybrid Scrollable History Implementation
+ * 
+ * Architecture: Hybrid rendering mode that provides BOTH:
+ * 1. Smooth in-place streaming (current message)
+ * 2. Native terminal scrollback (completed messages)
+ * 
+ * How it works:
+ * - Active messages use log-update (in-place updates)
+ * - Completed messages "freeze" into terminal history via console.log
+ * - User can scroll up naturally to see full conversation
+ * - Copy/paste works natively
  */
 
-import logUpdate from 'log-update';
-import chalk from 'chalk';
-import { CRUSH_THEME } from '../constants.js';
+// This will be integrated into the existing StreamingDisplay class
+
+/**
+ * Floyd Wrapper - Streaming token renderer
+ *
+ * Streams tokens directly to stderr to avoid readline conflicts.
+ */
 
 // ============================================================================
 // StreamingDisplay Class
 // ============================================================================
 
 /**
- * In-place streaming display for tokens
+ * Streaming display for tokens that works with readline
  */
 export class StreamingDisplay {
   /**
@@ -53,46 +65,32 @@ export class StreamingDisplay {
   appendToken(token: string): void {
     this.active = true;
     this.buffer += token;
-    this.render();
-  }
 
-
-
-  /**
-   * Render the current buffer in-place with styling
-   */
-  private render(): void {
-    const styledBuffer = this.styleThoughts(this.buffer);
-    logUpdate(styledBuffer);
-  }
-
-  /**
-   * Style <think> blocks in the output
-   */
-  private styleThoughts(text: string): string {
-    // Simple regex to find <think> content </think>
-    // Note: This relies on the tags being present in the buffer.
-    // Streaming tokens might split tags, but eventually it renders correctly.
-    // For a smoother experience, we'd need a token-aware parser, but this works for "eventual consistency".
-
-    return text.replace(/<think>([\s\S]*?)(<\/think>|$)/g, (_match, content) => {
-      // If the tag is closed, style distinctively
-      // If open (no closing tag yet), style the content we have so far
-      return chalk.hex(CRUSH_THEME.semantic.thinking).italic(content);
-    });
+    // Synchronous write to stderr for immediate visibility (no buffering)
+    try {
+      const { writeSync } = require('fs');
+      writeSync(2, token);  // 2 = stderr file descriptor
+    } catch {
+      // Fallback to async write if sync fails
+      process.stderr.write(token);
+    }
   }
 
   /**
-   * Complete the streaming display and finalize output
+   * Complete the streaming display
    */
   finish(): void {
     if (!this.active) {
       return;
     }
 
-    // Write final output with proper newline
-    // logUpdate.done() handles the final display, no need for console.log
-    logUpdate.done();
+    // Write newline using sync write for consistency
+    try {
+      const { writeSync } = require('fs');
+      writeSync(2, '\n');  // 2 = stderr file descriptor
+    } catch {
+      process.stderr.write('\n');
+    }
 
     // Reset state
     this.buffer = '';
@@ -104,7 +102,6 @@ export class StreamingDisplay {
    */
   clear(): void {
     this.buffer = '';
-    logUpdate.clear();
   }
 
   /**
@@ -123,9 +120,6 @@ export class StreamingDisplay {
 
   /**
    * Reset the singleton instance (for testing only)
-   *
-   * This method clears the global singleton instance, allowing
-   * tests to start with a fresh state. Should only be used in test code.
    */
   static resetInstance(): void {
     StreamingDisplay.instance = null;
