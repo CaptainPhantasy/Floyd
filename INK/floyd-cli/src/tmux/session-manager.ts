@@ -10,7 +10,7 @@
  * @module tmux/session-manager
  */
 
-import {execaCommand} from 'execa';
+// Use dynamic import for execa command to match package shape at runtime
 
 export interface SessionInfo {
 	name: string;
@@ -49,7 +49,8 @@ function buildTmuxCommand(socketPath?: string): string {
 async function execTmux(args: string[], socketPath?: string): Promise<string> {
 	const tmuxCmd = buildTmuxCommand(socketPath);
 	const command = `${tmuxCmd} ${args.join(' ')}`;
-	const {stdout} = await execaCommand(command);
+	const execa = (await import('execa')).default;
+	const { stdout } = await execa.command(command);
 	return stdout.trim();
 }
 
@@ -173,7 +174,7 @@ export async function getSessionWindows(
 export async function getSessionWindowIds(
 	sessionName: string,
 	socketPath?: string,
-): Promise<{mainWindowId?: number; monitorWindowId?: number}> {
+): Promise<{ mainWindowId?: number; monitorWindowId?: number }> {
 	const windows = await getSessionWindows(sessionName, socketPath);
 
 	const mainWindow = windows.find(w => w.name.toLowerCase() === 'main');

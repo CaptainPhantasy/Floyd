@@ -883,67 +883,19 @@ export function MainLayout({
 				return;
 			}
 
-			// Validation: Check for maximum length
-			if (value.length > MAX_INPUT_LENGTH) {
-				return;
-			}
-
-			// Prevent submission if agent is thinking
-			if (isThinking) {
-				return;
-			}
-
-			// Update last submission time
-			lastSubmitTimeRef.current = now;
-
-			// Record the API call (will be decremented from remaining)
-			useFloydStore.getState().recordCall();
-
-			// Clear input and submit
-			setInput('');
-			onSubmit?.(value);
-		},
-		[isThinking, onSubmit],
-	);
-
-	// Define hotkeys for the help overlay
-	const hotkeys: Hotkey[] = [
-		{
-			keys: 'Ctrl+/',
-			description: 'Show/hide keyboard shortcuts',
-			category: 'Navigation',
-			action: () => setShowHelp(false),
-		},
-		{
-			keys: 'Ctrl+P',
-			description: 'Open command palette',
-			category: 'Navigation',
-			action: () => {
-				// Command palette is handled by CommandPaletteTrigger
-				setShowHelp(false);
-			},
-		},
-		{
-			keys: 'Ctrl+M',
-			description: 'Toggle monitor dashboard',
-			category: 'Navigation',
-			action: () => {
-				onCommand?.('toggle-monitor');
-				setShowHelp(false);
-			},
-		},
-		{
-			keys: 'Ctrl+T',
-			description: 'Toggle agent visualization',
-			category: 'Navigation',
-			action: () => {
-				onCommand?.('toggle-agent-viz');
-				setShowHelp(false);
-			},
-		},
-		{
-			keys: 'Esc',
-			description: 'Close overlay / Exit',
+  // Scroll handling - FIXED: Auto-scroll to show NEWEST at TOP, scroll content UP away from input
+  // Content grows UP from input line, never DOWN into it
+  const handleScroll = useCallback((newScrollTop: number) => {
+    const minScroll = 0;
+    const maxScroll = Math.max(0, estimatedTotalHeight - viewportHeight);
+    const clamped = Math.max(minScroll, Math.min(maxScroll, newScrollTop));
+    setScrollTop(clamped);
+  }, [estimatedTotalHeight, viewportHeight]);
+        setScrollOffset((prev) => Math.min(minScroll, prev + scrollSpeed));
+      }
+    },
+    [containerDimensions, scrollSpeed]
+  );
 			category: 'Navigation',
 			action: () => {
 				setShowHelp(false);

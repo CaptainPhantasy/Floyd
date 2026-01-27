@@ -22,9 +22,19 @@ DEFAULT_CONFIG="$PLUGIN_ROOT/.claude/doc-parity.local.md"
 OUTPUT_FILE=$(mktemp)
 trap "rm -f $OUTPUT_FILE" EXIT
 
-# Read hook input
-INPUT=$(cat)
-TOOL_NAME=$(echo "$INPUT" | jq -r '.tool_name // empty')
+# Read hook input robustly
+if ! INPUT=$(cat); then
+    # Failed to read input
+    exit 0
+fi
+
+if [[ -z "$INPUT" ]]; then
+    # Empty input
+    exit 0
+fi
+
+# Safely extract tool name and file path
+TOOL_NAME=$(echo "$INPUT" | jq -r '.tool_name // empty' 2>/dev/null || echo "")
 FILE_PATH=$(echo "$INPUT" | jq -r '.tool_input.file_path // .tool_input.path // empty' 2>/dev/null || echo "")
 
 # Debug logging

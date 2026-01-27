@@ -10,8 +10,8 @@
  * @module tmux/dock
  */
 
-import {execaCommand} from 'execa';
-import {SessionManager} from './session-manager.js';
+// Use dynamic import for execa command to match package shape at runtime
+import { SessionManager } from './session-manager.js';
 
 export interface DockCommand {
 	/**
@@ -62,7 +62,7 @@ export interface DockResult {
  */
 export const DOCK_COMMANDS: Record<
 	string,
-	{command: string; args?: string[]; description?: string}
+	{ command: string; args?: string[]; description?: string }
 > = {
 	btop: {
 		command: 'btop',
@@ -120,7 +120,8 @@ function buildTmuxCommand(socketPath?: string): string {
 async function execTmux(args: string[], socketPath?: string): Promise<string> {
 	const tmuxCmd = buildTmuxCommand(socketPath);
 	const command = `${tmuxCmd} ${args.join(' ')}`;
-	const {stdout} = await execaCommand(command);
+	const execa = (await import('execa')).default;
+	const { stdout } = await execa.command(command);
 	return stdout.trim();
 }
 
@@ -129,7 +130,8 @@ async function execTmux(args: string[], socketPath?: string): Promise<string> {
  */
 async function commandExists(command: string): Promise<boolean> {
 	try {
-		await execaCommand(`command -v ${command}`);
+		const execa = (await import('execa')).default;
+		await execa.command(`command -v ${command}`);
 		return true;
 	} catch {
 		return false;
@@ -453,7 +455,7 @@ export class Dock {
  */
 export function parseDockCommand(
 	input: string,
-): {command: string; args?: string[]} | null {
+): { command: string; args?: string[] } | null {
 	const trimmed = input.trim();
 
 	// Match :dock <command> [args...]
@@ -462,7 +464,7 @@ export function parseDockCommand(
 		const command = dockMatch[1];
 		const argsStr = dockMatch[2];
 		const args = argsStr?.split(/\s+/).filter(Boolean);
-		return {command, args};
+		return { command, args };
 	}
 
 	// Match shorthand :<command> for predefined commands
@@ -472,7 +474,7 @@ export function parseDockCommand(
 		if (command in DOCK_COMMANDS) {
 			const argsStr = shorthandMatch[2];
 			const args = argsStr?.split(/\s+/).filter(Boolean);
-			return {command, args};
+			return { command, args };
 		}
 	}
 

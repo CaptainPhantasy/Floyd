@@ -1,6 +1,6 @@
 #!/usr/bin/env node
 import React from 'react';
-import {render} from 'ink';
+import { render } from 'ink';
 import meow from 'meow';
 import App from './app.js';
 
@@ -8,11 +8,12 @@ import App from './app.js';
 const MIN_ROWS = 20;
 const MIN_COLS = 80;
 
-// Check terminal size before starting
+// Check terminal size before starting (allow bypass for CI/tests)
 const terminalHeight = process.stdout.rows || 24;
 const terminalWidth = process.stdout.columns || 80;
+const ignoreSizeCheck = process.env.FLOYD_CLI_IGNORE_MIN_TERMINAL === '1';
 
-if (terminalHeight < MIN_ROWS || terminalWidth < MIN_COLS) {
+if (!ignoreSizeCheck && (terminalHeight < MIN_ROWS || terminalWidth < MIN_COLS)) {
 	console.error(`\n⚠️  Terminal too small: ${terminalWidth}x${terminalHeight}`);
 	console.error(`   Minimum required: ${MIN_COLS}x${MIN_ROWS}`);
 	console.error(`\n   Please resize your terminal and try again.\n`);

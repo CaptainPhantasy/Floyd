@@ -1,112 +1,132 @@
 /**
- * MCP Server Implementation - WebSocket Client Version
- * Connects to Floyd Desktop Web (ws://localhost:3005)
+ * MCP Server Implementation - Multi-Connection Version
+ * Supports connections from both CLI (port 3005) and Desktop (port 3000)
  */
 
 import { MCPMessageHandler } from './messages.js';
 import { ToolExecutor } from '../tools/executor.js';
 import { SafetyLayer } from '../safety/permissions.js';
+import { ConnectionManager } from './connection-manager.js';
 
 export class MCPServer {
   constructor() {
     this.messageHandler = new MCPMessageHandler();
     this.toolExecutor = new ToolExecutor();
     this.safetyLayer = new SafetyLayer();
-    this.ws = null;
-    this.isConnected = false;
+    this.connectionManager = new ConnectionManager();
     this.attachedTabs = new Map();
-    this.reconnectAttempts = 0;
-    this.maxReconnectAttempts = 50;
+
+    // Register message handler for MCP connections
+    this.connectionManager.registerHandler('mcp', (message, connectionName) => {
+      this.handleIncomingMessage(message, connectionName);
+    });
   }
 
   /**
-   * Initialize WebSocket connection to Floyd Desktop
+   * Initialize connections to CLI and Desktop
+   * @param {Object} config - Configuration with ports
    */
-  async connect(port = 3005) {
-    return new Promise((resolve) => {
-      try {
-        console.log(`[MCP] Connecting to Floyd Desktop on port ${port}...`);
-        this.ws = new WebSocket(`ws://localhost:${port}`);
+  async initialize(config = {}) {
+    const {
+      cliPort = 3005,
+      desktopPort = 3000,
+      enableCLI = true,
+      enableDesktop = true
+    } = config;
 
-        this.ws.onopen = () => {
-          this.isConnected = true;
-          this.reconnectAttempts = 0;
-          console.log('[MCP] Connected to Floyd Desktop');
-          
-          // Send initialization notification
-          this.sendNotification('initialized', {
-            protocolVersion: '2024-11-05',
-            capabilities: {
-              tools: this.toolExecutor.listTools()
-            }
-          });
-          resolve(true);
-        };
+    console.log('[MCP] Initializing multi-connection MCP server...');
 
-        this.ws.onmessage = (event) => {
-          try {
-            const message = JSON.parse(event.data);
-            this.handleIncomingMessage(message);
-          } catch (err) {
-            console.error('[MCP] Parse error:', err);
-          }
-        };
+    const results = {};
 
-        this.ws.onclose = () => {
-          this.handleDisconnect();
-          this.attemptReconnect(port);
-        };
+    // Connect to CLI (Floyd CLI)
+    if (enableCLI) {
+      results.cli = await this.connectionManager.connect(
+        'cli',
+        cliPort,
+        'mcp',
+        {
+          autoReconnect: true,
+          reconnectInterval: 5000,
+          maxReconnectAttempts: 50
+        }
+      );
 
-        this.ws.onerror = (err) => {
-          console.error('[MCP] WebSocket error:', err);
-          this.isConnected = false;
-          resolve(false);
-        };
+      if (results.cli) {
+        console.log('[MCP] Connected to Floyd CLI');
+        this.sendInitialization('cli');
+      } else {
+        console.log('[MCP] Floyd CLI not available');
+      }
+    }
 
-      } catch (error) {
-        console.error('[MCP] Connection failed:', error);
-        this.isConnected = false;
-        resolve(false);
+    // Connect to Desktop (Floyd Desktop Web)
+    if (enableDesktop) {
+      results.desktop = await this.connectionManager.connect(
+        'desktop',
+        desktopPort,
+        'mcp',
+        {
+          autoReconnect: true,
+          reconnectInterval: 5000,
+          maxReconnectAttempts: 50
+        }
+      );
+
+      if (results.desktop) {
+        console.log('[MCP] Connected to Floyd Desktop');
+        this.sendInitialization('desktop');
+      } else {
+        console.log('[MCP] Floyd Desktop not available');
+      }
+    }
+
+    return results;
+  }
+
+  /**
+   * Send initialization notification
+   */
+  sendInitialization(connectionName) {
+    this.sendNotification(connectionName, 'initialized', {
+      protocolVersion: '2024-11-05',
+      capabilities: {
+        tools: this.toolExecutor.listTools()
+      },
+      serverInfo: {
+        name: 'floyd-chrome',
+        version: '1.0.0'
       }
     });
   }
 
-  attemptReconnect(port) {
-    if (this.reconnectAttempts < this.maxReconnectAttempts) {
-      this.reconnectAttempts++;
-      console.log(`[MCP] Reconnecting attempt ${this.reconnectAttempts}...`);
-      setTimeout(() => this.connect(port), 5000);
-    }
-  }
-
   /**
-   * Handle incoming messages from FLOYD CLI
+   * Handle incoming messages from CLI or Desktop
    */
-  async handleIncomingMessage(message) {
+  async handleIncomingMessage(message, connectionName) {
     try {
       const parsed = this.messageHandler.parseMessage(message);
-      
+
       // If it's a tool call
       if (parsed.method === 'tools/call') {
-        await this.handleRequest(parsed);
+        await this.handleRequest(parsed, connectionName);
         return;
       }
 
       // If it's a notification
       if (!parsed.id && parsed.method) {
-        await this.handleNotification(parsed);
+        await this.handleNotification(parsed, connectionName);
         return;
       }
 
     } catch (error) {
-      console.error('[MCP] Error handling message:', error);
+      console.error(`[MCP] Error handling message from ${connectionName}:`, error);
     }
   }
 
   /**
    * Handle JSON-RPC request
    */
-  async handleRequest(message) {
+  async handleRequest(message, connectionName) {
     const { id, method, params } = message;
     // In our new architecture, the method name is inside params for tools/call
     const toolName = message.params?.name || method;
@@ -116,99 +136,126 @@ export class MCPServer {
       // Safety check
       const safetyCheck = await this.safetyLayer.checkAction(toolName, toolArgs);
       if (!safetyCheck.allowed) {
-        this.sendError(id, -32000, 'Safety check failed', safetyCheck.reason);
+        this.sendError(connectionName, id, -32000, 'Safety check failed', safetyCheck.reason);
         return;
       }
 
       // Execute tool
       const result = await this.toolExecutor.execute(toolName, toolArgs);
-      
-      // Log action
-      await this.logAction(toolName, toolArgs, result);
 
-      this.sendResponse(id, result);
+      // Log action with connection source
+      await this.logAction(toolName, toolArgs, result, connectionName);
+
+      this.sendResponse(connectionName, id, result);
     } catch (error) {
       console.error(`[MCP] Error executing ${toolName}:`, error);
-      this.sendError(id, -32603, 'Internal error', error.message);
+      this.sendError(connectionName, id, -32603, 'Internal error', error.message);
     }
   }
 
   /**
    * Handle JSON-RPC notification
    */
-  async handleNotification(message) {
+  async handleNotification(message, connectionName) {
     const { method } = message;
     switch (method) {
       case 'ping':
-        this.sendNotification('pong', { timestamp: Date.now() });
+        this.sendNotification(connectionName, 'pong', { timestamp: Date.now() });
         break;
       default:
-        console.warn(`[MCP] Unknown notification: ${method}`);
+        console.warn(`[MCP] Unknown notification from ${connectionName}: ${method}`);
     }
   }
 
   /**
    * Send JSON-RPC response
    */
-  sendResponse(id, result) {
-    if (!this.isConnected || !this.ws) return;
+  sendResponse(connectionName, id, result) {
+    if (!this.connectionManager.isConnected(connectionName)) {
+      console.warn(`[MCP] Cannot send response - ${connectionName} not connected`);
+      return;
+    }
 
-    this.ws.send(JSON.stringify({
+    this.connectionManager.send(connectionName, {
       jsonrpc: '2.0',
       id,
       result: {
         content: [{ type: 'text', text: JSON.stringify(result) }]
       }
-    }));
+    });
   }
 
   /**
    * Send JSON-RPC error
    */
-  sendError(id, code, message, data = null) {
-    if (!this.isConnected || !this.ws) return;
+  sendError(connectionName, id, code, message, data = null) {
+    if (!this.connectionManager.isConnected(connectionName)) {
+      return;
+    }
 
-    this.ws.send(JSON.stringify({
+    this.connectionManager.send(connectionName, {
       jsonrpc: '2.0',
       id,
       error: { code, message, data }
-    }));
+    });
   }
 
   /**
    * Send JSON-RPC notification
    */
-  sendNotification(method, params = {}) {
-    if (!this.isConnected || !this.ws) return;
+  sendNotification(connectionName, method, params = {}) {
+    if (!this.connectionManager.isConnected(connectionName)) {
+      return;
+    }
 
-    this.ws.send(JSON.stringify({
+    this.connectionManager.send(connectionName, {
       jsonrpc: '2.0',
       method,
       params
-    }));
+    });
   }
 
   /**
-   * Handle disconnection
+   * Handle disconnection of a specific connection
    */
-  handleDisconnect() {
-    this.isConnected = false;
-    
-    // Detach debugger from all tabs
-    for (const tabId of this.attachedTabs.keys()) {
-      chrome.debugger.detach({ tabId }).catch(() => {});
-    }
-    this.attachedTabs.clear();
+  handleDisconnect(connectionName) {
+    console.log(`[MCP] ${connectionName} disconnected`);
 
-    console.log('[MCP] Disconnected from Floyd Desktop');
+    // If all connections are gone, detach debugger
+    const status = this.connectionManager.getStatus();
+    const anyConnected = Object.values(status).some(s => s.connected);
+
+    if (!anyConnected) {
+      // Detach debugger from all tabs
+      for (const tabId of this.attachedTabs.keys()) {
+        chrome.debugger.detach({ tabId }).catch(() => {});
+      }
+      this.attachedTabs.clear();
+    }
   }
 
-  async logAction(method, params, result) {
+  /**
+   * Check if any connection is active
+   */
+  get isConnected() {
+    const status = this.connectionManager.getStatus();
+    return Object.values(status).some(s => s.connected);
+  }
+
+  /**
+   * Get connection status
+   */
+  getStatus() {
+    return this.connectionManager.getStatus();
+  }
+
+  async logAction(method, params, result, source) {
     const logEntry = {
       timestamp: Date.now(),
       method,
       params,
-      success: !!result
+      success: !!result,
+      source // 'cli' or 'desktop'
     };
     const { actionLog = [] } = await chrome.storage.local.get('actionLog');
     actionLog.push(logEntry);

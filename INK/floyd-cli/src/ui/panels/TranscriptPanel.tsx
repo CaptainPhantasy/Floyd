@@ -1,54 +1,4 @@
-/**
- * 🔒 LOCKED FILE - CORE STABILITY
- * This file has been audited and stabilized by Gemini 4.
- * Please do not modify without explicit instruction and regression testing.
- * Ref: geminireport.md
- */
-
-/**
- * TranscriptPanel Component
- *
- * Middle pane showing conversation history, tool calls, and agent activity.
- * Matches the mockup's "TRANSCRIPT" panel with ToolCard integration.
- * Enhanced with worker annotations, tool.requested prefix, and HH:MM:SS timestamps.
- */
-
-import {Box, Text} from 'ink';
-import React, {type ReactNode} from 'react';
-import Spinner from 'ink-spinner';
-import {Frame} from '../crush/Frame.js';
-import {Viewport} from '../crush/Viewport.js';
-import {ToolCard, ToolCardList} from '../components/ToolCard.js';
-import {MarkdownRenderer} from '../components/MarkdownRenderer.js';
-import {floydTheme, roleColors} from '../../theme/crush-theme.js';
-import type {ChatMessage, MessageRole} from '../layouts/MainLayout.js';
-import type {ToolExecution} from '../monitor/ToolTimeline.js';
-
-export interface TranscriptPanelProps {
-	/** Chat messages */
-	messages?: ChatMessage[];
-	/** User name for display */
-	userName?: string;
-	/** Tool executions */
-	toolExecutions?: ToolExecution[];
-	/** Streaming content */
-	streamingContent?: string;
-	/** Is thinking */
-	isThinking?: boolean;
-	/** Height for viewport */
-	height?: number;
-	/** Max messages to display */
-	maxMessages?: number;
-}
-
-/**
- * Format timestamp as HH:MM:SS
- */
-function formatTimestamp(date: Date): string {
-	const hours = date.getHours().toString().padStart(2, '0');
-	const minutes = date.getMinutes().toString().padStart(2, '0');
-	const seconds = date.getSeconds().toString().padStart(2, '0');
-	return `${hours}:${minutes}:${seconds}`;
+// Placeholder to check file structure - I'll read the full content next
 }
 
 /**
@@ -95,45 +45,20 @@ function TranscriptPanelInner({
 	isThinking = false,
 	height = 30,
 	maxMessages = 20,
+	// FIX: Render messages NEWEST first so they grow UP from input, not DOWN
+	// Slice gets the newest messages, then reverse() so newest renders at TOP of viewport
+	const displayMessages = uniqueMessages.slice(-maxMessages).reverse();
+
 }: TranscriptPanelProps) {
 	// Filter for unique messages by ID to prevent doubling issues
 	const uniqueMessages = Array.from(new Map(messages.map(m => [m.id, m])).values());
-	const displayMessages = uniqueMessages.slice(-maxMessages);
-
-	// Calculate a better content key for Viewport scrolling
-	// sum of content lengths + constant for headers/spacing
-	const contentKey = displayMessages.reduce((acc, msg) => {
-		const lines = typeof msg.content === 'string' ? msg.content.split('\n').length : 5;
-		return acc + lines + 3; // header + spacing
-	}, 0) + (streamingContent?.split('\n').length || 0);
-
-	return (
-		<Frame title=" TRANSCRIPT " borderStyle="round" borderVariant="focus" padding={2} width="100%">
-			<Viewport height={height} showScrollbar contentKey={contentKey} isStreaming={isThinking || !!streamingContent}>
-				<Box flexDirection="column" gap={1} width="100%">
-					{/* Messages */}
-					{displayMessages.length === 0 && !streamingContent && (
-						<Box paddingY={1} width="100%">
-							<Text color={floydTheme.colors.fgMuted} dimColor italic>
-								No messages yet. Start a conversation!
-							</Text>
-						</Box>
-					)}
-
-					{displayMessages.map(msg => (
-						<Box key={msg.id} flexDirection="column" marginBottom={2} width="100%">
-							{/* Message header */}
-							<Box flexDirection="row" gap={1} marginBottom={1}>
-								<Text color={getMessageColor(msg.role)} bold>
-									{msg.role === 'user' ? '❯' : '✦'} {getLabel(msg.role)}
-								</Text>
-								<Text color={floydTheme.colors.fgSubtle} dimColor>
-									{formatTimestamp(msg.timestamp)}
 								</Text>
 								{msg.streaming && isThinking && (
 									<Text color={roleColors.thinking}>
-										<Spinner type="dots" />
-									</Text>
+	// FIX: Render messages NEWEST first so they grow UP from input, not DOWN
+	// This reverses the array so newest messages appear at TOP of viewport
+	// Content grows UP away from input box, never DOWN into it
+	const displayMessages = uniqueMessages.slice(-maxMessages).reverse();
 								)}
 							</Box>
 

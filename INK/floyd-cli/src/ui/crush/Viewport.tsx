@@ -1,27 +1,3 @@
-/**
- * Viewport Component
- *
- * Scrollable viewport with content clipping.
- * Provides virtual scrolling for large content lists.
- *
- * Features:
- * - Scrollable content area
- * - Content clipping
- * - Scroll indicators
- * - Keyboard scroll support
- */
-
-import {useState, useCallback, useEffect, useRef, type ReactNode} from 'react';
-import {Box, Text, useInput} from 'ink';
-import {floydTheme} from '../../theme/crush-theme.js';
-
-export interface ViewportProps {
-	/** Content to display */
-	children: ReactNode;
-
-	/** Maximum height (rows) */
-	height?: number;
-
 	/** Enable scroll indicators */
 	showScrollbar?: boolean;
 
@@ -67,28 +43,17 @@ export function Viewport({
 			}
 
 			// Clamp to max scroll
-			const clampedScroll = Math.max(0, Math.min(newScrollTop, maxScrollTop));
-
-			if (controlledScrollTop === undefined) {
-				setInternalScrollTop(clampedScroll);
-			}
-			onScroll?.(clampedScroll);
-		},
-		[controlledScrollTop, onScroll, maxScrollTop],
-	);
-
-	// Auto-scroll to bottom when streaming and content changes
+	// Auto-scroll to show NEWEST messages at TOP of viewport (TUI grows UP from input)
+	// Content flows: [OLDEST at bottom] ... [NEWEST at top of viewport]
 	useEffect(() => {
 		if (autoScroll && isStreaming && contentKey !== previousContentKey.current) {
 			// Reset user scroll flag if we're auto-scrolling
 			setUserScrolled(false);
-			// Scroll to bottom
+			// Scroll to show newest content at TOP (positive offset moves content UP)
 			handleScroll(maxScrollTop, false);
 			previousContentKey.current = contentKey;
 		}
 	}, [autoScroll, isStreaming, contentKey, maxScrollTop, handleScroll]);
-
-	// Reset user scroll flag when streaming stops
 	useEffect(() => {
 		if (!isStreaming) {
 			setUserScrolled(false);

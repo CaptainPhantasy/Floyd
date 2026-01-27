@@ -12,15 +12,15 @@
  * - build: Build the project
  */
 
-import {Server} from '@modelcontextprotocol/sdk/server/index.js';
-import {StdioServerTransport} from '@modelcontextprotocol/sdk/server/stdio.js';
+import { Server } from '@modelcontextprotocol/sdk/server/index.js';
+import { StdioServerTransport } from '@modelcontextprotocol/sdk/server/stdio.js';
 import {
 	CallToolRequestSchema,
 	ListToolsRequestSchema,
 } from '@modelcontextprotocol/sdk/types.js';
 import fs from 'fs-extra';
 import path from 'path';
-import {execa} from 'execa';
+import execa from 'execa';
 
 export type ProjectType = 'node' | 'go' | 'rust' | 'python' | 'unknown';
 
@@ -216,14 +216,14 @@ export async function executeCommand(
 	duration: number;
 }> {
 	const startTime = Date.now();
-	const {cwd = process.cwd(), timeout = 30000} = options;
+	const { cwd = process.cwd(), timeout = 30000 } = options;
 
 	try {
 		const result = await execa(command, args, {
 			cwd,
 			timeout,
 			reject: false,
-			env: {...process.env, ...options.env},
+			env: { ...process.env, ...options.env },
 		});
 
 		return {
@@ -288,8 +288,8 @@ export async function runTests(
 		};
 	}
 
-	const {command: cmd, args} = parseCommandString(command);
-	const result = await executeCommand(cmd, args, {cwd: projectPath});
+	const { command: cmd, args } = parseCommandString(command);
+	const result = await executeCommand(cmd, args, { cwd: projectPath });
 
 	return {
 		...result,
@@ -330,8 +330,8 @@ export async function formatCode(
 		};
 	}
 
-	const {command: cmd, args} = parseCommandString(command);
-	const result = await executeCommand(cmd, args, {cwd: projectPath});
+	const { command: cmd, args } = parseCommandString(command);
+	const result = await executeCommand(cmd, args, { cwd: projectPath });
 
 	return {
 		...result,
@@ -372,8 +372,8 @@ export async function lintCode(
 		};
 	}
 
-	const {command: cmd, args} = parseCommandString(command);
-	const result = await executeCommand(cmd, args, {cwd: projectPath});
+	const { command: cmd, args } = parseCommandString(command);
+	const result = await executeCommand(cmd, args, { cwd: projectPath });
 
 	return {
 		...result,
@@ -414,8 +414,8 @@ export async function buildProject(
 		};
 	}
 
-	const {command: cmd, args} = parseCommandString(command);
-	const result = await executeCommand(cmd, args, {cwd: projectPath});
+	const { command: cmd, args } = parseCommandString(command);
+	const result = await executeCommand(cmd, args, { cwd: projectPath });
 
 	return {
 		...result,
@@ -430,7 +430,7 @@ export async function buildProject(
  * Check if a permission is granted for execution
  */
 interface PermissionStore {
-	permissions: Map<string, {granted: boolean; expiresAt: number}>;
+	permissions: Map<string, { granted: boolean; expiresAt: number }>;
 }
 
 const permissionStore: PermissionStore = {
@@ -649,12 +649,12 @@ export async function createRunnerServer(): Promise<Server> {
 	});
 
 	server.setRequestHandler(CallToolRequestSchema, async request => {
-		const {name, arguments: args} = request.params;
+		const { name, arguments: args } = request.params;
 
 		try {
 			switch (name) {
 				case 'detect_project': {
-					const {projectPath} = args as {projectPath?: string};
+					const { projectPath } = args as { projectPath?: string };
 					const cwd = projectPath || process.cwd();
 					const detection = await detectProject(cwd);
 
@@ -746,7 +746,7 @@ export async function createRunnerServer(): Promise<Server> {
 				}
 
 				case 'check_permission': {
-					const {toolName, projectPath} = args as {
+					const { toolName, projectPath } = args as {
 						toolName: string;
 						projectPath?: string;
 					};

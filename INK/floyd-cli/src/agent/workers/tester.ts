@@ -13,8 +13,8 @@
  * @module agent/workers/tester
  */
 
-import {createModuleLogger, type Logger} from '../../utils/logger.js';
-import {execa} from 'execa';
+import { createModuleLogger, type Logger } from '../../utils/logger.js';
+import execa from 'execa';
 import fs from 'fs-extra';
 import path from 'path';
 
@@ -202,7 +202,7 @@ export class TesterWorker {
 				const pkg = await fs.readJson(pkgPath).catch(() => ({}));
 
 				// Check devDependencies for test frameworks
-				const deps = {...pkg.dependencies, ...pkg.devDependencies};
+				const deps = { ...pkg.dependencies, ...pkg.devDependencies };
 
 				if (
 					deps.vitest ||
@@ -214,8 +214,8 @@ export class TesterWorker {
 					detection.configFile = files.includes('vitest.config.ts')
 						? 'vitest.config.ts'
 						: files.includes('vitest.config.js')
-						? 'vitest.config.js'
-						: undefined;
+							? 'vitest.config.js'
+							: undefined;
 					detection.command = 'npx vitest run';
 				} else if (
 					deps.jest ||
@@ -227,8 +227,8 @@ export class TesterWorker {
 					detection.configFile = files.includes('jest.config.ts')
 						? 'jest.config.ts'
 						: files.includes('jest.config.js')
-						? 'jest.config.js'
-						: undefined;
+							? 'jest.config.js'
+							: undefined;
 					detection.command = 'npx jest';
 				} else if (deps.mocha) {
 					detection.framework = 'mocha';
@@ -333,7 +333,7 @@ export class TesterWorker {
 
 		async function walk(currentPath: string) {
 			try {
-				const entries = await fs.readdir(currentPath, {withFileTypes: true});
+				const entries = await fs.readdir(currentPath, { withFileTypes: true });
 				for (const entry of entries) {
 					const fullPath = path.join(currentPath, entry.name);
 					if (entry.isDirectory()) {
@@ -486,7 +486,7 @@ export class TesterWorker {
 				status: result.exitCode === 0 ? 'pass' : 'fail',
 				duration: Date.now() - startTime,
 				error:
-					result.exitCode !== 0 ? {message: output.slice(0, 500)} : undefined,
+					result.exitCode !== 0 ? { message: output.slice(0, 500) } : undefined,
 			};
 		} catch (error) {
 			this.logger.error('Single test execution failed', error as Error);

@@ -20,6 +20,7 @@ export interface TagEvent {
 
 export class StreamTagParser {
 	private buffer = '';
+	private static readonly MAX_BUFFER_SIZE = 1000000; // 1MB safety limit
 	private currentTag: string | null = null;
 	private tags: string[];
 

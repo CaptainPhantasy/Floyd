@@ -8,8 +8,8 @@
  * @module tmux/launcher
  */
 
-import {execaCommand} from 'execa';
-import {SessionManager} from './session-manager.js';
+// Use dynamic import for execa command to match package shape at runtime
+import { SessionManager } from './session-manager.js';
 
 export interface LaunchOptions {
 	/**
@@ -183,7 +183,8 @@ function buildSelectWindowCommand(
  */
 async function checkTmuxAvailable(): Promise<boolean> {
 	try {
-		await execaCommand('tmux -V');
+		const execa = (await import('execa')).default;
+		await execa.command('tmux -V');
 		return true;
 	} catch {
 		return false;
@@ -245,7 +246,8 @@ export async function launchDualScreen(
 			mainCommand,
 			options,
 		);
-		await execaCommand(`tmux ${tmuxFlags.join(' ')} ${newSessionCmd}`);
+		const execa = (await import('execa')).default;
+		await execa.command(`tmux ${tmuxFlags.join(' ')} ${newSessionCmd}`);
 
 		// Create the monitor window
 		const newWindowCmd = buildNewWindowCommand(
@@ -254,14 +256,14 @@ export async function launchDualScreen(
 			monitorCommand,
 			options,
 		);
-		await execaCommand(`tmux ${tmuxFlags.join(' ')} ${newWindowCmd}`);
+		await execa.command(`tmux ${tmuxFlags.join(' ')} ${newWindowCmd}`);
 
 		// Select main window as active
 		const selectCmd = buildSelectWindowCommand(sessionName, mainWindowName);
-		await execaCommand(`tmux ${tmuxFlags.join(' ')} ${selectCmd}`);
+		await execa.command(`tmux ${tmuxFlags.join(' ')} ${selectCmd}`);
 
 		// Get window IDs
-		const {mainWindowId, monitorWindowId} =
+		const { mainWindowId, monitorWindowId } =
 			await SessionManager.getSessionWindowIds(sessionName);
 
 		// Attach if requested
@@ -295,8 +297,8 @@ export async function attachSession(
 	const attachCmd = ['attach', '-t', sessionName];
 
 	// Use execa with stdio: inherit to connect terminal directly
-	const {execaCommand} = await import('execa');
-	await execaCommand(`tmux ${flags.join(' ')} ${attachCmd.join(' ')}`, {
+	const execa = (await import('execa')).default;
+	await execa.command(`tmux ${flags.join(' ')} ${attachCmd.join(' ')}`, {
 		stdio: 'inherit',
 	});
 }

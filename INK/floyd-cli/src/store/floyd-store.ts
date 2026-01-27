@@ -506,52 +506,11 @@ export const useFloydStore = create<FloydStore>()(
 					showAgentBuilder: false,
 					showCommandPalette: false,
 					showConfig: false,
-				}),
-
-			hasOpenOverlay: () => {
-				const state = get();
-				return (
-					state.showHelp ||
-					state.showMonitor ||
-					state.showPromptLibrary ||
-					state.showAgentBuilder ||
-					state.showCommandPalette ||
-					state.showConfig
-				);
-			},
-
-			addMessage: message =>
-				set(produce(state => {
-					// Add new message efficiently using immer
-					state.messages.push(message);
-
-					// Trim to max messages if needed
-					if (state.messages.length > state.maxMessages) {
-						state.messages = state.messages.slice(-state.maxMessages);
-					}
-
-					// Update session metadata
-					state.session.messageCount = state.messages.length;
-					state.session.lastActivity = Date.now();
-				})),
-
-			updateMessage: (id, updates) =>
-				set(produce(state => {
-					// Find and update message efficiently using immer
-					const messageIndex = state.messages.findIndex(msg => msg.id === id);
-					if (messageIndex !== -1) {
-						Object.assign(state.messages[messageIndex], updates);
-					}
-				})),
-
-			removeMessage: id =>
-				set(state => ({
-					messages: state.messages.filter(msg => msg.id !== id),
-				})),
-
-			clearMessages: () =>
-				set({
-					messages: [],
+		appendStreamingContent: (content: string) =>
+			set(state => ({
+				streamingContent: state.streamingContent + content,
+			})),
+		addMessage: message =>
 					streamingContent: '',
 				}),
 

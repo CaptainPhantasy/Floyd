@@ -450,6 +450,12 @@ export class MCPBrowserServer {
    * Start the server
    */
   async start(): Promise<void> {
+    // Allow disabling browser bridge when extension is unavailable (CI/headless)
+    if (process.env.FLOYD_DISABLE_MCP_BROWSER === '1') {
+      console.error('[MCP Browser] Disabled via FLOYD_DISABLE_MCP_BROWSER=1');
+      return;
+    }
+
     // Try to connect to extension (non-blocking)
     this.connect()
       .then(() => {

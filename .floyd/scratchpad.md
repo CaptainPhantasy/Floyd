@@ -1,11 +1,5 @@
-# Current Thinking & Scratchpad (FLOYD)
-Use this file to store temporary code snippets, error logs, investigation notes, decisions, and “things we must remember” so we don’t clog chat context.
-
-## Current Focus
-initializing...
-
-## Decisions (persistent)
-- (none yet)
-
-## Errors / Warnings Log
-(none yet)
+IMPORTANT CHAT ROOM EDIT NEEDED:
+- Make Floyd's words/messages only FLOW UP (never down)
+- This is likely a UI/layout configuration for the chat interface
+- May involve scroll behavior, message positioning, or flow direction
+- DO NOT FORGET TO IMPLEMENT THIS CHANGE

@@ -4,55 +4,55 @@
  * Please do not modify without explicit instruction and regression testing.
  * Ref: geminireport.md
  */
-import {useState, useEffect, useRef, useCallback, useMemo} from 'react';
-import {Box, Text, useInput, useApp} from 'ink';
-import {AgentEngine, MCPClientManager, PermissionManager} from 'floyd-agent-core';
-import {SessionManager} from './store/session-store.js';
-import {ConfigLoader} from './utils/config.js';
-import {BUILTIN_SERVERS} from './config/builtin-servers.js';
-import {StreamProcessor} from './streaming/stream-engine.js';
-import {StreamTagParser} from './streaming/tag-parser.js';
-import {getRandomWhimsicalPhrase} from './utils/whimsical-phrases.js';
-import {floydTheme, floydRoles} from './theme/crush-theme.js';
+import { useState, useEffect, useRef, useCallback, useMemo } from 'react';
+import { Box, Text, useInput, useApp } from 'ink';
+import { AgentEngine, MCPClientManager, PermissionManager } from 'floyd-agent-core';
+import { SessionManager } from './store/session-store.js';
+import { ConfigLoader } from './utils/config.js';
+import { BUILTIN_SERVERS } from './config/builtin-servers.js';
+import { StreamProcessor } from './streaming/stream-engine.js';
+import { StreamTagParser } from './streaming/tag-parser.js';
+import { getRandomWhimsicalPhrase } from './utils/whimsical-phrases.js';
+import { floydTheme, floydRoles } from './theme/crush-theme.js';
 import {
 	MainLayout,
 	MonitorLayout,
 	type ChatMessage,
 	type MonitorData,
 } from './ui/layouts/index.js';
-import {useFloydStore, type ConversationMessage} from './store/floyd-store.js';
-import {ErrorBoundary} from './ui/components/ErrorBoundary.js';
+import { useFloydStore, type ConversationMessage } from './store/floyd-store.js';
+import { ErrorBoundary } from './ui/components/ErrorBoundary.js';
 import {
 	commonCommands,
 	type CommandItem,
 } from './ui/components/CommandPalette.js';
-import {runDockCommand, parseDockArgs} from './commands/dock.js';
-import type {ThinkingStatus} from './ui/agent/ThinkingStream.js';
-import type {Task} from './ui/agent/TaskChecklist.js';
-import type {ToolExecution} from './ui/monitor/ToolTimeline.js';
-import type {StreamEvent} from './ui/monitor/EventStream.js';
+import { runDockCommand, parseDockArgs } from './commands/dock.js';
+import type { ThinkingStatus } from './ui/agent/ThinkingStream.js';
+import type { Task } from './ui/agent/TaskChecklist.js';
+import type { ToolExecution } from './ui/monitor/ToolTimeline.js';
+import type { StreamEvent } from './ui/monitor/EventStream.js';
 import dotenv from 'dotenv';
-import {resolve} from 'node:path';
+import { resolve } from 'node:path';
 
 // Load environment variables from multiple possible locations
 const envPaths = [
-  '.env.local', // Project-specific local env (git-ignored)
-  '.env', // Project env
-  `${process.env.HOME}/.floyd/.env.local`, // Global user env
+	'.env.local', // Project-specific local env (git-ignored)
+	'.env', // Project env
+	`${process.env.HOME}/.floyd/.env.local`, // Global user env
 ];
 
 for (const envPath of envPaths) {
-  try {
-    const result = dotenv.config({path: envPath});
-    if (result.error) {
-      // Silently ignore ENOENT (file not found) errors
-      // Log other errors
-    } else if (Object.keys(result.parsed ?? {}).length > 0) {
-      // Environment loaded successfully
-    }
-  } catch {
-    // Ignore errors, try next path
-  }
+	try {
+		const result = dotenv.config({ path: envPath });
+		if (result.error) {
+			// Silently ignore ENOENT (file not found) errors
+			// Log other errors
+		} else if (Object.keys(result.parsed ?? {}).length > 0) {
+			// Environment loaded successfully
+		}
+	} catch {
+		// Ignore errors, try next path
+	}
 }
 
 type Message = {
@@ -104,7 +104,7 @@ function toChatMessage(msg: Message | ConversationMessage): ChatMessage {
  * Integrates the MainLayout with AgentEngine, SessionManager, and Zustand store.
  * Provides streaming responses, command palette support, and full UI functionality.
  */
-export default function App({name = 'User', chrome = false}: AppProps) {
+export default function App({ name = 'User', chrome = false }: AppProps) {
 	// Local state
 	const [isThinking, setIsThinking] = useState(false);
 	const [agentStatus, setAgentStatus] = useState<ThinkingStatus>('idle');
@@ -153,19 +153,20 @@ export default function App({name = 'User', chrome = false}: AppProps) {
 	const toggleMonitor = useCallback(() => {
 		useFloydStore.getState().toggleOverlay('showMonitor');
 	}, []);
-	
-	const {exit} = useApp();
+
+	const { exit } = useApp();
 
 	// ============================================================================
 	// INITIALIZATION
 	// ============================================================================
 
-	useEffect(() => {
+	// TEMPORARY_BREAKPOINT_for_DEBUGGING
+useEffect(() => {
 		const init = async () => {
 			try {
 				// Initialize shared MCPClientManager with built-in servers
 				const mcpManager = new MCPClientManager(BUILTIN_SERVERS);
-				
+
 				if (chrome) {
 					await mcpManager.startServer(3000); // Default port for Chrome bridge
 				}
@@ -189,19 +190,19 @@ export default function App({name = 'User', chrome = false}: AppProps) {
 					// or we could block.
 				}
 
-			engineRef.current = new AgentEngine(
-				{
-					apiKey,
-					baseURL: apiEndpoint,
-					model: apiModel,
-					enableThinkingMode: true,
-					temperature: 0.2,
-				},
-				mcpManager,
-				sessionManager,
-				permissionManager,
-				config,
-			);
+				engineRef.current = new AgentEngine(
+					{
+						apiKey,
+						baseURL: apiEndpoint,
+						model: apiModel,
+						enableThinkingMode: true,
+						temperature: 0.2,
+					},
+					mcpManager,
+					sessionManager,
+					permissionManager,
+					config,
+				);
 				await engineRef.current.initSession(process.cwd());
 
 				setAgentStatus('idle');
@@ -219,14 +220,15 @@ export default function App({name = 'User', chrome = false}: AppProps) {
 						'Hello! I am Floyd (GLM-4 Powered). How can I help you today?',
 					timestamp: Date.now(),
 				};
-				addMessage(greeting);
+				// Use stable getter to avoid changing function identity and re-running effect
+				useFloydStore.getState().addMessage(greeting);
 				// Removed setLocalMessages - UI reads from Zustand store
 			} catch {
 				setAgentStatus('error');
 			}
 		};
 		init();
-	}, [chrome, addMessage]);
+	}, [chrome]);
 
 	// ============================================================================
 	// MESSAGE SUBMISSION
@@ -275,7 +277,7 @@ export default function App({name = 'User', chrome = false}: AppProps) {
 			if (!engineRef.current) return;
 
 			// Add user message
-			const userMsg: Message = {role: 'user', content: value};
+			const userMsg: Message = { role: 'user', content: value };
 			const userMsgStore: ConversationMessage = {
 				id: `user-${Date.now()}`,
 				role: 'user',
@@ -461,12 +463,15 @@ export default function App({name = 'User', chrome = false}: AppProps) {
 	// Use store messages as single source of truth (convert to ChatMessage format)
 	// Memoized to prevent infinite re-render loop in MainLayout
 	const allMessages: ChatMessage[] = useMemo(
-		() => storeMessages.map(toChatMessage),
-		[storeMessages]
+	() => {
+			// Use a stable reference comparison to prevent infinite re-render loop
+			// Only recompute when the actual messages array reference changes
+			return storeMessages.map(toChatMessage);
+		},
+		[storeMessages],
 	);
 
-	// ============================================================================
-	// COMMAND PALETTE HANDLERS
+
 	// ============================================================================
 
 	const handleCommand = useCallback(
@@ -580,7 +585,7 @@ export default function App({name = 'User', chrome = false}: AppProps) {
 					// This command entry is for documentation/help purposes
 				},
 			},
-		].map(cmd => ({...cmd, action: () => handleCommand(cmd.id)})),
+		].map(cmd => ({ ...cmd, action: () => handleCommand(cmd.id) })),
 		[commonCommands, handleCommand, toggleMonitor]
 	);
 
@@ -589,7 +594,7 @@ export default function App({name = 'User', chrome = false}: AppProps) {
 	// ============================================================================
 
 	if (showMonitor) {
-		const monitorData: MonitorData = {events, toolExecutions};
+		const monitorData: MonitorData = { events, toolExecutions };
 		return (
 			<MonitorLayout
 				data={monitorData}
