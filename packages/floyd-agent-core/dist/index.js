@@ -2,7 +2,10 @@
 export { AgentEngine } from './agent/AgentEngine.js';
 export { MCPClientManager } from './mcp/client-manager.js';
 export { SessionManager } from './store/conversation-store.js';
-export { PermissionManager } from './permissions/permission-manager.js';
+// GAP #2 FIX: Export SimplePermissionManager as the preferred name
+// Both SimplePermissionManager and PermissionManager (alias) are exported
+// PermissionManager is deprecated but kept for backward compatibility
+export { SimplePermissionManager, PermissionManager } from './permissions/permission-manager.js';
 export { Config } from './utils/config.js';
 // Error handling utilities
 export { humanizeError, formatHumanizedError, getSeverityEmoji } from './utils/error-humanizer.js';

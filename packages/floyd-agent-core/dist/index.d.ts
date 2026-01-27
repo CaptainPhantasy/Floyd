@@ -1,7 +1,8 @@
 export { AgentEngine } from './agent/AgentEngine.js';
 export { MCPClientManager } from './mcp/client-manager.js';
 export { SessionManager } from './store/conversation-store.js';
-export { PermissionManager } from './permissions/permission-manager.js';
+export { SimplePermissionManager, PermissionManager } from './permissions/permission-manager.js';
+export type { PermissionRule } from './permissions/permission-manager.js';
 export { Config } from './utils/config.js';
 export { humanizeError, formatHumanizedError, getSeverityEmoji, type HumanizedError } from './utils/error-humanizer.js';
 export { createLLMClient, OpenAICompatibleClient, AnthropicClient } from './llm/index.js';

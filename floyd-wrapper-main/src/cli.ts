@@ -18,11 +18,13 @@ import { SessionManager } from './persistence/session-manager.js';
 import chalk from 'chalk';
 import Table from 'cli-table3';
 import { CRUSH_THEME } from './constants.js';
+import { getSandboxManager } from './sandbox/index.js';
 import { StreamingDisplay } from './ui/rendering.js';
 import { renderMarkdown } from './ui/formatters.js';
 import { getMessageQueue } from './ui/message-queue.js';
 import { getMonitoringModule } from './ui/monitoring-module.js';
 import { getInterruptManager, type InterruptEvent } from './interrupts/index.js';
+import { createInstanceLock } from './utils/instance-lock.js';
 
 // Load environment variables from multiple possible locations
 const envPaths = [
@@ -59,6 +61,7 @@ const cli = meow(
     --bridge      Start mobile bridge server
     --resume      Resume specific session (id or name)
     --mode        Set initial execution mode (ask, yolo, plan, auto, dialogue)
+    --force       Override instance lock (use with caution)
     --version     Show version number
 
   Examples
@@ -67,6 +70,7 @@ const cli = meow(
     $ floyd --bridge     # Start mobile bridge server
     $ floyd --debug
     $ floyd --mode yolo  # Start in YOLO mode
+    $ floyd --force      # Override existing instance lock
     $ floyd-tui          # Alternative way to launch TUI
 `,
   {
@@ -89,6 +93,10 @@ const cli = meow(
       },
       mode: {
         type: 'string',
+      },
+      force: {
+        type: 'boolean',
+        default: false,
       },
     },
   }
@@ -113,6 +121,7 @@ export class FloydCLI {
   private sigintHandler?: () => void;
   private onExitCleanup?: () => void;
   private testMode: boolean = false;
+  private instanceLock?: ReturnType<typeof createInstanceLock>;
 
   constructor(options?: { testMode?: boolean }) {
     this.terminal = FloydTerminal.getInstance();
@@ -130,6 +139,21 @@ export class FloydCLI {
 
       // Load project context and ignore patterns
       const projectRoot = process.cwd();
+
+      // FIX #6: Check instance lock before proceeding (skip in test mode)
+      if (!this.testMode) {
+        this.instanceLock = createInstanceLock(projectRoot);
+        const lockResult = this.instanceLock.acquire(cli.flags.force);
+        if (!lockResult.success) {
+          this.terminal.error('Failed to acquire instance lock:');
+          this.terminal.error(lockResult.error || 'Unknown error');
+          if (lockResult.existingPid) {
+            this.terminal.muted(`Lock file: ${this.instanceLock.getLockPath()}`);
+          }
+          throw new Error('Instance lock acquisition failed');
+        }
+      }
+
       const projectContext = await loadProjectContext(projectRoot);
       const ignorePatterns = await loadFloydIgnore(projectRoot);
 
@@ -154,7 +178,7 @@ export class FloydCLI {
 
       // Set execution mode from CLI flag if provided
       if (cli.flags.mode) {
-        const validModes = ['ask', 'yolo', 'plan', 'auto', 'dialogue'];
+        const validModes = ['ask', 'yolo', 'plan', 'auto', 'dialogue', 'fuckit'];
         const mode = cli.flags.mode.toLowerCase();
         if (validModes.includes(mode)) {
           process.env.FLOYD_MODE = mode;
@@ -215,6 +239,24 @@ export class FloydCLI {
       // Register rewind & sandbox commands
       const { rewindCommands } = await import('./commands/rewind-commands.js');
       for (const cmd of rewindCommands) {
+        slashCommands.register(cmd);
+      }
+
+      // FIX #4: Register tools visibility commands
+      const { toolsCommands } = await import('./commands/tools-commands.js');
+      for (const cmd of toolsCommands) {
+        slashCommands.register(cmd);
+      }
+
+      // FIX #1: Register sandbox commands
+      const { sandboxCommands } = await import('./commands/sandbox-commands.js');
+      for (const cmd of sandboxCommands) {
+        slashCommands.register(cmd);
+      }
+
+      // FIX #5: Register permissions audit commands
+      const { permissionsCommands } = await import('./commands/permissions-commands.js');
+      for (const cmd of permissionsCommands) {
         slashCommands.register(cmd);
       }
 
@@ -306,7 +348,7 @@ export class FloydCLI {
           // Only prompt again if stdin is a TTY (interactive mode)
           // When stdin is piped, readline will close automatically after input ends
           if (this.isRunning && process.stdin.isTTY) {
-            this.rl?.prompt();
+            this.safePrompt();
             this.showCursor(); // Ensure cursor is visible after each prompt
           }
         });
@@ -378,6 +420,23 @@ export class FloydCLI {
           const monitoring = getMonitoringModule();
           monitoring.stopThinking();
         },
+        // FIX #3: Show checkpoint notification to user
+        onCheckpointCreated: (checkpointId: string, fileCount: number, toolName: string) => {
+          // Show checkpoint notification to user
+          console.log(`✓ Checkpoint created: ${fileCount} files (before ${toolName})`);
+          // FIX #3: Update monitoring module to track checkpoint for prompt indicator
+          const monitoring = getMonitoringModule() as any;
+          if (monitoring.setCheckpoint) {
+            monitoring.setCheckpoint(checkpointId, fileCount);
+          }
+          // FIX #3: Refresh prompt to show checkpoint indicator
+          this.updatePrompt();
+        },
+        // FIX #2: Show AUTO mode adaptation notification
+        onModeAdapt: (_fromMode: string, toMode: string, toolName: string) => {
+          this.terminal.info(`🔄 AUTO mode: Switching to ${toMode.toUpperCase()} behavior for ${toolName}`);
+          this.terminal.muted(`  Complex task detected - write operations will be blocked`);
+        },
       }, this.sessionManager);
 
       // Import permission manager and set up proper permission prompting
@@ -406,8 +465,13 @@ export class FloydCLI {
 
         // Resume main readline
         if (this.rl) {
-          this.rl.resume();
-          this.rl.prompt();
+          try {
+            this.rl.resume();
+            this.safePrompt();
+          } catch (error) {
+            // Readline might be closed, ignore
+            logger.debug('Failed to resume readline (likely closed)', { error });
+          }
         }
 
         return response;
@@ -449,7 +513,7 @@ export class FloydCLI {
 
         case 'confirm_exit':
           console.log('\n\n👋 Press Ctrl+C again to exit, or type a message to continue.');
-          this.rl?.prompt();
+          this.safePrompt();
           break;
 
         case 'cancel_turn':
@@ -461,7 +525,7 @@ export class FloydCLI {
           }
           // Reset state to idle
           interruptManager.setState('idle');
-          this.rl?.prompt();
+          this.safePrompt();
           break;
 
         case 'abort_tool':
@@ -473,13 +537,13 @@ export class FloydCLI {
           }
           console.log(chalk.hex(CRUSH_THEME.colors.warning)('[Tool aborted - session preserved]'));
           interruptManager.setState('idle');
-          this.rl?.prompt();
+          this.safePrompt();
           break;
 
         case 'clear_prompt':
           // Just clear and show new prompt
           console.log('');
-          this.rl?.prompt();
+          this.safePrompt();
           break;
 
         case 'ignore':
@@ -529,6 +593,45 @@ export class FloydCLI {
   }
 
   /**
+   * Safely show prompt, avoiding ERR_USE_AFTER_CLOSE
+   */
+  private safePrompt(): void {
+    if (this.rl) {
+      try {
+        // FIX #3: Update prompt with checkpoint indicator
+        this.updatePrompt();
+        this.rl.prompt();
+      } catch (error) {
+        // Readline might be closed, ignore error
+        if ((error as NodeJS.ErrnoException).code !== 'ERR_USE_AFTER_CLOSE') {
+          logger.debug('Failed to show prompt (readline likely closed)', { error });
+        }
+      }
+    }
+  }
+
+  /**
+   * FIX #3: Update the prompt with checkpoint indicator
+   */
+  private updatePrompt(): void {
+    if (!this.rl) return;
+
+    const monitoring = getMonitoringModule() as any;
+    const checkpointIndicator = monitoring.getCheckpointIndicator ? monitoring.getCheckpointIndicator() : '';
+
+    // Build prompt with checkpoint indicator
+    let prompt = '> ';
+    if (checkpointIndicator) {
+      prompt = `${checkpointIndicator} ${prompt}`;
+    }
+
+    // Only update if prompt changed
+    if ((this.rl as any)._prompt !== prompt) {
+      this.rl.setPrompt(prompt);
+    }
+  }
+
+  /**
    * Prompt user for permission (yes/no)
    *
    * CRITICAL: In piped/non-TTY mode, stdin is already consumed and cannot be used
@@ -564,11 +667,15 @@ export class FloydCLI {
   }
 
   /**
-   * Setup Shift+Tab mode switching
+   * Setup Shift+Tab mode switching and double-space interrupt
    */
   private setupModeSwitching(): void {
-    // Modes in order: ask -> yolo -> plan -> auto -> dialogue -> ask
-    const modes: Array<'ask' | 'yolo' | 'plan' | 'auto' | 'dialogue'> = ['ask', 'yolo', 'plan', 'auto', 'dialogue'];
+    // Modes in order: ask -> yolo -> plan -> auto -> dialogue -> fuckit -> ask
+    const modes: Array<'ask' | 'yolo' | 'plan' | 'auto' | 'dialogue' | 'fuckit'> = ['ask', 'yolo', 'plan', 'auto', 'dialogue', 'fuckit'];
+
+    // Double-space detection
+    let lastSpaceTime = 0;
+    const DOUBLE_SPACE_THRESHOLD = 500; // milliseconds
 
     // Get the input stream from readline
     const input = this.rl ? (this.rl as any).input : null;
@@ -580,7 +687,7 @@ export class FloydCLI {
         // Detect Shift+Tab: key.name === 'tab' && key.shift
         if (key && key.name === 'tab' && key.shift) {
           // Get current mode
-          const currentMode = (process.env.FLOYD_MODE as 'ask' | 'yolo' | 'plan' | 'auto' | 'dialogue') || 'ask';
+          const currentMode = (process.env.FLOYD_MODE as 'ask' | 'yolo' | 'plan' | 'auto' | 'dialogue' | 'fuckit') || 'ask';
           const currentIndex = modes.indexOf(currentMode);
 
           // Cycle to next mode
@@ -608,22 +715,101 @@ export class FloydCLI {
               this.terminal.muted('SAFE: read-only tools + moderate operations (fetch, branch, stage)');
               this.terminal.muted('DANGEROUS: write, run, delete, git_commit STILL require approval');
               this.terminal.muted('NOTE: In piped/non-TTY mode, dangerous tools are DENIED (cannot prompt)');
+              // Show sandbox status
+              const sandboxManager = getSandboxManager();
+              if (sandboxManager.isActive()) {
+                const summary = sandboxManager.getChangesSummary();
+                this.terminal.info(`🔒 Sandbox ACTIVE: ${summary.total} changes pending`);
+              } else {
+                this.terminal.muted('💡 Use "/sandbox start" to isolate file operations');
+              }
               break;
             case 'plan':
               this.terminal.info('Floyd will create plans but NOT edit files.');
               break;
             case 'auto':
-              this.terminal.info('Floyd will decide the best mode for each request.');
+              this.terminal.info('AUTO mode: Adapts based on task complexity.');
+              this.terminal.muted('Simple tasks (read files, single operations): Auto-approved');
+              this.terminal.muted('Complex tasks (multiple files, dangerous tools): Asks for permission');
               break;
             case 'dialogue':
               this.terminal.info('💬 Quick chat mode. Floyd responds one line at a time.');
+              break;
+            case 'fuckit':
+              // RED WARNING BANNER for FUCKIT mode
+              const boxWidth = 78;
+              const pad = (str: string) => str.padEnd(boxWidth - 2, ' ');
+              console.log('');
+              console.log(chalk.bgRed.white.bold('╔' + '═'.repeat(boxWidth - 2) + '╗'));
+              console.log(chalk.bgRed.white.bold('║') + chalk.bgRed.white.bold(pad('  🔥🔥🔥  FUCKIT MODE ACTIVATED  🔥🔥🔥  ')) + chalk.bgRed.white.bold('║'));
+              console.log(chalk.bgRed.white.bold('║') + chalk.bgRed.white(pad('  ' + chalk.red.bold('ALL PERMISSIONS GRANTED. NO RESTRICTIONS. NO SAFETY NETS.'))) + chalk.bgRed.white.bold('║'));
+              console.log(chalk.bgRed.white.bold('║') + chalk.bgRed.white(pad('  ' + chalk.red.bold('⚠️  Floyd will execute ANY tool WITHOUT asking ⚠️'))) + chalk.bgRed.white.bold('║'));
+              console.log(chalk.bgRed.white.bold('║') + chalk.bgRed.white(pad('  ' + chalk.white.bold('This includes DANGEROUS operations:'))) + chalk.bgRed.white.bold('║'));
+              console.log(chalk.bgRed.white.bold('║') + chalk.bgRed.white(pad('   • Deleting files without confirmation')) + chalk.bgRed.white.bold('║'));
+              console.log(chalk.bgRed.white.bold('║') + chalk.bgRed.white(pad('   • Running arbitrary shell commands')) + chalk.bgRed.white.bold('║'));
+              console.log(chalk.bgRed.white.bold('║') + chalk.bgRed.white(pad('   • Making git commits without review')) + chalk.bgRed.white.bold('║'));
+              console.log(chalk.bgRed.white.bold('║') + chalk.bgRed.white(pad('   • Overwriting files without backup')) + chalk.bgRed.white.bold('║'));
+              console.log(chalk.bgRed.white.bold('║') + chalk.bgRed.white(pad('')) + chalk.bgRed.white.bold('║'));
+              console.log(chalk.bgRed.white.bold('║') + chalk.bgRed.white(pad('  ' + chalk.red.bold('🚨 YOU ARE RESPONSIBLE FOR ALL CONSEQUENCES 🚨'))) + chalk.bgRed.white.bold('║'));
+              console.log(chalk.bgRed.white.bold('╚' + '═'.repeat(boxWidth - 2) + '╝'));
+              console.log('');
               break;
           }
 
           console.log('');
 
-          // Re-show prompt
-          this.rl?.prompt();
+          // Re-show prompt safely
+          this.safePrompt();
+        }
+
+        // Detect double-space press (within 500ms)
+        if (key && key.name === 'space' && !key.ctrl && !key.meta) {
+          const now = Date.now();
+          if (now - lastSpaceTime < DOUBLE_SPACE_THRESHOLD) {
+            // Double-space detected! Interrupt Floyd and return control to user
+            lastSpaceTime = 0; // Reset to prevent triple-trigger
+
+            // Trigger interrupt via interrupt manager
+            const interruptMgr = getInterruptManager();
+            if (this.engine && typeof (this.engine as any).abortController === 'object') {
+              // Abort the current operation
+              const controller = (this.engine as any).abortController as AbortController;
+              if (controller) {
+                controller.abort();
+              }
+            }
+
+            // Clear current line
+            readline.clearLine(process.stdout, 0);
+            readline.moveCursor(process.stdout, 0, -1);
+            console.log('');
+
+            this.terminal.warning('⏹️  Double-space: Floyd interrupted. Your turn.');
+
+            // Stop any active streaming/spinner
+            if (this.streamingDisplay.isActive()) {
+              this.streamingDisplay.finish();
+            }
+
+            const monitoring = getMonitoringModule();
+            monitoring.stopThinking();
+
+            // Reset state to idle
+            interruptMgr.setState('idle');
+
+            // Clear the input line and show fresh prompt
+            // Use internal method to clear readline input
+            if (this.rl) {
+              (this.rl as any)._writeToOutput('\r> ');
+            }
+
+            // Re-show prompt safely
+            this.safePrompt();
+            this.showCursor();
+
+            return; // Don't process the space as normal input
+          }
+          lastSpaceTime = now;
         }
       });
     }
@@ -867,7 +1053,7 @@ export class FloydCLI {
       // Only prompt if stdin is a TTY (interactive mode)
       // Note: Event handlers are already attached in initialize()
       if (process.stdin.isTTY) {
-        this.rl.prompt();
+        this.safePrompt();
         this.showCursor(); // Ensure cursor is visible
       }
 
@@ -957,6 +1143,9 @@ export class FloydCLI {
 
     // Ensure cursor is visible before closing
     this.showCursor();
+
+    // FIX #6: Release instance lock on shutdown
+    this.instanceLock?.release();
 
     this.rl?.close();
     this.terminal.success('Goodbye!');

@@ -6,7 +6,7 @@
  */
 import { useState, useEffect, useRef, useCallback, useMemo } from 'react';
 import { Box, Text, useInput, useApp } from 'ink';
-import { AgentEngine, MCPClientManager, PermissionManager } from 'floyd-agent-core';
+import { AgentEngine, MCPClientManager } from 'floyd-agent-core';
 import { SessionManager } from './store/session-store.js';
 import { ConfigLoader } from './utils/config.js';
 import { BUILTIN_SERVERS } from './config/builtin-servers.js';
@@ -14,6 +14,8 @@ import { StreamProcessor } from './streaming/stream-engine.js';
 import { StreamTagParser } from './streaming/tag-parser.js';
 import { getRandomWhimsicalPhrase } from './utils/whimsical-phrases.js';
 import { floydTheme, floydRoles } from './theme/crush-theme.js';
+import { type PermissionRequest, type PermissionResponse } from './permissions/ask-overlay.js';
+import { PermissionManager } from './permissions/ask-ui.js';
 import {
 	MainLayout,
 	MonitorLayout,
@@ -274,6 +276,10 @@ export default function App({ name = 'User', chrome = false }: AppProps) {
 
 	// Refs for engine instances
 	const engineRef = useRef<AgentEngine | null>(null);
+	const permissionManagerRef = useRef<PermissionManager | null>(null);
+
+	// Permission state
+	const [permissionRequest, setPermissionRequest] = useState<PermissionRequest | null>(null);
 
 	// Zustand store selectors - stable references to prevent infinite re-render loops
 	// NOTE: Use stable selectors for values, useCallback for actions to prevent infinite re-render loops
@@ -315,6 +321,28 @@ export default function App({ name = 'User', chrome = false }: AppProps) {
 		useFloydStore.getState().toggleOverlay('showMonitor');
 	}, []);
 
+	// Permission response handler
+	const handlePermissionResponse = useCallback((response: PermissionResponse) => {
+		if (permissionManagerRef.current) {
+			permissionManagerRef.current.handleResponse(response);
+		}
+		setPermissionRequest(null);
+	}, []);
+
+	// Poll for pending permission requests
+	useEffect(() => {
+		const pollInterval = setInterval(() => {
+			if (permissionManagerRef.current && !permissionRequest) {
+				const currentRequest = permissionManagerRef.current.getCurrentRequest();
+				if (currentRequest) {
+					setPermissionRequest(currentRequest);
+				}
+			}
+		}, 100); // Poll every 100ms
+
+		return () => clearInterval(pollInterval);
+	}, [permissionRequest]);
+
 	const { exit } = useApp();
 
 	// ============================================================================
@@ -333,7 +361,8 @@ export default function App({ name = 'User', chrome = false }: AppProps) {
 
 				const sessionManager = new SessionManager();
 				const config = await ConfigLoader.loadProjectConfig();
-				const permissionManager = new PermissionManager(config.allowedTools);
+				const permissionManager = new PermissionManager(config.allowedTools, process.cwd());
+				permissionManagerRef.current = permissionManager;
 
 				// Start built-in MCP servers (patch, runner, git, cache)
 				await mcpManager.startBuiltinServers();
@@ -953,6 +982,8 @@ export default function App({ name = 'User', chrome = false }: AppProps) {
 				commands={augmentedCommands}
 				safetyMode={safetyMode}
 				onSafetyModeChange={handleSafetyModeChange}
+				permissionRequest={permissionRequest}
+				onPermissionResponse={handlePermissionResponse}
 			/>
 		</ErrorBoundary>
 	);

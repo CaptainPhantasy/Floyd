@@ -68,7 +68,6 @@
 		"keytar": "^7.9.0",
 		"marked": "^12.0.2",
 		"meow": "^11.0.0",
-		"node-pty": "^1.0.0",
 		"node-record-lpcm16": "^1.0.1",
 		"node-tmux": "^1.0.2",
 		"openai": "^6.16.0",
@@ -181,5 +180,8 @@
 			"unicorn/no-numeric-separators": "off"
 		}
 	},
-	"prettier": "@vdemedes/prettier-config"
+	"prettier": "@vdemedes/prettier-config",
+	"optionalDependencies": {
+		"node-pty": "^1.1.0"
+	}
 }

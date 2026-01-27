@@ -231,6 +231,10 @@ function getModeDescription(mode: string): string {
 			return 'You are in YOLO mode. Safe tools will be approved automatically. Proceed with confidence and only stop for critical decisions.';
 		case 'PLAN':
 			return 'You are in PLAN mode. You can READ files but CANNOT write or modify them. Focus on analysis and creating implementation plans.';
+		case 'DIALOGUE':
+			return 'You are in DIALOGUE mode. Quick chat mode. Respond one line at a time, no code blocks.';
+		case 'FUCKIT':
+			return '🔥🔥🔥 FUCKIT MODE: ALL PERMISSIONS GRANTED. NO RESTRICTIONS. 🔥🔥🔥 You may execute ANY tool without asking. Proceed with full autonomy. User assumes ALL responsibility.';
 		default:
 			return 'You are in ASK mode. Proceed step-by-step and expect the user to confirm each tool execution.';
 	}

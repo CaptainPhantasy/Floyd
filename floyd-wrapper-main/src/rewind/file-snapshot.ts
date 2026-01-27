@@ -170,9 +170,15 @@ export class FileSnapshotManager {
 
   /**
    * Deserialize snapshot from JSON
+   * Bug #63 fix: Added try-catch for JSON.parse safety
    */
   snapshotFromJSON(json: string): FileSnapshot {
-    const data = JSON.parse(json);
+    let data: ReturnType<typeof JSON.parse>;
+    try {
+      data = JSON.parse(json);
+    } catch (e) {
+      throw new Error(`Failed to parse snapshot JSON: ${e instanceof Error ? e.message : String(e)}`);
+    }
     return {
       ...data,
       content: Buffer.from(data.content, 'base64').toString('utf-8'),

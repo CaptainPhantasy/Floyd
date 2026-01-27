@@ -177,22 +177,35 @@ export class FileSnapshotManager {
 
 	/**
 	 * Parse snapshot from JSON
+	 * @throws {Error} If JSON is invalid or malformed
 	 */
 	snapshotFromJSON(json: string): FileSnapshot {
-		const parsed = JSON.parse(json);
+		let parsed: unknown;
+		try {
+			parsed = JSON.parse(json);
+		} catch (error) {
+			throw new Error(`Failed to parse snapshot JSON: ${(error as Error).message}`);
+		}
+
+		// Validate parsed object has required structure
+		if (!parsed || typeof parsed !== 'object') {
+			throw new Error('Invalid snapshot: parsed result is not an object');
+		}
+
+		const snapshot = parsed as Record<string, unknown>;
 
 		// Convert date strings back to Date objects
 		return {
 			...parsed,
-			snapshotAt: new Date(parsed.snapshotAt),
+			snapshotAt: new Date(snapshot.snapshotAt as string),
 			stats: {
-				...parsed.stats,
-				mtime: new Date(parsed.stats.mtime),
-				birthtime: parsed.stats.birthtime
-					? new Date(parsed.stats.birthtime)
+				...(snapshot.stats as Record<string, unknown>),
+				mtime: new Date((snapshot.stats as Record<string, unknown>).mtime as string),
+				birthtime: (snapshot.stats as Record<string, unknown>).birthtime
+					? new Date((snapshot.stats as Record<string, unknown>).birthtime as string)
 					: undefined,
 			},
-		};
+		} as FileSnapshot;
 	}
 
 	/**

@@ -96,27 +96,57 @@ export interface SessionState {
 /**
  * SessionManager class - maintains backward compatibility with existing code
  * that uses SessionManager directly from conversation-store
+ *
+ * Implements initPromise pattern to prevent race conditions during concurrent
+ * initialization attempts.
  */
 export class SessionManager {
 	private sessionsDir: string;
+	private initPromise: Promise<void> | null = null;
 
 	constructor() {
-		// Prefer ~/.floyd/sessions, fall back to local .floyd/sessions
-		const homeDir = os.homedir();
-		const globalSessionsDir = path.join(homeDir, '.floyd', 'sessions');
-		const localSessionsDir = path.join(process.cwd(), '.floyd', 'sessions');
+		// Defer directory initialization to prevent race conditions
+		this.sessionsDir = '';
+	}
 
-		// Try to use global directory, fall back to local
-		try {
-			fs.ensureDirSync(globalSessionsDir);
-			this.sessionsDir = globalSessionsDir;
-		} catch {
-			fs.ensureDirSync(localSessionsDir);
-			this.sessionsDir = localSessionsDir;
+	/**
+	 * Initialize the sessions directory (called lazily on first access)
+	 * Uses initPromise pattern to ensure only one initialization runs even
+	 * if multiple methods are called concurrently.
+	 */
+	private async init(): Promise<void> {
+		// If initialization is already in progress, wait for it
+		if (this.initPromise) {
+			return this.initPromise;
 		}
+
+		// If already initialized, return immediately
+		if (this.sessionsDir) {
+			return;
+		}
+
+		// Start initialization
+		this.initPromise = (async () => {
+			// Prefer ~/.floyd/sessions, fall back to local .floyd/sessions
+			const homeDir = os.homedir();
+			const globalSessionsDir = path.join(homeDir, '.floyd', 'sessions');
+			const localSessionsDir = path.join(process.cwd(), '.floyd', 'sessions');
+
+			// Try to use global directory, fall back to local
+			try {
+				await fs.ensureDir(globalSessionsDir);
+				this.sessionsDir = globalSessionsDir;
+			} catch {
+				await fs.ensureDir(localSessionsDir);
+				this.sessionsDir = localSessionsDir;
+			}
+		})();
+
+		await this.initPromise;
 	}
 
 	async createSession(cwd: string): Promise<SessionData> {
+		await this.init();
 		const id = uuidv4();
 		const session: SessionData = {
 			id,
@@ -130,18 +160,21 @@ export class SessionManager {
 	}
 
 	async saveSession(session: SessionData): Promise<void> {
+		await this.init();
 		session.updated = Date.now();
 		const filePath = path.join(this.sessionsDir, `${session.id}.json`);
 		await fs.writeJson(filePath, session, {spaces: 2});
 	}
 
 	async loadSession(id: string): Promise<SessionData | null> {
+		await this.init();
 		const filePath = path.join(this.sessionsDir, `${id}.json`);
 		if (!(await fs.pathExists(filePath))) return null;
 		return await fs.readJson(filePath);
 	}
 
 	async listSessions(): Promise<SessionData[]> {
+		await this.init();
 		if (!(await fs.pathExists(this.sessionsDir))) return [];
 		const files = await fs.readdir(this.sessionsDir);
 		const sessions: SessionData[] = [];
@@ -163,7 +196,8 @@ export class SessionManager {
 		return sessions.length > 0 ? sessions[0] || null : null;
 	}
 
-	getSessionsDir(): string {
+	async getSessionsDir(): Promise<string> {
+		await this.init();
 		return this.sessionsDir;
 	}
 }

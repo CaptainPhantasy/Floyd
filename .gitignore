@@ -89,3 +89,5 @@ SMOKE_TEST_RECEIPT_*.txt
 
 # Local environment files
 .env.local
+
+.early.coverage

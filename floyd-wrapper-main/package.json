@@ -11,7 +11,7 @@
   "type": "module",
   "scripts": {
     "dev": "tsx watch src/cli.ts",
-    "build": "tsc || true && tsc-alias && find src -name '*.js' -exec sh -c 'target=dist/${1#src/}; mkdir -p $(dirname $target); cp $1 $target' _ {} \\; && find dist -name '*.js' -exec sed -i '' \"s/from '\\([^']*\\)\\.ts'/from '\\1.js'/g\" {} + && find dist -name '*.js' -exec sed -i '' 's/from \"\\([^\"]*\\)\\.ts\"/from \"\\1.js\"/g' {} + && find dist -name '*.js' -exec sed -i '' \"s/import('\\([^']*\\)\\.ts'/import('\\1.js'/g\" {} + && npm run build:check",
+    "build": "tsc || true && tsc-alias && find src -name '*.js' -exec sh -c 'target=dist/${1#src/}; mkdir -p $(dirname $target); cp $1 $target' _ {} \\; && find dist -name '*.js' -exec sed -i '' \"s/from '\\([^']*\\)\\.ts'/from '\\1.js'/g\" {} + && find dist -name '*.js' -exec sed -i '' 's/from \"\\([^\"]*\\)\\.ts\"/from \"\\1.js\"/g' {} + && find dist -name '*.js' -exec sed -i '' \"s/import('\\([^']*\\)\\.ts'/import('\\1.js'/g\" {} + && npm run build:check && chmod +x dist/cli.js",
     "build:check": "bash scripts/check-build-imports.sh",
     "start": "node dist/cli.js",
     "test": "npm run test:unit && npm run test:integration",
@@ -98,6 +98,7 @@
     "c8": "^9.0.0",
     "diff": "^8.0.3",
     "eslint": "^8.56.0",
+    "node-pty": "^1.1.0",
     "parse-diff": "^0.11.1",
     "prettier": "^3.2.4",
     "simple-git": "^3.30.0",

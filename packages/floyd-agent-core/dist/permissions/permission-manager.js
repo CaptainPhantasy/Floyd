@@ -1,14 +1,31 @@
 // Permission management for Floyd agent tools
 // Controls which tools can be executed without user confirmation
+//
+// NOTE: This is a REFERENCE IMPLEMENTATION of the IPermissionManager interface.
+// The actual production permission system is in floyd-wrapper-main/src/permissions/permission-manager.ts
+// which provides readline-based prompting and risk classification.
+//
+// Use this SimplePermissionManager for:
+// - Testing (in-memory, deterministic)
+// - Simple automation (batch mode)
+// - Reference implementation for IPermissionManager
+//
+// For interactive CLI use, the floyd-wrapper permission manager is used instead.
 /**
- * PermissionManager controls tool execution permissions
+ * SimplePermissionManager controls tool execution permissions
  *
- * Supports:
- * - Explicit allow/deny by tool name
- * - Wildcard patterns (e.g., "git-*" allows all tools starting with "git-")
- * - "*" to allow all tools
+ * GAP #2 FIX: Renamed from PermissionManager to SimplePermissionManager to avoid
+ * confusion with the production permission system in floyd-wrapper-main.
+ *
+ * This is a reference implementation of IPermissionManager that:
+ * - Uses in-memory state (no persistence)
+ * - Supports wildcard patterns (e.g., "git-*" allows all tools starting with "git-")
+ * - Returns allow/deny/ask without prompting
+ * - Useful for testing and automation
+ *
+ * @deprecated For production CLI use, see floyd-wrapper-main/src/permissions/permission-manager.ts
  */
-export class PermissionManager {
+export class SimplePermissionManager {
     allowedTools;
     deniedTools;
     wildcardAllowed;
@@ -133,4 +150,10 @@ export class PermissionManager {
         }
     }
 }
+// GAP #2 FIX: Backward compatibility alias
+// PermissionManager is deprecated - use SimplePermissionManager instead
+/**
+ * @deprecated Use SimplePermissionManager instead. This alias exists for backward compatibility.
+ */
+export const PermissionManager = SimplePermissionManager;
 //# sourceMappingURL=permission-manager.js.map

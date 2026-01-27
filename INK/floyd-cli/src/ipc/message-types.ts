@@ -1,39 +1,41 @@
 /**
- * IPC Message Types
+ * IPC Message Types (Simplified Format)
  *
  * Shared type definitions for IPC communication between
  * Main process, Monitor dashboard, and other IPC clients.
+ *
+ * Message Format: { id, method, params } - Simple, flat structure
  *
  * @module ipc/message-types
  */
 
 // ============================================================================
-// BASE MESSAGE TYPE
+// BASE MESSAGE TYPE (SIMPLIFIED)
 // ============================================================================
 
 /**
- * Base IPC message type
- * All messages have a type and optional data payload
+ * Base IPC message type - Simplified flat format
+ * Format: { id, method, params }
  */
 export interface IPCMessage {
-	/** Message type identifier */
-	type: IPCMessageType;
+	/** Unique message ID for request/response correlation */
+	id: string;
 
-	/** Message payload */
-	data?: unknown;
+	/** Message method (what to do) */
+	method: IPCMessageMethod;
 
-	/** Timestamp when message was created */
+	/** Method parameters */
+	params?: unknown;
+
+	/** Timestamp when message was created (optional) */
 	timestamp?: number;
-
-	/** Unique message ID */
-	id?: string;
 }
 
 /**
- * All possible IPC message types
+ * All possible IPC message methods
  */
-export type IPCMessageType =
-	| 'config' // Configuration messages (client info, server info)
+export type IPCMessageMethod =
+	| 'config' // Configuration handshake (client info, server info)
 	| 'events' // Event stream updates
 	| 'metrics' // System metrics updates
 	| 'tools' // Tool execution updates
@@ -41,9 +43,7 @@ export type IPCMessageType =
 	| 'browser' // Browser state updates
 	| 'workers' // Worker state updates
 	| 'alerts' // Alert notifications
-	| 'command' // Command messages
-	| 'response' // Command responses
-	| 'error' // Error messages
+	| 'error' // Error notifications
 	| 'heartbeat'; // Connection heartbeat
 
 // ============================================================================
@@ -53,9 +53,9 @@ export type IPCMessageType =
 /**
  * Config message - sent during connection handshake
  */
-export interface ConfigMessage extends IPCMessage {
-	type: 'config';
-	data: ConfigData;
+export interface ConfigMessage extends Omit<IPCMessage, 'params'> {
+	method: 'config';
+	params: ConfigData;
 }
 
 export interface ConfigData {
@@ -82,9 +82,9 @@ export interface ConfigData {
 /**
  * Events message - stream event updates
  */
-export interface EventsMessage extends IPCMessage {
-	type: 'events';
-	data: StreamEvent[];
+export interface EventsMessage extends Omit<IPCMessage, 'params'> {
+	method: 'events';
+	params: StreamEvent[];
 }
 
 export interface StreamEvent {
@@ -120,9 +120,9 @@ export interface StreamEvent {
 /**
  * Metrics message - system metrics updates
  */
-export interface MetricsMessage extends IPCMessage {
-	type: 'metrics';
-	data: SystemMetricsData;
+export interface MetricsMessage extends Omit<IPCMessage, 'params'> {
+	method: 'metrics';
+	params: SystemMetricsData;
 }
 
 export interface SystemMetricsData {
@@ -153,9 +153,9 @@ export interface SystemMetricsData {
 /**
  * Tools message - tool execution updates
  */
-export interface ToolsMessage extends IPCMessage {
-	type: 'tools';
-	data: ToolExecution[];
+export interface ToolsMessage extends Omit<IPCMessage, 'params'> {
+	method: 'tools';
+	params: ToolExecution[];
 }
 
 export interface ToolExecution {
@@ -194,9 +194,9 @@ export interface ToolExecution {
 /**
  * Git message - git status updates
  */
-export interface GitMessage extends IPCMessage {
-	type: 'git';
-	data: GitStatus;
+export interface GitMessage extends Omit<IPCMessage, 'params'> {
+	method: 'git';
+	params: GitStatus;
 }
 
 export interface GitStatus {
@@ -230,9 +230,9 @@ export interface GitStatus {
 /**
  * Browser message - browser state updates
  */
-export interface BrowserMessage extends IPCMessage {
-	type: 'browser';
-	data: BrowserState;
+export interface BrowserMessage extends Omit<IPCMessage, 'params'> {
+	method: 'browser';
+	params: BrowserState;
 }
 
 export interface BrowserState {
@@ -259,9 +259,9 @@ export interface BrowserState {
 /**
  * Workers message - worker state updates
  */
-export interface WorkersMessage extends IPCMessage {
-	type: 'workers';
-	data: WorkerState[];
+export interface WorkersMessage extends Omit<IPCMessage, 'params'> {
+	method: 'workers';
+	params: WorkerState[];
 }
 
 export interface WorkerState {
@@ -300,9 +300,9 @@ export interface WorkerState {
 /**
  * Alerts message - alert notifications
  */
-export interface AlertsMessage extends IPCMessage {
-	type: 'alerts';
-	data: Alert[];
+export interface AlertsMessage extends Omit<IPCMessage, 'params'> {
+	method: 'alerts';
+	params: Alert[];
 }
 
 export interface Alert {
@@ -326,63 +326,15 @@ export interface Alert {
 }
 
 // ============================================================================
-// COMMAND MESSAGES
-// ============================================================================
-
-/**
- * Command message - command request
- */
-export interface CommandMessage extends IPCMessage {
-	type: 'command';
-	data: CommandData;
-}
-
-export interface CommandData {
-	/** Command name */
-	command: string;
-
-	/** Command arguments */
-	args?: Record<string, unknown>;
-
-	/** Request ID */
-	requestId: string;
-
-	/** Source client ID */
-	sourceId?: string;
-}
-
-/**
- * Response message - command response
- */
-export interface ResponseMessage extends IPCMessage {
-	type: 'response';
-	data: ResponseData;
-}
-
-export interface ResponseData {
-	/** Request ID this responds to */
-	requestId: string;
-
-	/** Response status */
-	status: 'success' | 'error';
-
-	/** Response result (if success) */
-	result?: unknown;
-
-	/** Error message (if error) */
-	error?: string;
-}
-
-// ============================================================================
 // ERROR MESSAGES
 // ============================================================================
 
 /**
  * Error message - error notification
  */
-export interface ErrorMessage extends IPCMessage {
-	type: 'error';
-	data: ErrorData;
+export interface ErrorMessage extends Omit<IPCMessage, 'params'> {
+	method: 'error';
+	params: ErrorData;
 }
 
 export interface ErrorData {
@@ -410,8 +362,8 @@ export interface ErrorData {
  * Heartbeat message - connection heartbeat
  */
 export interface HeartbeatMessage extends IPCMessage {
-	type: 'heartbeat';
-	data?: {
+	method: 'heartbeat';
+	params?: {
 		/** Timestamp */
 		timestamp: number;
 
@@ -428,14 +380,14 @@ export interface HeartbeatMessage extends IPCMessage {
  * Type guard for config messages
  */
 export function isConfigMessage(message: IPCMessage): message is ConfigMessage {
-	return message.type === 'config';
+	return message.method === 'config';
 }
 
 /**
  * Type guard for events messages
  */
 export function isEventsMessage(message: IPCMessage): message is EventsMessage {
-	return message.type === 'events';
+	return message.method === 'events';
 }
 
 /**
@@ -444,21 +396,21 @@ export function isEventsMessage(message: IPCMessage): message is EventsMessage {
 export function isMetricsMessage(
 	message: IPCMessage,
 ): message is MetricsMessage {
-	return message.type === 'metrics';
+	return message.method === 'metrics';
 }
 
 /**
  * Type guard for tools messages
  */
 export function isToolsMessage(message: IPCMessage): message is ToolsMessage {
-	return message.type === 'tools';
+	return message.method === 'tools';
 }
 
 /**
  * Type guard for git messages
  */
 export function isGitMessage(message: IPCMessage): message is GitMessage {
-	return message.type === 'git';
+	return message.method === 'git';
 }
 
 /**
@@ -467,7 +419,7 @@ export function isGitMessage(message: IPCMessage): message is GitMessage {
 export function isBrowserMessage(
 	message: IPCMessage,
 ): message is BrowserMessage {
-	return message.type === 'browser';
+	return message.method === 'browser';
 }
 
 /**
@@ -476,39 +428,21 @@ export function isBrowserMessage(
 export function isWorkersMessage(
 	message: IPCMessage,
 ): message is WorkersMessage {
-	return message.type === 'workers';
+	return message.method === 'workers';
 }
 
 /**
  * Type guard for alerts messages
  */
 export function isAlertsMessage(message: IPCMessage): message is AlertsMessage {
-	return message.type === 'alerts';
-}
-
-/**
- * Type guard for command messages
- */
-export function isCommandMessage(
-	message: IPCMessage,
-): message is CommandMessage {
-	return message.type === 'command';
-}
-
-/**
- * Type guard for response messages
- */
-export function isResponseMessage(
-	message: IPCMessage,
-): message is ResponseMessage {
-	return message.type === 'response';
+	return message.method === 'alerts';
 }
 
 /**
  * Type guard for error messages
  */
 export function isErrorMessage(message: IPCMessage): message is ErrorMessage {
-	return message.type === 'error';
+	return message.method === 'error';
 }
 
 /**
@@ -517,7 +451,7 @@ export function isErrorMessage(message: IPCMessage): message is ErrorMessage {
 export function isHeartbeatMessage(
 	message: IPCMessage,
 ): message is HeartbeatMessage {
-	return message.type === 'heartbeat';
+	return message.method === 'heartbeat';
 }
 
 // ============================================================================
@@ -525,37 +459,52 @@ export function isHeartbeatMessage(
 // ============================================================================
 
 /**
- * Create a new IPC message
+ * Create a new IPC message (simplified format)
  */
 export function createMessage<T extends IPCMessage>(
-	type: T['type'],
-	data?: T['data'],
+	method: T['method'],
+	params?: T['params'],
+	id: string = generateMessageId(),
 	timestamp: number = Date.now(),
 ): T {
 	const message: IPCMessage = {
-		type,
+		id,
+		method,
 		timestamp,
 	};
 
-	if (data !== undefined) {
-		message.data = data;
+	if (params !== undefined) {
+		message.params = params;
 	}
 
 	return message as T;
 }
 
 /**
+ * Generate a unique message ID
+ */
+export function generateMessageId(): string {
+	return `msg_${Date.now()}_${Math.random().toString(36).substr(2, 9)}`;
+}
+
+/**
  * Create a config message
  */
-export function createConfigMessage(data: ConfigData): ConfigMessage {
-	return createMessage('config', data);
+export function createConfigMessage(
+	params: ConfigData,
+	id?: string,
+): ConfigMessage {
+	return createMessage('config', params, id);
 }
 
 /**
  * Create an events message
  */
-export function createEventsMessage(events: StreamEvent[]): EventsMessage {
-	return createMessage('events', events);
+export function createEventsMessage(
+	events: StreamEvent[],
+	id?: string,
+): EventsMessage {
+	return createMessage('events', events, id);
 }
 
 /**
@@ -563,23 +512,30 @@ export function createEventsMessage(events: StreamEvent[]): EventsMessage {
  */
 export function createMetricsMessage(
 	metrics: SystemMetricsData,
+	id?: string,
 ): MetricsMessage {
-	return createMessage('metrics', metrics);
+	return createMessage('metrics', metrics, id);
 }
 
 /**
  * Create an error message
  */
-export function createErrorMessage(error: ErrorData): ErrorMessage {
-	return createMessage('error', error);
+export function createErrorMessage(
+	error: ErrorData,
+	id?: string,
+): ErrorMessage {
+	return createMessage('error', error, id);
 }
 
 /**
- * Create a response message
+ * Create a heartbeat message
  */
-export function createResponseMessage(response: ResponseData): ResponseMessage {
-	return createMessage('response', response);
+export function createHeartbeatMessage(
+	params?: { timestamp: number; clientId?: string },
+	id?: string,
+): HeartbeatMessage {
+	return createMessage('heartbeat', params, id);
 }
 
 // Re-export the base IPCMessage type for backward compatibility
-export type {IPCMessage as default};
+export type { IPCMessage as default };

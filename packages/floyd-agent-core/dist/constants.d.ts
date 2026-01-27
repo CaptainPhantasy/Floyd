@@ -1,4 +1,5 @@
 /**
+ * ⚠️ DO NOT MODIFY WITHOUT PERMISSION - VERIFIED WORKING CONFIGURATION
  * Shared configuration constants
  * Single source of truth for all default values
  *
@@ -44,11 +45,16 @@ export declare const PROVIDER_DEFAULTS: {
 };
 export type Provider = keyof typeof PROVIDER_DEFAULTS;
 /**
+ * ⚠️ DO NOT MODIFY - Critical endpoint detection
  * Determine provider from endpoint URL
  */
 export declare function inferProviderFromEndpoint(endpoint: string): Provider;
 /**
+ * ⚠️ DO NOT MODIFY - Format detection (CRITICAL for floyd-cli tool calling)
  * Check if endpoint uses OpenAI-compatible format
+ *
+ * BREAKING CHANGE: Modifying this function will break tool calling in floyd-cli
+ * VERIFIED WORKING: 2026-01-25 - Tool calling tested and confirmed working
  */
 export declare function isOpenAICompatible(endpoint: string): boolean;
 //# sourceMappingURL=constants.d.ts.map

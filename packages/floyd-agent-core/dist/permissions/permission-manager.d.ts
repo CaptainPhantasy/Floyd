@@ -4,14 +4,20 @@ export interface PermissionRule {
     level: 'allow' | 'deny';
 }
 /**
- * PermissionManager controls tool execution permissions
+ * SimplePermissionManager controls tool execution permissions
  *
- * Supports:
- * - Explicit allow/deny by tool name
- * - Wildcard patterns (e.g., "git-*" allows all tools starting with "git-")
- * - "*" to allow all tools
+ * GAP #2 FIX: Renamed from PermissionManager to SimplePermissionManager to avoid
+ * confusion with the production permission system in floyd-wrapper-main.
+ *
+ * This is a reference implementation of IPermissionManager that:
+ * - Uses in-memory state (no persistence)
+ * - Supports wildcard patterns (e.g., "git-*" allows all tools starting with "git-")
+ * - Returns allow/deny/ask without prompting
+ * - Useful for testing and automation
+ *
+ * @deprecated For production CLI use, see floyd-wrapper-main/src/permissions/permission-manager.ts
  */
-export declare class PermissionManager {
+export declare class SimplePermissionManager {
     private allowedTools;
     private deniedTools;
     private wildcardAllowed;
@@ -58,4 +64,8 @@ export declare class PermissionManager {
      */
     importRules(rules: PermissionRule[]): void;
 }
+/**
+ * @deprecated Use SimplePermissionManager instead. This alias exists for backward compatibility.
+ */
+export declare const PermissionManager: typeof SimplePermissionManager;
 //# sourceMappingURL=permission-manager.d.ts.map

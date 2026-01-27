@@ -6,6 +6,7 @@
  */
 
 import { getRandomFloydMessage } from '../whimsy/floyd-spinners.js';
+import { getSandboxManager } from '../sandbox/index.js';
 
 /**
  * Simple spinner for progress indication (ora-style behavior)
@@ -23,15 +24,17 @@ class SimpleSpinner {
 	start() {
 		this.active = true;
 		this.tick();
-		this.interval = setInterval(() => this.tick(), 100);
+		// Slower interval - less intrusive (200ms instead of 100ms)
+		this.interval = setInterval(() => this.tick(), 200);
 	}
 
 	tick() {
 		if (!this.active) return;
 		const frame = this.frames[this.currentFrame % this.frames.length];
 		this.currentFrame++;
-		// Simple sequential output - no cursor positioning
-		process.stdout.write(`\r${frame} ${this.text}`);
+		// Update on SAME line using carriage return
+		process.stdout.write('\r' + ' '.repeat(100) + '\r'); // Clear line
+		process.stdout.write(`${frame} ${this.text}`); // Write on same line
 	}
 
 	update(text) {
@@ -47,8 +50,8 @@ class SimpleSpinner {
 			clearInterval(this.interval);
 			this.interval = null;
 		}
-		// Clear line and move to next line
-		process.stdout.write('\r' + ' '.repeat(80) + '\r');
+		// Clear spinner line completely
+		process.stdout.write('\r' + ' '.repeat(100) + '\r');
 	}
 }
 
@@ -59,6 +62,8 @@ export class MonitoringModule {
 		this.currentTool = null;
 		this.todos = [];
 		this.spinner = null;
+		// FIX #3: Track last checkpoint for visual indicator
+		this.lastCheckpoint = null; // { id, fileCount, timestamp }
 	}
 
 	/**
@@ -87,8 +92,8 @@ export class MonitoringModule {
 			this.spinner = null;
 		}
 
-		// Ensure line is cleared even if spinner was already null
-		process.stdout.write('\r' + ' '.repeat(80) + '\r');
+		// Clear spinner line
+		process.stdout.write('\r' + ' '.repeat(100) + '\r');
 	}
 
 	/**
@@ -97,15 +102,23 @@ export class MonitoringModule {
 	 */
 	setTool(toolName) {
 		this.currentTool = toolName;
-		
+
+		// Get sandbox status for display
+		const sandboxManager = getSandboxManager();
+		let sandboxSuffix = '';
+		if (sandboxManager.isActive()) {
+			const summary = sandboxManager.getChangesSummary();
+			sandboxSuffix = ` | 🔒sandbox:${summary.total}`;
+		}
+
 		if (this.spinner) {
-			const text = this.thinkingMessage 
-				? `${this.thinkingMessage} | 🛠 ${toolName}`
-				: `🛠 Executing: ${toolName}`;
+			const text = this.thinkingMessage
+				? `${this.thinkingMessage} | 🛠 ${toolName}${sandboxSuffix}`
+				: `🛠 Executing: ${toolName}${sandboxSuffix}`;
 			this.spinner.update(text);
 		} else {
 			// Sequential output for tool call without spinner
-			console.log(`🛠 ${toolName}`);
+			console.log(`🛠 ${toolName}${sandboxSuffix}`);
 		}
 	}
 
@@ -179,6 +192,41 @@ export class MonitoringModule {
 	destroy() {
 		this.stopThinking();
 		this.todos = [];
+	}
+
+	// FIX #3: Checkpoint tracking methods
+
+	/**
+	 * Set the last checkpoint info (called when checkpoint is created)
+	 */
+	setCheckpoint(checkpointId, fileCount) {
+		this.lastCheckpoint = {
+			id: checkpointId,
+			fileCount: fileCount,
+			timestamp: Date.now()
+		};
+	}
+
+	/**
+	 * Clear checkpoint info (after restore or discard)
+	 */
+	clearCheckpoint() {
+		this.lastCheckpoint = null;
+	}
+
+	/**
+	 * Get checkpoint indicator for prompt
+	 * Returns '✓' if checkpoint available, empty string otherwise
+	 */
+	getCheckpointIndicator() {
+		return this.lastCheckpoint ? '✓' : '';
+	}
+
+	/**
+	 * Get checkpoint info for display
+	 */
+	getCheckpointInfo() {
+		return this.lastCheckpoint;
 	}
 }
 

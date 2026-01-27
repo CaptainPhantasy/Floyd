@@ -85,7 +85,11 @@ export declare class AgentEngine {
      */
     deleteSession(sessionId: string): Promise<void>;
     /**
+     * ⚠️ DO NOT MODIFY - Tool role conversion (CRITICAL for multi-turn conversations)
      * Convert internal history to LLM messages format
+     *
+     * BREAKING CHANGE: Modifying this will break multi-turn tool conversations
+     * VERIFIED WORKING: 2026-01-25 - 4-turn conversation with tools tested
      */
     private convertHistoryToLLMMessages;
     /**

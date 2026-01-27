@@ -15,11 +15,15 @@ import express from 'express';
 import { createServer } from 'http';
 import { WebSocketServer, WebSocket } from 'ws';
 import { v4 as uuidv4 } from 'uuid';
+import { logger } from '../utils/logger.js';
+import { registerCoreTools } from '../tools/index.js';
 import { QRGenerator } from './qr-generator.js';
 import { TokenManager } from './token-manager.js';
 import { NgrokManager } from './ngrok-manager.js';
 import { SessionRouter } from './session-router.js';
 import { getBridgeURL } from './local-ip.js';
+import { handleFloydAgentRequest } from './floyd-agent-handler.js';
+import type { FloydAgentRequest, FloydAgentResponse } from './floyd-agent-types.js';
 import type { BridgeConfig } from './types.js';
 
 /**
@@ -56,12 +60,15 @@ export class BridgeServer {
     this.port = config.port || 4000;
     this.bridgeUrl = getBridgeURL(this.port);
 
+    // Register all core tools for Floyd Agent API
+    registerCoreTools();
+
     // Initialize Express app
     this.app = express();
     this.server = createServer(this.app);
 
-    // Initialize WebSocket server on /ws path
-    this.wss = new WebSocketServer({ server: this.server, path: '/ws' });
+    // Initialize single WebSocket server that handles both /ws and /agent paths
+    this.wss = new WebSocketServer({ noServer: true });
 
     // Initialize managers
     this.qrGenerator = new QRGenerator();
@@ -77,6 +84,7 @@ export class BridgeServer {
     this.setupMiddleware();
     this.setupRoutes();
     this.setupWebSocket();
+    this.setupServerUpgrade();
   }
 
   /**
@@ -318,6 +326,103 @@ export class BridgeServer {
   }
 
   /**
+   * Setup server upgrade handler to route WebSocket connections
+   *
+   * Handles both /ws (mobile) and /agent (Floyd Agent API) paths
+   */
+  private setupServerUpgrade(): void {
+    this.server.on('upgrade', (req: any, socket: any, head: any) => {
+      const { pathname } = new URL(req.url || '', `http://${req.headers.host}`);
+
+      if (pathname === '/ws') {
+        // Handle mobile WebSocket connection
+        this.wss.handleUpgrade(req, socket, head, (ws) => {
+          this.wss.emit('connection', ws, req);
+        });
+      } else if (pathname === '/agent') {
+        // Handle Floyd Agent API connection
+        this.wss.handleUpgrade(req, socket, head, (ws) => {
+          this.handleAgentConnection(ws, req);
+        });
+      } else {
+        // Reject unknown paths
+        socket.destroy();
+      }
+    });
+
+    console.log('[Server] WebSocket upgrade handler ready for /ws and /agent');
+  }
+
+  /**
+   * Handle Floyd Agent API WebSocket connection
+   *
+   * Handles Floyd Agent API requests using the contract format:
+   * - Request: { id, method, params, stream?, timeout? }
+   * - Response: { id, success, data?, error?, timing? }
+   */
+  private handleAgentConnection(ws: WebSocket, req: any): void {
+    // Extract token from query params (optional for Agent API)
+    const url = new URL(req.url || '', `http://${req.headers.host}`);
+    const token = url.searchParams.get('token');
+
+    if (token) {
+      // Verify token if provided
+      const payload = this.tokenManager.verifyToken(token);
+      if (!payload) {
+        console.warn('[Agent WebSocket] Connection rejected: Invalid token');
+        ws.close(1008, 'Invalid token');
+        return;
+      }
+      console.log(`[Agent WebSocket] Client connected: ${payload.deviceName}`);
+    } else {
+      console.log('[Agent WebSocket] Anonymous client connected (local development mode)');
+    }
+
+    // Handle messages from client
+    ws.on('message', async (data: Buffer) => {
+      try {
+        const request: FloydAgentRequest = JSON.parse(data.toString());
+
+        logger.debug('[FloydAgent] Received request', {
+          id: request.id,
+          method: request.method,
+        });
+
+        // Handle the request
+        const response = await handleFloydAgentRequest(request);
+
+        // Send response
+        ws.send(JSON.stringify(response));
+
+      } catch (error) {
+        // Send error response
+        const errorResponse: FloydAgentResponse = {
+          id: 'unknown',
+          success: false,
+          error: {
+            code: 'UNKNOWN_ERROR',
+            message: error instanceof Error ? error.message : String(error),
+            details: error,
+            recoverable: false,
+          },
+        };
+
+        ws.send(JSON.stringify(errorResponse));
+      }
+    });
+
+    // Handle WebSocket close
+    ws.on('close', () => {
+      console.log('[Agent WebSocket] Client disconnected');
+    });
+
+    // Handle WebSocket errors
+    ws.on('error', (error) => {
+      console.error('[Agent WebSocket] Error:', error);
+    });
+  }
+
+  /**
    * Display QR code for easy mobile pairing
    *
    * Generates a QR code containing handshake data and displays it in the terminal
@@ -398,7 +503,8 @@ export class BridgeServer {
         console.log('════════════════════════════════════════════════════');
         console.log(`✓ Bridge server listening on port ${this.port}`);
         console.log(`✓ Bridge URL: ${this.bridgeUrl}`);
-        console.log(`✓ WebSocket: ${this.bridgeUrl}/ws`);
+        console.log(`✓ Mobile WebSocket: ${this.bridgeUrl}/ws`);
+        console.log(`✓ Floyd Agent API: ${this.bridgeUrl}/agent`);
         console.log('');
 
         // Generate and display QR code for easy pairing

@@ -292,7 +292,7 @@ export type AgentState =
 /**
  * Execution Mode
  */
-export type ExecutionMode = 'ask' | 'yolo' | 'plan' | 'auto' | 'dialogue';
+export type ExecutionMode = 'ask' | 'yolo' | 'plan' | 'auto' | 'dialogue' | 'fuckit';
 
 /**
  * Agent execution execution context

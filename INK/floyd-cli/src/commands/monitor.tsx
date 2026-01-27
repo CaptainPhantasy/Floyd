@@ -127,8 +127,9 @@ class MonitorIPCClient {
 
 				// Send hello message with client info
 				this.send({
-					type: 'config',
-					data: {
+					id: uuidv4(),
+					method: 'config',
+					params: {
 						clientType: 'monitor',
 						clientId: uuidv4(),
 						timestamp: Date.now(),
@@ -224,11 +225,11 @@ class MonitorIPCClient {
 	 * Handle incoming IPC messages
 	 */
 	private handleMessage(message: IPCMessage): void {
-		if (!message.type) return;
+		if (!message.method) return;
 
 		// Store message data in buffer by type
-		if (message.data !== undefined) {
-			this.messageBuffer.set(message.type, message.data);
+		if (message.params !== undefined) {
+			this.messageBuffer.set(message.method, message.params);
 		}
 
 		// Trigger data callback with accumulated data

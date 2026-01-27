@@ -12,6 +12,7 @@
 This is **not** a demo or proof of concept. This is production software that must work flawlessly.
 
 The project uses a **shared TypeScript agent core** (`packages/floyd-agent-core/`) that powers multiple frontend interfaces:
+
 - **Ink CLI** (Terminal-based TUI with React Ink)
 - **FloydDesktopWeb** (Electron desktop application)
 - **FloydChrome** (Chrome extension for browser automation)
@@ -335,6 +336,7 @@ export default function MyComponent() {
 ```
 
 **Key patterns:**
+
 - Use functional components with hooks
 - Import components from `ink`
 - No class components
@@ -361,6 +363,7 @@ export function MyDialog() {
 ```
 
 **Key patterns:**
+
 - Use Radix UI primitives
 - Named imports (`import * as Dialog`)
 - State management with `useState`
@@ -400,6 +403,7 @@ export class MyMcpServer {
 ```
 
 **Key patterns:**
+
 - Extend `Server` from MCP SDK
 - Set up handlers in constructor or separate method
 - Use JSON-RPC 2.0 message types
@@ -432,6 +436,7 @@ npm run test:runtime
 ```
 
 **Test locations:**
+
 - `src/ui/components/__tests__/` - Component tests
 - `src/__tests__/` - Unit and integration tests
 - `src/__tests__/build-verification.test.ts` - Build verification
@@ -451,6 +456,7 @@ npm run test:run
 ```
 
 **Test configuration:**
+
 - Framework: Vitest
 - Environment: jsdom
 - Include: `src/**/*.{test,spec}.{js,ts,tsx}`
@@ -458,6 +464,7 @@ npm run test:run
 - Setup: `src/test-setup.ts`
 
 **Path aliases in tests:**
+
 - `@'` maps to `./src`
 
 ---
@@ -468,7 +475,8 @@ npm run test:run
 
 **Issue:** Packages depend on each other, must build in correct order.
 
-**Solution:** 
+**Solution:**
+
 ```bash
 # Build shared core first
 cd packages/floyd-agent-core && npm run build
@@ -485,6 +493,7 @@ cd FloydDesktopWeb && npm run build
 **Issue:** CLI requires minimum terminal size.
 
 **Check:** `INK/floyd-cli/src/cli.tsx`
+
 ```typescript
 const MIN_ROWS = 20;
 const MIN_COLS = 80;
@@ -497,6 +506,7 @@ const MIN_COLS = 80;
 **Issue:** CLI needs proper signal handling for quit commands.
 
 **Keys:**
+
 - `Ctrl+Q` (SIGQUIT): Definitive quit
 - `Ctrl+C` (SIGINT): Failsafe quit
 
@@ -506,7 +516,8 @@ const MIN_COLS = 80;
 
 **Issue:** Chrome extension connects to Floyd via WebSocket, needs reconnection logic.
 
-**Pattern:** 
+**Pattern:**
+
 ```typescript
 private reconnectAttempts = 0;
 private maxReconnectAttempts = 10;
@@ -525,7 +536,8 @@ private reconnectInterval = 3000;
 
 **Issue:** Sessions must persist across CLI restarts.
 
-**Pattern:** 
+**Pattern:**
+
 ```typescript
 // Sessions stored in .floyd/sessions/
 // JSON format with metadata (id, created, updated, title, workingDirectory)
@@ -542,6 +554,7 @@ private reconnectInterval = 3000;
 **Issue:** 77 bugs have cross-dependencies, must fix in sequence.
 
 **Reference:** `.floyd/P0_CRITICAL_BUGS.md` contains:
+
 - Phase-based fix order
 - Cross-bug dependency maps
 - 98%+ confidence validated fixes
@@ -555,6 +568,7 @@ private reconnectInterval = 3000;
 **Pattern:** Retired code moved to `.archive/YYYY-MM-DD-description/` for reference.
 
 **Examples:**
+
 - `.archive/2026-01-16-go-tui-retirement/` - Original Go Bubbletea TUI
 - `.archive/2026-01-19-pre-p0-plan/` - Old roadmap docs
 
@@ -584,6 +598,7 @@ private reconnectInterval = 3000;
 ### MCP Servers
 
 **Built-in MCP servers in Floyd CLI:**
+
 - `browser-server.ts` - Browser automation tools
 - `cache-server.ts` - SUPERCACHE management
 - `git-server.ts` - Git operations
@@ -598,6 +613,7 @@ private reconnectInterval = 3000;
 **Purpose:** Disposable specialist agents with fresh context for single tasks.
 
 **Examples:**
+
 - `desktop.ts` - Desktop-specific tasks
 - `chrome.ts` - Chrome extension tasks
 - `browser.ts` - Browser automation
@@ -638,6 +654,7 @@ private reconnectInterval = 3000;
 **Reference:** `.floyd/AGENT_ORCHESTRATION.md` (legacy but contains philosophy)
 
 **Process:**
+
 1. Orchestrator spawns specialist with single task
 2. Specialist executes with full context window
 3. Specialist returns result and disposes
@@ -647,6 +664,7 @@ private reconnectInterval = 3000;
 ### Quality Gate
 
 **Process:**
+
 - 15-turn simulation of all work
 - 3-round smoke tests
 - Only pass if all simulations succeed
@@ -698,6 +716,7 @@ private reconnectInterval = 3000;
 ### Environment Variables
 
 **Used by:**
+
 - `ANTHROPIC_API_KEY` - Anthropic API access
 - `GLM_API_KEY` - GLM-4.7 API access
 - `OPENAI_API_KEY` - OpenAI API access (future)
@@ -708,6 +727,7 @@ private reconnectInterval = 3000;
 **Location:** `.floyd/`
 
 **Contents:**
+
 - `sessions/` - JSON session files
 - `cache/` - SUPERCACHE storage (reasoning, project, vault)
 - `status/` - Agent status files (JSON)
@@ -768,7 +788,8 @@ private reconnectInterval = 3000;
 
 ### Issue: "Cannot find module '@anthropic-ai/sdk'"
 
-**Solution:** 
+**Solution:**
+
 ```bash
 cd packages/floyd-agent-core
 npm ci
@@ -781,6 +802,7 @@ npm ci
 ### Issue: "Type check failed" after changes
 
 **Solution:**
+
 ```bash
 # Run type-check to see errors
 npm run type-check
@@ -792,6 +814,7 @@ cd INK/floyd-cli && npm run build
 ### Issue: Chrome extension not connecting
 
 **Solution:**
+
 1. Start FloydDesktopWeb (`npm run dev:web`) or Floyd CLI (`npm run dev`)
 2. Check if WebSocket server is running (`lsof -i :3005` or `:3000`)
 3. Reload Chrome extension
@@ -799,6 +822,7 @@ cd INK/floyd-cli && npm run build
 ### Issue: "Permission denied" for file operations
 
 **Solution:** Check `.floyd/` permissions:
+
 ```bash
 chmod -R 755 .floyd/
 ```
@@ -806,6 +830,7 @@ chmod -R 755 .floyd/
 ### Issue: "Module not found" errors
 
 **Solution:** Build dependencies in order:
+
 ```bash
 cd packages/floyd-agent-core && npm run build
 cd INK/floyd-cli && npm run build

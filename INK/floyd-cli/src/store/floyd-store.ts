@@ -295,11 +295,17 @@ interface SessionSlice {
  */
 interface ConfigSlice {
 	/** Safety mode setting */
-	safetyMode: 'yolo' | 'ask' | 'plan';
-	/** Toggle safety mode */
+	safetyMode: 'ask' | 'yolo' | 'plan' | 'auto' | 'dialogue' | 'fuckit';
+	/** GAP #7 FIX: Pending FUCKIT mode confirmation (shows warning before entering) */
+	pendingFuckitMode: boolean;
+	/** Toggle safety mode (with confirmation for FUCKIT mode) */
 	toggleSafetyMode: () => void;
-	/** Set safety mode */
-	setSafetyMode: (mode: 'yolo' | 'ask' | 'plan') => void;
+	/** Confirm entering FUCKIT mode (call after showing warning) */
+	confirmFuckitMode: () => void;
+	/** Cancel entering FUCKIT mode */
+	cancelFuckitMode: () => void;
+	/** Set safety mode directly (bypasses confirmation) */
+	setSafetyMode: (mode: 'ask' | 'yolo' | 'plan' | 'auto' | 'dialogue' | 'fuckit') => void;
 }
 
 /**
@@ -466,8 +472,9 @@ const initialSessionState: SessionState = {
 	totalTokens: 0,
 };
 
-const initialConfigState: Omit<ConfigSlice, 'toggleSafetyMode' | 'setSafetyMode'> = {
+const initialConfigState: Omit<ConfigSlice, 'toggleSafetyMode' | 'setSafetyMode' | 'confirmFuckitMode' | 'cancelFuckitMode'> = {
 	safetyMode: 'ask', // Default to ASK mode for safety
+	pendingFuckitMode: false, // No pending FUCKIT mode confirmation
 };
 
 const initialOverlayState: Omit<
@@ -544,11 +551,46 @@ export const useFloydStore = create<FloydStore>()(
 			...initialConfigState,
 
 			toggleSafetyMode: () =>
-			set(state => ({
-				safetyMode: state.safetyMode === 'yolo' ? 'ask' : state.safetyMode === 'ask' ? 'plan' : 'yolo',
-			})),
+			set(state => {
+				const modes: Array<'ask' | 'yolo' | 'plan' | 'auto' | 'dialogue' | 'fuckit'> = ['ask', 'yolo', 'plan', 'auto', 'dialogue', 'fuckit'];
+				const currentIndex = modes.indexOf(state.safetyMode);
+				const nextIndex = (currentIndex + 1) % modes.length;
+				const newMode = modes[nextIndex];
 
-			setSafetyMode: (mode: 'yolo' | 'ask' | 'plan') => set({safetyMode: mode}),
+				// GAP #7 FIX: Require confirmation before entering FUCKIT mode
+				if (newMode === 'fuckit' && state.safetyMode !== 'fuckit') {
+					// Don't actually change mode yet - set pending state
+					// UI should show warning and call confirmFuckitMode() or cancelFuckitMode()
+					return { pendingFuckitMode: true };
+				}
+
+				// GAP #4 FIX: Sync with process.env.FLOYD_MODE so execution engine sees the change
+				process.env.FLOYD_MODE = newMode;
+
+				return { safetyMode: newMode };
+			}),
+
+			confirmFuckitMode: () =>
+			set(() => {
+				// GAP #7 FIX: User confirmed - actually enter FUCKIT mode
+				process.env.FLOYD_MODE = 'fuckit';
+				return { safetyMode: 'fuckit', pendingFuckitMode: false };
+			}),
+
+			cancelFuckitMode: () =>
+			set(() => {
+				// GAP #7 FIX: User cancelled - stay in current mode
+				return { pendingFuckitMode: false };
+			}),
+
+			setSafetyMode: (mode: 'ask' | 'yolo' | 'plan' | 'auto' | 'dialogue' | 'fuckit') =>
+			set(() => {
+				// GAP #4 FIX: Sync with process.env.FLOYD_MODE so execution engine sees the change
+				// GAP #7 FIX: Bypass confirmation for direct set (used by CLI args)
+				process.env.FLOYD_MODE = mode;
+
+				return { safetyMode: mode, pendingFuckitMode: false };
+			}),
 
 			// ============================================================
 			// OVERLAY STATE
@@ -1173,6 +1215,23 @@ export const useFloydStore = create<FloydStore>()(
 		},
 	),
 );
+
+// ============================================================================
+// GAP #4 FIX: Initialize process.env.FLOYD_MODE from persisted state
+// ============================================================================
+
+/**
+ * Initialize FLOYD_MODE environment variable from the store's safety mode.
+ * This ensures the execution engine reads the correct mode on startup.
+ * Call this when the application starts.
+ */
+export function initializeFloydMode(): void {
+	const currentMode = useFloydStore.getState().safetyMode;
+	process.env.FLOYD_MODE = currentMode;
+}
+
+// Auto-initialize on module load
+initializeFloydMode();
 
 // ============================================================================
 // CONVENIENCE SELECTORS

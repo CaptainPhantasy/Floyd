@@ -9,6 +9,7 @@ import type { ToolDefinition, ToolResult, ToolCategory, ToolReceipt, ReceiptType
 import { logger } from '../utils/logger.js';
 import { ToolExecutionError } from '../utils/errors.js';
 import { getCheckpointManager, DANGEROUS_TOOLS, type Checkpoint } from '../rewind/index.js';
+import { getSandboxManager } from '../sandbox/index.js';
 
 // ============================================================================
 // Tool Registry Class
@@ -365,8 +366,16 @@ export class ToolRegistry {
     // Execute tool
     logger.debug(`Executing tool: ${name}`);
 
+    // FIX #1: Translate paths to sandbox if active (YOLO mode)
+    const inputForExecution = this.translateInputToSandbox(name, validatedInput as Record<string, unknown>);
+
     try {
-      const result = await tool.execute(validatedInput);
+      const result = await tool.execute(inputForExecution);
+
+      // FIX #1: Track sandbox changes after execution
+      if (result && typeof result === 'object') {
+        this.trackSandboxChanges(name, inputForExecution as Record<string, unknown>, result as unknown);
+      }
 
       logger.debug(`Tool ${name} completed successfully`);
       logger.tool(name, validatedInput, result);
@@ -739,6 +748,106 @@ export class ToolRegistry {
       ...receipt,
       checkpoint,
     };
+  }
+
+  // ==========================================================================
+  // FIX #1: Sandbox Integration for YOLO Mode
+  // ==========================================================================
+
+  /**
+   * Translate input paths to sandbox paths when sandbox is active
+   * This ensures file operations in YOLO mode go to the sandbox, not real project
+   */
+  private translateInputToSandbox(name: string, input: Record<string, unknown>): Record<string, unknown> {
+    const sandboxManager = getSandboxManager();
+
+    // Only translate if sandbox is active and mode is YOLO
+    if (!sandboxManager.isActive() || process.env.FLOYD_MODE !== 'yolo') {
+      return input;
+    }
+
+    // Tools that modify files - need sandbox translation
+    const fileModifyingTools = [
+      'write', 'write_file', 'edit_file', 'create_file',
+      'delete', 'delete_file', 'remove', 'rm',
+      'move', 'move_file', 'rename', 'mv',
+      'replace_in_file', 'search_replace',
+      'apply_unified_diff', 'patch',
+    ];
+
+    // Only translate for file-modifying tools
+    if (!fileModifyingTools.includes(name)) {
+      return input;
+    }
+
+    const translated = { ...input };
+    const pathFields = ['file_path', 'filePath', 'path', 'source', 'destination'];
+
+    for (const field of pathFields) {
+      if (translated[field] && typeof translated[field] === 'string') {
+        try {
+          const realPath = String(translated[field]);
+          const sandboxPath = sandboxManager.translatePath(realPath);
+          translated[field] = sandboxPath;
+          logger.debug(`[SANDBOX] Translated ${realPath} → ${sandboxPath}`);
+        } catch (error) {
+          // Path is outside project root, leave as-is
+          logger.debug(`[SANDBOX] Path outside project root, not translated: ${translated[field]}`);
+        }
+      }
+    }
+
+    // Handle array of paths
+    const arrayFields = ['paths', 'files', 'file_paths', 'targets'];
+    for (const field of arrayFields) {
+      if (Array.isArray(translated[field])) {
+        translated[field] = (translated[field] as string[]).map(p => {
+          try {
+            return sandboxManager.translatePath(String(p));
+          } catch {
+            return p; // Path outside project root
+          }
+        });
+      }
+    }
+
+    return translated;
+  }
+
+  /**
+   * Track sandbox changes after tool execution
+   * Called after a file-modifying tool completes in YOLO mode with sandbox active
+   */
+  private trackSandboxChanges(name: string, input: Record<string, unknown>, _result: unknown): void {
+    const sandboxManager = getSandboxManager();
+
+    if (!sandboxManager.isActive() || process.env.FLOYD_MODE !== 'yolo') {
+      return;
+    }
+
+    // Track the change based on tool type
+    const pathFields = ['file_path', 'filePath', 'path', 'source'];
+    for (const field of pathFields) {
+      if (input[field] && typeof input[field] === 'string') {
+        const sandboxPath = String(input[field]);
+        try {
+          const realPath = sandboxManager.translateToReal(sandboxPath);
+
+          // Determine change type based on tool name
+          let changeType: 'created' | 'modified' | 'deleted' = 'modified';
+          if (name.includes('delete') || name.includes('remove') || name.includes('rm')) {
+            changeType = 'deleted';
+          } else if (name.includes('create') || name.includes('write')) {
+            changeType = 'created';
+          }
+
+          sandboxManager.trackChange(sandboxPath, changeType);
+          logger.debug(`[SANDBOX] Tracked ${changeType}: ${realPath}`);
+        } catch {
+          // Path outside sandbox
+        }
+      }
+    }
   }
 }
 

@@ -36,8 +36,8 @@ export interface ToolDefinition {
 	/** Tool category for organization */
 	category: 'file' | 'code' | 'search' | 'build' | 'git' | 'cache' | 'browser' | 'terminal' | 'patch' | 'special';
 
-	/** Permission level: none=auto-approve, ask=prompt user, dangerous=warn+confirm */
-	permission?: 'none' | 'ask' | 'dangerous';
+	/** Permission level: none=auto-approve, moderate=prompt user, dangerous=warn+confirm */
+	permission?: 'none' | 'moderate' | 'dangerous';
 }
 
 /**
@@ -63,7 +63,7 @@ export const AVAILABLE_TOOLS: ToolDefinition[] = [
 		icon: '[W]',
 		defaultEnabled: true,
 		category: 'file',
-		permission: 'ask',
+		permission: 'moderate',
 	},
 	{
 		name: 'edit_file',
@@ -72,7 +72,7 @@ export const AVAILABLE_TOOLS: ToolDefinition[] = [
 		icon: '[E]',
 		defaultEnabled: true,
 		category: 'file',
-		permission: 'ask',
+		permission: 'moderate',
 	},
 	{
 		name: 'search_replace',
@@ -81,7 +81,7 @@ export const AVAILABLE_TOOLS: ToolDefinition[] = [
 		icon: '[R]',
 		defaultEnabled: true,
 		category: 'file',
-		permission: 'ask',
+		permission: 'moderate',
 	},
 	{
 		name: 'list_directory',
@@ -99,7 +99,7 @@ export const AVAILABLE_TOOLS: ToolDefinition[] = [
 		icon: '[M]',
 		defaultEnabled: true,
 		category: 'file',
-		permission: 'ask',
+		permission: 'moderate',
 	},
 	{
 		name: 'delete_file',
@@ -130,7 +130,7 @@ export const AVAILABLE_TOOLS: ToolDefinition[] = [
 		icon: '[+]',
 		defaultEnabled: true,
 		category: 'git',
-		permission: 'ask',
+		permission: 'moderate',
 	},
 	{
 		name: 'git_commit',
@@ -139,7 +139,7 @@ export const AVAILABLE_TOOLS: ToolDefinition[] = [
 		icon: '[C]',
 		defaultEnabled: true,
 		category: 'git',
-		permission: 'ask',
+		permission: 'moderate',
 	},
 	{
 		name: 'git_diff',
@@ -166,7 +166,7 @@ export const AVAILABLE_TOOLS: ToolDefinition[] = [
 		icon: '[B]',
 		defaultEnabled: true,
 		category: 'git',
-		permission: 'ask',
+		permission: 'moderate',
 	},
 	{
 		name: 'git_checkout',
@@ -175,7 +175,7 @@ export const AVAILABLE_TOOLS: ToolDefinition[] = [
 		icon: '[K]',
 		defaultEnabled: true,
 		category: 'git',
-		permission: 'ask',
+		permission: 'moderate',
 	},
 	{
 		name: 'git_stash',
@@ -184,7 +184,7 @@ export const AVAILABLE_TOOLS: ToolDefinition[] = [
 		icon: '[T]',
 		defaultEnabled: true,
 		category: 'git',
-		permission: 'ask',
+		permission: 'moderate',
 	},
 	{
 		name: 'git_merge',
@@ -246,7 +246,7 @@ export const AVAILABLE_TOOLS: ToolDefinition[] = [
 		icon: '[X]',
 		defaultEnabled: true,
 		category: 'cache',
-		permission: 'ask',
+		permission: 'moderate',
 	},
 	{
 		name: 'cache_clear',
@@ -291,7 +291,7 @@ export const AVAILABLE_TOOLS: ToolDefinition[] = [
 		icon: '[P]',
 		defaultEnabled: true,
 		category: 'cache',
-		permission: 'ask',
+		permission: 'moderate',
 	},
 	{
 		name: 'cache_store_pattern',
@@ -327,7 +327,7 @@ export const AVAILABLE_TOOLS: ToolDefinition[] = [
 		icon: '[A]',
 		defaultEnabled: true,
 		category: 'cache',
-		permission: 'ask',
+		permission: 'moderate',
 	},
 
 	// =========================================================================
@@ -340,7 +340,7 @@ export const AVAILABLE_TOOLS: ToolDefinition[] = [
 		icon: '[>]',
 		defaultEnabled: true,
 		category: 'build',
-		permission: 'ask',
+		permission: 'moderate',
 	},
 	{
 		name: 'ask_user',
@@ -358,7 +358,7 @@ export const AVAILABLE_TOOLS: ToolDefinition[] = [
 		icon: '[U]',
 		defaultEnabled: true,
 		category: 'terminal',
-		permission: 'ask',
+		permission: 'moderate',
 	},
 
 	// =========================================================================
@@ -380,7 +380,7 @@ export const AVAILABLE_TOOLS: ToolDefinition[] = [
 		icon: '[N]',
 		defaultEnabled: false,
 		category: 'browser',
-		permission: 'ask',
+		permission: 'moderate',
 	},
 	{
 		name: 'browser_read_page',
@@ -407,7 +407,7 @@ export const AVAILABLE_TOOLS: ToolDefinition[] = [
 		icon: '[C]',
 		defaultEnabled: false,
 		category: 'browser',
-		permission: 'ask',
+		permission: 'moderate',
 	},
 	{
 		name: 'browser_type',
@@ -416,7 +416,7 @@ export const AVAILABLE_TOOLS: ToolDefinition[] = [
 		icon: '[T]',
 		defaultEnabled: false,
 		category: 'browser',
-		permission: 'ask',
+		permission: 'moderate',
 	},
 	{
 		name: 'browser_find',
@@ -443,7 +443,7 @@ export const AVAILABLE_TOOLS: ToolDefinition[] = [
 		icon: '[+]',
 		defaultEnabled: false,
 		category: 'browser',
-		permission: 'ask',
+		permission: 'moderate',
 	},
 
 	// =========================================================================
@@ -456,7 +456,7 @@ export const AVAILABLE_TOOLS: ToolDefinition[] = [
 		icon: '[P]',
 		defaultEnabled: true,
 		category: 'patch',
-		permission: 'ask',
+		permission: 'moderate',
 	},
 	{
 		name: 'edit_range',
@@ -465,7 +465,7 @@ export const AVAILABLE_TOOLS: ToolDefinition[] = [
 		icon: '[E]',
 		defaultEnabled: true,
 		category: 'patch',
-		permission: 'ask',
+		permission: 'moderate',
 	},
 	{
 		name: 'insert_at',
@@ -474,7 +474,7 @@ export const AVAILABLE_TOOLS: ToolDefinition[] = [
 		icon: '[I]',
 		defaultEnabled: true,
 		category: 'patch',
-		permission: 'ask',
+		permission: 'moderate',
 	},
 	{
 		name: 'delete_range',
@@ -514,7 +514,7 @@ export const AVAILABLE_TOOLS: ToolDefinition[] = [
 		icon: '[*]',
 		defaultEnabled: true,
 		category: 'special',
-		permission: 'ask',
+		permission: 'moderate',
 	},
 	{
 		name: 'impact_simulate',
@@ -607,7 +607,7 @@ export function getToolStats(): {
 
 	for (const tool of AVAILABLE_TOOLS) {
 		byCategory[tool.category] = (byCategory[tool.category] || 0) + 1;
-		const perm = tool.permission || 'ask';
+		const perm = tool.permission || 'moderate';
 		byPermission[perm] = (byPermission[perm] || 0) + 1;
 	}
 

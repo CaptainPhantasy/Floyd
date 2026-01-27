@@ -41,7 +41,7 @@ export interface SlashCommand {
  * Slash Command Registry
  */
 export class SlashCommandRegistry {
-    private commands: Map<string, SlashCommand> = new Map();
+    private readonly commands: Map<string, SlashCommand> = new Map();
 
     /**
      * Register a slash command

@@ -14,6 +14,8 @@ import { logger } from '../utils/logger.js';
 import { buildSystemPrompt } from '../prompts/system/index.js';
 import { buildHardenedSystemPrompt } from '../prompts/hardened/index.js';
 import type { SessionManager } from '../persistence/session-manager.js';
+import { getSandboxManager } from '../sandbox/index.js';
+import * as path from 'node:path';
 
 // ============================================================================
 // Engine Callbacks
@@ -33,6 +35,10 @@ export interface EngineCallbacks {
   onThinkingStart?: () => void;
   /** Called when the model finishes thinking (after LLM API call completes) */
   onThinkingComplete?: () => void;
+  /** FIX #3: Called when an auto-checkpoint is created before a dangerous tool */
+  onCheckpointCreated?: (checkpointId: string, fileCount: number, toolName: string) => void;
+  /** FIX #2: Called when AUTO mode adapts its behavior */
+  onModeAdapt?: (fromMode: string, toMode: string, toolName: string) => void;
 }
 
 // ============================================================================
@@ -58,6 +64,7 @@ export class FloydAgentEngine {
   private sessionManager?: SessionManager;
   private executionLock: Promise<unknown> = Promise.resolve(); // Mutex for concurrent execution prevention
   private config: FloydConfig; // Store config to rebuild system prompt later
+  private sandboxManager = getSandboxManager();
 
   constructor(
     config: FloydConfig,
@@ -310,7 +317,7 @@ export class FloydAgentEngine {
     const toolResults: Array<{ toolUseId: string; result: unknown }> = [];
 
     // Get current mode
-    const mode = (process.env.FLOYD_MODE as 'ask' | 'yolo' | 'plan' | 'auto') || 'ask';
+    const mode = (process.env.FLOYD_MODE as 'ask' | 'yolo' | 'plan' | 'auto' | 'dialogue' | 'fuckit') || 'ask';
 
     await this.streamHandler.processStream(
       stream,
@@ -329,10 +336,18 @@ export class FloydAgentEngine {
           const toolDef = toolRegistry.get(toolName);
           const permissionLevel = toolDef?.permission || 'moderate';
 
+          // GAP #5 FIX: Extract target for audit logging
+          const target = this.extractTarget(input);
+
           // Mode-based Permission Logic
           let permissionGranted = false;
 
-          if (mode === 'yolo') {
+          if (mode === 'fuckit') {
+            // FUCKIT mode: NO RESTRICTIONS. ALL PERMISSIONS GRANTED.
+            // This mode bypasses ALL permission checks - use at your own risk!
+            permissionGranted = true;
+            logger.info(`[PERMIT] ${toolName}:${target} - AUTO-APPROVED (FUCKIT mode)`);
+          } else if (mode === 'yolo') {
             // YOLO mode: Auto-approve safe tools (permission: none or moderate)
             // but still require permission for dangerous tools (delete_file, git_commit, etc.)
             if (permissionLevel === 'dangerous') {
@@ -340,19 +355,48 @@ export class FloydAgentEngine {
               permissionGranted = await permissionManager.requestPermission(toolName, input);
             } else {
               permissionGranted = true;
-              logger.info(`YOLO mode: Auto-approving safe tool: ${toolName}`);
+              logger.info(`[PERMIT] ${toolName}:${target} - AUTO-APPROVED (YOLO mode, safe tool)`);
             }
           } else if (mode === 'plan') {
             // PLAN mode: Only allow read-only tools (permission: 'none')
             if (permissionLevel === 'none') {
               permissionGranted = true;
+              logger.debug(`[PERMIT] ${toolName}:${target} - AUTO-APPROVED (PLAN mode, read-only)`);
             } else {
-              logger.info(`Blocked tool execution in PLAN mode: ${toolName}`);
-              // We don't ask, we just block
+              // GAP #5 FIX: Clear PLAN mode block message
+              logger.warn(`[PERMIT] ${toolName}:${target} - DENIED (PLAN mode blocks writes)`);
               permissionGranted = false;
             }
+          } else if (mode === 'auto') {
+            // FIX #2: AUTO mode - Adapt behavior based on request complexity
+            const isComplex = this.assessComplexity(toolName, input, permissionLevel);
+            if (isComplex) {
+              // Complex task: Switch to PLAN mode behavior temporarily
+              logger.info(`AUTO mode: Complex task detected, switching to PLAN mode behavior for ${toolName}`);
+              // Notify user about mode adaptation
+              if (this.callbacks.onModeAdapt) {
+                this.callbacks.onModeAdapt('auto', 'plan', toolName);
+              }
+              // Use PLAN mode logic: only allow read-only tools
+              if (permissionLevel === 'none') {
+                permissionGranted = true;
+                logger.info(`[PERMIT] ${toolName}:${target} - AUTO-APPROVED (AUTO→PLAN mode, read-only)`);
+              } else {
+                logger.warn(`[PERMIT] ${toolName}:${target} - DENIED (AUTO→PLAN mode blocks writes)`);
+                permissionGranted = false;
+              }
+            } else {
+              // Simple task: Use ASK mode behavior with auto-approval for safe tools
+              if (permissionLevel === 'none' || permissionLevel === 'moderate') {
+                permissionGranted = true;
+                logger.info(`[PERMIT] ${toolName}:${target} - AUTO-APPROVED (AUTO mode, simple task)`);
+              } else {
+                // Dangerous tools in AUTO mode always ask, even for simple tasks
+                permissionGranted = await permissionManager.requestPermission(toolName, input);
+              }
+            }
           } else {
-            // ASK / AUTO / DIALOGUE mode: Default behavior, ask unless it's 'none'
+            // ASK / DIALOGUE mode: Default behavior, ask unless it's 'none'
             permissionGranted = await permissionManager.requestPermission(toolName, input);
           }
 
@@ -389,10 +433,51 @@ export class FloydAgentEngine {
             return;
           }
 
-          // Execute tool through registry with granted permission
-          const result = await toolRegistry.execute(toolName, input, {
+          // GAP #8 FIX: Working directory enforcement for file operations
+          const validationError = this.validateWorkingDirectory(toolName, input);
+          if (validationError) {
+            logger.warn(`Working directory violation: ${toolName}`, { input, cwd: this.config.cwd });
+
+            const errorResult = {
+              success: false,
+              error: {
+                code: 'WORKING_DIRECTORY_VIOLATION',
+                message: validationError,
+              },
+            };
+
+            const pendingToolUse = this.streamHandler.getPendingToolUse();
+            if (pendingToolUse) {
+              toolResults.push({
+                toolUseId: pendingToolUse.id as string,
+                result: errorResult,
+              });
+            }
+
+            this.callbacks.onToolComplete?.(toolName, errorResult);
+            return;
+          }
+
+          // FIX #3: Execute tool through registry with auto-checkpoint
+          // This creates a checkpoint before dangerous operations
+          const resultWithCheckpoint = await toolRegistry.executeWithAutoCheckpoint(toolName, input, {
             permissionGranted: true,
+            sessionId: this.sessionManager?.getCurrentSessionId() ?? undefined,
           });
+
+          // FIX #3: Show checkpoint notification to user
+          if (resultWithCheckpoint.checkpoint) {
+            const cp = resultWithCheckpoint.checkpoint;
+            logger.info(`📦 Auto-checkpoint created before ${toolName}`, {
+              checkpointId: cp.id.slice(0, 12),
+              fileCount: cp.fileCount,
+            });
+            // Notify user via callback
+            this.callbacks.onCheckpointCreated?.(cp.id.slice(0, 12), cp.fileCount, toolName);
+          }
+
+          // Extract the base result (without checkpoint) for compatibility
+          const { checkpoint, ...result } = resultWithCheckpoint;
 
           // Store result for later
           const pendingToolUse = this.streamHandler.getPendingToolUse();
@@ -555,6 +640,112 @@ export class FloydAgentEngine {
   }
 
   /**
+   * GAP #5 FIX: Extract target from input for audit logging
+   * Shows what the tool is acting on (file path, URL, etc.)
+   */
+  private extractTarget(input: Record<string, unknown>): string {
+    // Try common target field names
+    const targetFields = ['file_path', 'path', 'filePath', 'url', 'command', 'query', 'pattern'];
+    for (const field of targetFields) {
+      if (input[field] && typeof input[field] === 'string') {
+        const value = input[field] as string;
+        // Truncate long values for readability
+        return value.length > 50 ? value.substring(0, 47) + '...' : value;
+      }
+    }
+    // Fallback to tool name if no target found
+    return '(no target)';
+  }
+
+  /**
+   * FIX #2: Assess task complexity for AUTO mode
+   * Determines if a tool execution is "complex" based on:
+   * - Tool permission level (dangerous = complex)
+   * - Number of files affected (arrays of paths)
+   * - Input size (large inputs = complex)
+   *
+   * @param toolName - Name of the tool being executed
+   * @param input - Tool input parameters
+   * @param permissionLevel - Permission level of the tool
+   * @returns true if task is complex, false if simple
+   */
+  private assessComplexity(toolName: string, input: Record<string, unknown>, permissionLevel: string): boolean {
+    // Dangerous tools are always complex
+    if (permissionLevel === 'dangerous') {
+      return true;
+    }
+
+    // Check for batch operations (arrays of files/paths)
+    const inputObj = input as Record<string, unknown>;
+    const arrayFields = ['paths', 'files', 'file_paths', 'targets', 'queries', 'patterns'];
+    for (const field of arrayFields) {
+      if (Array.isArray(inputObj[field]) && (inputObj[field] as unknown[]).length > 1) {
+        return true; // Multiple items = complex
+      }
+    }
+
+    // Check input size (large JSON inputs might be complex)
+    const inputSize = JSON.stringify(input).length;
+    if (inputSize > 1000) {
+      return true; // Large input = complex
+    }
+
+    // Specific tools that are inherently complex
+    const complexTools = ['search_replace', 'search_and_replace', 'refactor', 'apply_unified_diff', 'batch_edit'];
+    if (complexTools.some(ct => toolName.includes(ct))) {
+      return true;
+    }
+
+    // Default to simple for read operations and basic tools
+    return false;
+  }
+
+  /**
+   * GAP #8 FIX: Validate that file operations stay within working directory
+   * Returns an error message if validation fails, null if valid
+   */
+  private validateWorkingDirectory(toolName: string, input: Record<string, unknown>): string | null {
+    // Only validate file-related tools
+    const fileTools = ['write', 'edit_file', 'search_replace', 'move_file', 'delete_file', 'apply_unified_diff', 'edit_range', 'insert_at', 'delete_range'];
+    if (!fileTools.includes(toolName)) {
+      return null; // Not a file tool, skip validation
+    }
+
+    // Get the working directory (resolve to absolute path)
+    const cwd = this.config.cwd;
+    const resolvedCwd = path.resolve(cwd);
+
+    // Extract file paths from input
+    const paths: string[] = [];
+    const pathFields = ['file_path', 'path', 'filePath', 'target', 'destination', 'source', 'from', 'to', 'file', 'filename'];
+    for (const field of pathFields) {
+      const value = input[field];
+      if (typeof value === 'string') {
+        paths.push(value);
+      } else if (Array.isArray(value)) {
+        for (const item of value) {
+          if (typeof item === 'string') {
+            paths.push(item);
+          }
+        }
+      }
+    }
+
+    // Validate each path
+    for (const pathStr of paths) {
+      const resolvedPath = path.resolve(resolvedCwd, pathStr);
+      const normalizedPath = path.normalize(resolvedPath);
+
+      // Check if the path is within the working directory
+      if (!normalizedPath.startsWith(resolvedCwd + path.sep) && normalizedPath !== resolvedCwd) {
+        return `Path "${pathStr}" is outside the working directory (${cwd}). Use relative paths or stay within the project directory.`;
+      }
+    }
+
+    return null; // All paths valid
+  }
+
+  /**
    * Update the system prompt in conversation history
    *
    * Rebuilds the system prompt with current mode and updates the
@@ -609,6 +800,24 @@ export class FloydAgentEngine {
    */
   getTokenStatistics() {
     return this.glmClient.getTokenUsage();
+  }
+
+  /**
+   * Get sandbox status for display
+   *
+   * @returns Sandbox status string for display in terminal
+   */
+  getSandboxStatus(): { active: boolean; text: string } {
+    if (!this.sandboxManager.isActive()) {
+      return { active: false, text: '' };
+    }
+
+    const summary = this.sandboxManager.getChangesSummary();
+
+    return {
+      active: true,
+      text: ` | 🔒sandbox:${summary.total}changes`,
+    };
   }
 
   /**

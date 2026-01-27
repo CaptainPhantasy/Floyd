@@ -10,8 +10,16 @@
 		"esModuleInterop": true,
 		"allowSyntheticDefaultImports": true,
 		"downlevelIteration": true,
-		"types": ["node"]
+		"types": ["node"],
+		"baseUrl": ".",
+		"paths": {
+			"floyd-agent-core": ["../../packages/floyd-agent-core/src"],
+			"floyd-agent-core/*": ["../../packages/floyd-agent-core/src/*"]
+		}
 	},
 	"include": ["src"],
-	"exclude": ["src/**/__tests__", "**/*.test.ts", "**/*.test.tsx"]
+	"exclude": ["src/**/__tests__", "**/*.test.ts", "**/*.test.tsx"],
+	"references": [
+		{ "path": "../../packages/floyd-agent-core", "prepend": false }
+	]
 }

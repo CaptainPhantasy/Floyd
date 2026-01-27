@@ -42,7 +42,7 @@ export interface FloydConfig {
 
 export type LogLevel = 'debug' | 'info' | 'warn' | 'error';
 export type PermissionLevel = 'auto' | 'ask' | 'deny';
-export type ExecutionMode = 'ask' | 'yolo' | 'plan' | 'auto' | 'dialogue';
+export type ExecutionMode = 'ask' | 'yolo' | 'plan' | 'auto' | 'dialogue' | 'fuckit';
 
 /**
  * Load configuration from environment variables and config files
