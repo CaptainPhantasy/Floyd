@@ -239,14 +239,24 @@ export interface FloydConfig {
   projectContext?: string;
   /** Current working directory */
   cwd: string;
+  /** Use SUGGESTED prompt system (Lean Core - Deterministic Routing) */
+  useSuggestedPrompt?: boolean;
   /** Use hardened prompt system (v1.1.0+) */
   useHardenedPrompt?: boolean;
+  /** Use Claude-style prompt system */
+  useClaudePrompt?: boolean;
+  /** Use Floyd 4.7 GLM-optimized prompt system (v1.4.0+) */
+  useFloyd47Prompt?: boolean;
+  /** Use Flash mode (glm-4-flash) - fast and cheap */
+  useFlashMode?: boolean;
   /** Enable preserved thinking across turns */
   enablePreservedThinking?: boolean;
   /** Enable turn-level thinking control */
   enableTurnLevelThinking?: boolean;
   /** Use JSON planning mode */
   useJsonPlanning?: boolean;
+  /** Disable reasoning for simple tasks (GLM-4.7 optimization) */
+  disableReasoning?: boolean;
 }
 
 // ============================================================================

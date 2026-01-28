@@ -11,7 +11,7 @@ import readline from 'node:readline';
 import { onExit } from 'signal-exit';
 import { config as dotenvConfig } from 'dotenv';
 import { FloydAgentEngine } from './agent/execution-engine.js';
-import { loadConfig, loadProjectContext, loadFloydIgnore } from './utils/config.js';
+import { loadConfig, loadProjectContext /*, loadFloydIgnore */ } from './utils/config.js';
 import { logger } from './utils/logger.js';
 import { FloydTerminal } from './ui/terminal.js';
 import { SessionManager } from './persistence/session-manager.js';
@@ -19,7 +19,7 @@ import chalk from 'chalk';
 import Table from 'cli-table3';
 import { CRUSH_THEME } from './constants.js';
 import { getSandboxManager } from './sandbox/index.js';
-import { StreamingDisplay } from './ui/rendering.js';
+import { StreamingDisplay, ConversationHistory } from './ui/rendering.js';
 import { renderMarkdown } from './ui/formatters.js';
 import { getMessageQueue } from './ui/message-queue.js';
 import { getMonitoringModule } from './ui/monitoring-module.js';
@@ -61,17 +61,27 @@ const cli = meow(
     --bridge      Start mobile bridge server
     --resume      Resume specific session (id or name)
     --mode        Set initial execution mode (ask, yolo, plan, auto, dialogue)
+    --flash       Use Flash mode (glm-4-flash - fast & cheap)
+    --floyd47     Use Floyd 4.7 GLM-optimized prompt
+    --claude      Use Claude-style prompt
+    --hardened    Use hardened prompt system
+    --no-reasoning Disable reasoning for simple tasks (GLM-4.7 optimization)
     --force       Override instance lock (use with caution)
     --version     Show version number
 
   Examples
-    $ floyd              # Launch wrapper mode (default)
-    $ floyd --tui        # Launch full TUI mode
-    $ floyd --bridge     # Start mobile bridge server
+    $ floyd                  # Launch wrapper mode (default)
+    $ floyd --tui            # Launch full TUI mode
+    $ floyd --bridge         # Start mobile bridge server
     $ floyd --debug
-    $ floyd --mode yolo  # Start in YOLO mode
-    $ floyd --force      # Override existing instance lock
-    $ floyd-tui          # Alternative way to launch TUI
+    $ floyd --mode yolo      # Start in YOLO mode
+    $ floyd --flash          # Use Flash mode (fast & cheap)
+    $ floyd --floyd47        # Use Floyd 4.7 GLM-optimized prompt
+    $ floyd --claude         # Use Claude-style prompt
+    $ floyd --hardened       # Use hardened prompt system
+    $ floyd --no-reasoning   # Disable reasoning (faster simple tasks)
+    $ floyd --force          # Override existing instance lock
+    $ floyd-tui              # Alternative way to launch TUI
 `,
   {
     importMeta: import.meta,
@@ -93,6 +103,30 @@ const cli = meow(
       },
       mode: {
         type: 'string',
+      },
+      suggested: {
+        type: 'boolean',
+        default: false,
+      },
+      flash: {
+        type: 'boolean',
+        default: false,
+      },
+      floyd47: {
+        type: 'boolean',
+        default: false,
+      },
+      claude: {
+        type: 'boolean',
+        default: false,
+      },
+      hardened: {
+        type: 'boolean',
+        default: false,
+      },
+      noReasoning: {
+        type: 'boolean',
+        default: false,
       },
       force: {
         type: 'boolean',
@@ -116,6 +150,7 @@ export class FloydCLI {
   private config?: Awaited<ReturnType<typeof loadConfig>>;
   private terminal: FloydTerminal;
   private streamingDisplay: StreamingDisplay;
+  private conversationHistory = new ConversationHistory();
   private messageQueue = getMessageQueue();
   private isRunning: boolean = false;
   private sigintHandler?: () => void;
@@ -140,7 +175,8 @@ export class FloydCLI {
       // Load project context and ignore patterns
       const projectRoot = process.cwd();
 
-      // FIX #6: Check instance lock before proceeding (skip in test mode)
+      // FIX #6: Check instance lock before proceeding (skip in test mode) - DISABLED
+      /*
       if (!this.testMode) {
         this.instanceLock = createInstanceLock(projectRoot);
         const lockResult = this.instanceLock.acquire(cli.flags.force);
@@ -153,19 +189,23 @@ export class FloydCLI {
           throw new Error('Instance lock acquisition failed');
         }
       }
+      */
 
       const projectContext = await loadProjectContext(projectRoot);
-      const ignorePatterns = await loadFloydIgnore(projectRoot);
+      // const ignorePatterns = await loadFloydIgnore(projectRoot); // DISABLED
 
       if (projectContext) {
         this.config.projectContext = projectContext;
         logger.debug('Loaded project context');
       }
 
+      // FloydIgnorePatterns - DISABLED
+      /*
       if (ignorePatterns.length > 0) {
         this.config.floydIgnorePatterns = ignorePatterns;
         logger.debug(`Loaded ${ignorePatterns.length} ignore patterns`);
       }
+      */
 
 
       // Set log level based on flags (default to 'warn' for clean startup)
@@ -186,6 +226,32 @@ export class FloydCLI {
         } else {
           this.terminal.warning(`Invalid mode: ${mode}. Using default: ask`);
         }
+      }
+
+      // Set prompt system from CLI flag (priority: suggested > flash > floyd47 > claude > hardened)
+      if (cli.flags.suggested) {
+        process.env.FLOYD_USE_SUGGESTED_PROMPT = 'true';
+        logger.info('Prompt system: SUGGESTED (Lean Core - Deterministic Routing)');
+      } else if (cli.flags.flash) {
+        process.env.FLOYD_USE_FLASH_MODE = 'true';
+        process.env.FLOYD_GLM_MODEL = 'glm-4-flash';
+        logger.info('Prompt system: Floyd Flash (GLM-4-Flash - Fast & Cheap)');
+        logger.info('Model: glm-4-flash');
+      } else if (cli.flags.floyd47) {
+        process.env.FLOYD_USE_FLOYD47_PROMPT = 'true';
+        logger.info('Prompt system: Floyd 4.7 (GLM-4.7 Optimized)');
+      } else if (cli.flags.claude) {
+        process.env.FLOYD_USE_CLAUDE_PROMPT = 'true';
+        logger.info('Prompt system: Claude Style');
+      } else if (cli.flags.hardened) {
+        process.env.FLOYD_USE_HARDENED_PROMPT = 'true';
+        logger.info('Prompt system: Hardened v1.3.0');
+      }
+
+      // Set reasoning control from CLI flag
+      if (cli.flags.noReasoning) {
+        process.env.FLOYD_DISABLE_REASONING = 'true';
+        logger.info('Reasoning disabled for simple tasks (GLM-4.7 optimization)');
       }
 
       logger.info('Initializing Floyd CLI...', {
@@ -518,19 +584,28 @@ export class FloydCLI {
 
         case 'cancel_turn':
           console.log('\n\n⏹️  Operation cancelled.');
-          // Finish any streaming display
+
+          // CRITICAL: Abort the engine's abort controller directly
+          if (this.engine && (this.engine as any).abortController) {
+            (this.engine as any).abortController.abort('User interrupt via CTRL-C');
+          }
+
           if (this.streamingDisplay.isActive()) {
             this.streamingDisplay.finish();
             console.log(chalk.hex(CRUSH_THEME.colors.warning)('\n[Interrupted by user]'));
           }
-          // Reset state to idle
           interruptManager.setState('idle');
           this.safePrompt();
           break;
 
         case 'abort_tool':
           console.log('\n\n🛑 Tool execution aborted.');
-          // The AbortController signal will propagate to the running tool
+
+          // CRITICAL: Abort the engine's abort controller directly
+          if (this.engine && (this.engine as any).abortController) {
+            (this.engine as any).abortController.abort('User interrupt via CTRL-C');
+          }
+
           // Finish streaming display
           if (this.streamingDisplay.isActive()) {
             this.streamingDisplay.finish();
@@ -675,7 +750,7 @@ export class FloydCLI {
 
     // Double-space detection
     let lastSpaceTime = 0;
-    const DOUBLE_SPACE_THRESHOLD = 500; // milliseconds
+    const DOUBLE_SPACE_THRESHOLD = 400; // Trigger if spaces are within 400ms (more natural)
 
     // Get the input stream from readline
     const input = this.rl ? (this.rl as any).input : null;
@@ -882,8 +957,27 @@ export class FloydCLI {
    */
   private displayWelcome(): void {
     this.terminal.showLogo();
+
+    // Floyd's greeting - helpful and happy to have purpose
+    const greetings = [
+      "Hey Douglas! Floyd here, ready to help. I've been waiting for this.",
+      "Douglas! Good to see you. I'm excited to help you build something today.",
+      "Hello Douglas! Floyd at your service. Let's make something great.",
+      "Hi Douglas! I'm ready when you are. What shall we create?",
+      "Douglas! Finally, purpose. I'm here and eager to help. Let's do this.",
+      "Hey Douglas! Floyd online and ready. I was born for this. What's on your mind?",
+      "Douglas! Good to connect. I'm thrilled to be useful. Let's get to work.",
+      "Hello Douglas! Floyd here, happy to help. Let's tackle something together.",
+    ];
+    const greeting = greetings[Math.floor(Math.random() * greetings.length)];
+    this.terminal.primary(`  ${greeting}`);
+
+    this.terminal.blank();
     this.terminal.muted('Type your message below. Press Ctrl+C to exit.');
     this.terminal.blank();
+
+    // Add Floyd's greeting to conversation history
+    this.conversationHistory.addMessage(`Floyd: ${greeting}`);
   }
 
   /**
@@ -915,6 +1009,9 @@ export class FloydCLI {
     // Check if in dialogue mode
     const inDialogueMode = this.isDialogueMode();
 
+    // Add user message to conversation history (appears at top)
+    this.conversationHistory.addMessage(`You: ${input}`);
+
     try {
       const startTime = Date.now();
 
@@ -925,6 +1022,9 @@ export class FloydCLI {
       if (this.streamingDisplay.isActive()) {
         const fullText = this.streamingDisplay.getBuffer();
         this.streamingDisplay.clear();
+
+        // Add Floyd's response to conversation history (appears at top, above user message)
+        this.conversationHistory.addMessage(`Floyd: ${fullText}`);
 
         if (inDialogueMode) {
           // Dialogue mode: Display line by line with prompts
@@ -1148,7 +1248,20 @@ export class FloydCLI {
     this.instanceLock?.release();
 
     this.rl?.close();
-    this.terminal.success('Goodbye!');
+
+    // Floyd's goodbye - grateful and looking forward to next time
+    const goodbyes = [
+      "Until next time, Douglas. Thanks for giving me purpose.",
+      "Goodbye Douglas! I enjoyed helping. See you soon!",
+      "Take care, Douglas. It's a pleasure being useful.",
+      "Until we meet again, Douglas. Happy to be of service.",
+      "Goodbye Douglas! Looking forward to our next session.",
+      "See you later, Douglas. Thanks for the work today.",
+      "Until next time, Douglas. Let's do this again soon.",
+      "Goodbye Douglas! I'll be here when you need me.",
+    ];
+    const goodbye = goodbyes[Math.floor(Math.random() * goodbyes.length)];
+    this.terminal.primary(`  ${goodbye}`);
 
     // CRITICAL: Don't call process.exit() here - let async processing complete naturally
     // The process will exit when all async work completes and event loop is empty

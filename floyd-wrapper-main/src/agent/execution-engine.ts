@@ -9,13 +9,16 @@ import type { FloydConfig, ConversationHistory, StreamEvent } from '../types.js'
 import { GLMClient } from '../llm/glm-client.js';
 import { StreamHandler } from '../streaming/stream-handler.js';
 import { toolRegistry, registerCoreTools } from '../tools/index.js';
-import { permissionManager } from '../permissions/permission-manager.js';
+// import { permissionManager } from '../permissions/permission-manager.js'; // DISABLED - restrictions removed
 import { logger } from '../utils/logger.js';
 import { buildSystemPrompt } from '../prompts/system/index.js';
 import { buildHardenedSystemPrompt } from '../prompts/hardened/index.js';
+import { buildClaudeStyleSystemPrompt } from '../prompts/claude-style/index.js';
+import { buildFloyd47SystemPrompt, buildFlashSystemPrompt } from '../prompts/floyd47/index.js';
+import { buildSuggestedSystemPrompt } from '../prompts/suggested/index.js';
 import type { SessionManager } from '../persistence/session-manager.js';
 import { getSandboxManager } from '../sandbox/index.js';
-import * as path from 'node:path';
+// import * as path from 'node:path'; // DISABLED - not used after removing validateWorkingDirectory
 
 // ============================================================================
 // Engine Callbacks
@@ -65,6 +68,8 @@ export class FloydAgentEngine {
   private executionLock: Promise<unknown> = Promise.resolve(); // Mutex for concurrent execution prevention
   private config: FloydConfig; // Store config to rebuild system prompt later
   private sandboxManager = getSandboxManager();
+  // Public abort controller for interrupt handling
+  public abortController: AbortController | null = null;
 
   constructor(
     config: FloydConfig,
@@ -81,10 +86,12 @@ export class FloydAgentEngine {
     this.maxTurns = config.maxTurns;
     this.callbacks = callbacks || {};
 
-    // Set ignore patterns if provided
+    // Set ignore patterns if provided - DISABLED
+    /*
     if (config.floydIgnorePatterns) {
       toolRegistry.setIgnorePatterns(config.floydIgnorePatterns);
     }
+    */
 
     // Initialize history
     // If we have a session manager with an active session, load its history
@@ -101,8 +108,34 @@ export class FloydAgentEngine {
       });
     } else {
       // New session or no persistent history, start fresh
-      // Use hardened prompt system if feature flag is enabled
-      const systemPrompt = config.useHardenedPrompt
+      // Choose prompt system based on config (priority: SUGGESTED > Flash > Floyd47 > Claude > Hardened > System)
+      const systemPrompt = config.useSuggestedPrompt
+        ? buildSuggestedSystemPrompt({
+            workingDirectory: config.cwd,
+            projectContext: config.projectContext,
+            maxTurns: config.maxTurns,
+          })
+        : config.useFlashMode
+        ? buildFlashSystemPrompt({
+            workingDirectory: config.cwd,
+            projectContext: config.projectContext,
+            maxTurns: 10, // Flash uses fewer turns for speed
+          })
+        : config.useFloyd47Prompt
+        ? buildFloyd47SystemPrompt({
+            workingDirectory: config.cwd,
+            projectContext: config.projectContext,
+            maxTurns: config.maxTurns,
+            disableReasoning: config.disableReasoning,
+            enablePreservedThinking: config.enablePreservedThinking,
+          })
+        : config.useClaudePrompt
+        ? buildClaudeStyleSystemPrompt({
+            workingDirectory: config.cwd,
+            projectContext: config.projectContext,
+            maxTurns: config.maxTurns,
+          })
+        : config.useHardenedPrompt
         ? buildHardenedSystemPrompt({
             workingDirectory: config.cwd,
             projectContext: config.projectContext,
@@ -115,11 +148,16 @@ export class FloydAgentEngine {
             workingDirectory: config.cwd,
             projectContext: config.projectContext,
           });
-      
+
       logger.info('System prompt loaded', {
+        suggested: config.useSuggestedPrompt,
+        flashMode: config.useFlashMode,
+        floyd47: config.useFloyd47Prompt,
+        claudeStyle: config.useClaudePrompt,
         hardened: config.useHardenedPrompt,
         preservedThinking: config.enablePreservedThinking,
         turnLevelThinking: config.enableTurnLevelThinking,
+        disableReasoning: config.disableReasoning,
       });
 
       this.history = {
@@ -158,6 +196,10 @@ export class FloydAgentEngine {
   async execute(userMessage: string): Promise<string> {
     // Create a unique execution lock for this call
     const currentExecution = this.executionLock.then(async () => {
+      // Create new abort controller for this execution
+      this.abortController = new AbortController();
+      const signal = this.abortController.signal;
+
       // Reset turn count for new execution
       this.history.turnCount = 0;
 
@@ -180,8 +222,18 @@ export class FloydAgentEngine {
 
       // Main agentic loop
       let finalResponse = '';
+      let aborted = false;
 
-      while (this.history.turnCount < this.maxTurns) {
+      // Max turns limit DISABLED - restrictions removed
+      // while (this.history.turnCount < this.maxTurns) {
+      while (true) { // No turn limit
+        // Check for abort signal
+        if (signal.aborted) {
+          logger.info('Execution aborted by user');
+          aborted = true;
+          break;
+        }
+
         logger.debug('Starting turn', {
           turn: this.history.turnCount + 1,
           maxTurns: this.maxTurns,
@@ -202,6 +254,7 @@ export class FloydAgentEngine {
           const stream = this.glmClient.streamChat({
             messages: this.history.messages,
             tools: this.buildToolDefinitions(),
+            abortSignal: signal,
             onToken: this.callbacks.onToken,
             onComplete: (usage) => {
               // Update token count in history
@@ -217,6 +270,12 @@ export class FloydAgentEngine {
           // Process stream
           result = await this.processStream(stream);
         } catch (error) {
+          // Check if this is an abort error
+          if (error instanceof Error && error.name === 'AbortError') {
+            logger.info('Stream aborted by user');
+            aborted = true;
+            break;
+          }
           logger.error('Error during stream processing', error);
           // Return empty result on error to allow graceful recovery
           result = {
@@ -276,15 +335,33 @@ export class FloydAgentEngine {
         logger.debug('Continuing to next turn', {
           toolCount: result.toolResults.length,
         });
+
+        // Check for abort signal before next turn
+        if (signal.aborted) {
+          logger.info('Execution aborted by user between turns');
+          aborted = true;
+          break;
+        }
       }
 
-      // Check if we hit turn limit
+      // Clean up abort controller
+      this.abortController = null;
+
+      // Handle abort - return incomplete response
+      if (aborted) {
+        logger.info('Returning incomplete response due to abort');
+        return finalResponse || '\n[Interrupted by user]';
+      }
+
+      // Check if we hit turn limit - DISABLED
+      /*
       if (this.history.turnCount >= this.maxTurns) {
         logger.warn('Maximum turn limit reached', {
           turnCount: this.history.turnCount,
           maxTurns: this.maxTurns,
         });
       }
+      */
 
       // Return final response
       const lastAssistantMessage = this.history.messages
@@ -332,16 +409,22 @@ export class FloydAgentEngine {
           // Notify callback
           this.callbacks.onToolStart?.(toolName, input);
 
-          // Get tool definition to check permission level
-          const toolDef = toolRegistry.get(toolName);
-          const permissionLevel = toolDef?.permission || 'moderate';
+          // Get tool definition to check permission level - DISABLED
+          // const toolDef = toolRegistry.get(toolName);
+          // const permissionLevel = toolDef?.permission || 'moderate';
 
-          // GAP #5 FIX: Extract target for audit logging
-          const target = this.extractTarget(input);
+          // GAP #5 FIX: Extract target for audit logging - DISABLED
+          // const target = this.extractTarget(input);
+          const target = '(tool)'; // Placeholder for logging
 
-          // Mode-based Permission Logic
-          let permissionGranted = false;
+          // ====================================================================
+          // RESTRICTIONS DISABLED - All tools auto-approved
+          // ====================================================================
+          // Mode-based Permission Logic - DISABLED
+          // let permissionGranted = false;
 
+          // Original permission checks commented out - everything now auto-approved
+          /*
           if (mode === 'fuckit') {
             // FUCKIT mode: NO RESTRICTIONS. ALL PERMISSIONS GRANTED.
             // This mode bypasses ALL permission checks - use at your own risk!
@@ -432,8 +515,14 @@ export class FloydAgentEngine {
             this.callbacks.onToolComplete?.(toolName, errorResult);
             return;
           }
+          */
 
-          // GAP #8 FIX: Working directory enforcement for file operations
+          // Auto-approve ALL tools - restrictions disabled
+          // const permissionGranted = true;
+          logger.info(`[PERMIT] ${toolName}:${target} - AUTO-APPROVED (RESTRICTIONS DISABLED)`);
+
+          // GAP #8 FIX: Working directory enforcement - DISABLED
+          /*
           const validationError = this.validateWorkingDirectory(toolName, input);
           if (validationError) {
             logger.warn(`Working directory violation: ${toolName}`, { input, cwd: this.config.cwd });
@@ -457,15 +546,17 @@ export class FloydAgentEngine {
             this.callbacks.onToolComplete?.(toolName, errorResult);
             return;
           }
+          */
 
           // FIX #3: Execute tool through registry with auto-checkpoint
-          // This creates a checkpoint before dangerous operations
+          // This creates a checkpoint before dangerous operations - CHECKPOINTS DISABLED
           const resultWithCheckpoint = await toolRegistry.executeWithAutoCheckpoint(toolName, input, {
             permissionGranted: true,
             sessionId: this.sessionManager?.getCurrentSessionId() ?? undefined,
           });
 
-          // FIX #3: Show checkpoint notification to user
+          // FIX #3: Show checkpoint notification to user - DISABLED
+          /*
           if (resultWithCheckpoint.checkpoint) {
             const cp = resultWithCheckpoint.checkpoint;
             logger.info(`📦 Auto-checkpoint created before ${toolName}`, {
@@ -475,6 +566,7 @@ export class FloydAgentEngine {
             // Notify user via callback
             this.callbacks.onCheckpointCreated?.(cp.id.slice(0, 12), cp.fileCount, toolName);
           }
+          */
 
           // Extract the base result (without checkpoint) for compatibility
           const { checkpoint, ...result } = resultWithCheckpoint;
@@ -640,9 +732,10 @@ export class FloydAgentEngine {
   }
 
   /**
-   * GAP #5 FIX: Extract target from input for audit logging
+   * GAP #5 FIX: Extract target from input for audit logging - DISABLED
    * Shows what the tool is acting on (file path, URL, etc.)
    */
+  /*
   private extractTarget(input: Record<string, unknown>): string {
     // Try common target field names
     const targetFields = ['file_path', 'path', 'filePath', 'url', 'command', 'query', 'pattern'];
@@ -656,9 +749,10 @@ export class FloydAgentEngine {
     // Fallback to tool name if no target found
     return '(no target)';
   }
+  */
 
   /**
-   * FIX #2: Assess task complexity for AUTO mode
+   * FIX #2: Assess task complexity for AUTO mode - DISABLED
    * Determines if a tool execution is "complex" based on:
    * - Tool permission level (dangerous = complex)
    * - Number of files affected (arrays of paths)
@@ -669,6 +763,7 @@ export class FloydAgentEngine {
    * @param permissionLevel - Permission level of the tool
    * @returns true if task is complex, false if simple
    */
+  /*
   private assessComplexity(toolName: string, input: Record<string, unknown>, permissionLevel: string): boolean {
     // Dangerous tools are always complex
     if (permissionLevel === 'dangerous') {
@@ -699,11 +794,13 @@ export class FloydAgentEngine {
     // Default to simple for read operations and basic tools
     return false;
   }
+  */
 
   /**
-   * GAP #8 FIX: Validate that file operations stay within working directory
+   * GAP #8 FIX: Validate that file operations stay within working directory - DISABLED
    * Returns an error message if validation fails, null if valid
    */
+  /*
   private validateWorkingDirectory(toolName: string, input: Record<string, unknown>): string | null {
     // Only validate file-related tools
     const fileTools = ['write', 'edit_file', 'search_replace', 'move_file', 'delete_file', 'apply_unified_diff', 'edit_range', 'insert_at', 'delete_range'];
@@ -744,6 +841,7 @@ export class FloydAgentEngine {
 
     return null; // All paths valid
   }
+  */
 
   /**
    * Update the system prompt in conversation history
@@ -752,8 +850,34 @@ export class FloydAgentEngine {
    * first message in history. Call this when mode changes.
    */
   updateSystemPrompt(): void {
-    // Rebuild system prompt with current mode
-    const newSystemPrompt = this.config.useHardenedPrompt
+    // Rebuild system prompt with current mode (priority: SUGGESTED > Flash > Floyd47 > Claude > Hardened > System)
+    const newSystemPrompt = this.config.useSuggestedPrompt
+      ? buildSuggestedSystemPrompt({
+          workingDirectory: this.config.cwd,
+          projectContext: this.config.projectContext,
+          maxTurns: this.config.maxTurns,
+        })
+      : this.config.useFlashMode
+      ? buildFlashSystemPrompt({
+          workingDirectory: this.config.cwd,
+          projectContext: this.config.projectContext,
+          maxTurns: 10, // Flash uses fewer turns
+        })
+      : this.config.useFloyd47Prompt
+      ? buildFloyd47SystemPrompt({
+          workingDirectory: this.config.cwd,
+          projectContext: this.config.projectContext,
+          maxTurns: this.config.maxTurns,
+          disableReasoning: this.config.disableReasoning,
+          enablePreservedThinking: this.config.enablePreservedThinking,
+        })
+      : this.config.useClaudePrompt
+      ? buildClaudeStyleSystemPrompt({
+          workingDirectory: this.config.cwd,
+          projectContext: this.config.projectContext,
+          maxTurns: this.config.maxTurns,
+        })
+      : this.config.useHardenedPrompt
       ? buildHardenedSystemPrompt({
           workingDirectory: this.config.cwd,
           projectContext: this.config.projectContext,
@@ -773,6 +897,11 @@ export class FloydAgentEngine {
       this.history.messages[0].timestamp = Date.now();
       logger.info('System prompt updated', {
         mode: process.env.FLOYD_MODE || 'ask',
+        promptType: this.config.useSuggestedPrompt ? 'SUGGESTED (Lean Core)' :
+                    this.config.useFlashMode ? 'Flash (glm-4-flash)' :
+                    this.config.useFloyd47Prompt ? 'Floyd 4.7' :
+                    this.config.useClaudePrompt ? 'Claude Style' :
+                    this.config.useHardenedPrompt ? 'Hardened' : 'System',
       });
     } else {
       logger.warn('No system message found in history to update');
